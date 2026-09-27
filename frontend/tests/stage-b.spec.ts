@@ -1,5 +1,6 @@
 import { test, expect, type Page, type APIRequestContext } from '@playwright/test';
 import fs from 'node:fs/promises';
+import {createHash} from 'node:crypto';
 import path from 'node:path';
 const root=path.resolve(import.meta.dirname,'../..'), headers={'X-Local-Resume':'1'};
 let created:string[]=[];
@@ -80,6 +81,10 @@ test('both templates export searchable one/two-page PDFs with local images and f
  await fs.mkdir(path.join(root,'output/pdf'),{recursive:true});
  for(const template of ['classic','banner'])for(const sample of ['one','two']){
   let resume=await create(request,sample);resume.document.layout.template=template;resume.document.layout.font=template==='banner'?'serif':'sans';
+  const avatar=await (await request.get('/api/assets/'+resume.document.layout.photo.id)).json();
+  const source=await fs.readFile(path.join(root,'src/main/resources/static/samples/nailong-portrait.png'));
+  expect(avatar.format).toBe('PNG');expect([avatar.sourceWidth,avatar.sourceHeight]).toEqual([690,930]);
+  expect(avatar.sha256).toBe(createHash('sha256').update(source).digest('hex'));
   const put=await request.put('/api/resumes/'+resume.id,{headers,data:{title:resume.title,document:resume.document,expectedRevision:resume.revision,mutationId:crypto.randomUUID()}});expect(put.ok()).toBeTruthy();resume=await put.json();
   const preview=await (await request.post('/api/documents/preview',{headers,data:resume.document})).json();await page.goto(preview.url);
   await page.waitForFunction(()=>((window as any).__resumeReady || (window as any).__resumeError));expect(await page.evaluate(()=>(window as any).__resumeError)).toBeUndefined();await expect(page.locator('.sheet')).toHaveCount(sample==='one'?1:2);

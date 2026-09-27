@@ -29,7 +29,7 @@ public class ResumeController {
         if(doc==null) {
             doc=ResumeDocument.sample(input.sample()==null ? "blank" : input.sample());
             if(input.sample()!=null && !input.sample().equals("blank")) {
-                var p=images.importImage(new ClassPathResource("static/samples/portrait-exif-6.jpg").getContentAsByteArray());
+                var p=images.importImage(new ClassPathResource("static/samples/nailong-portrait.png").getContentAsByteArray());
                 var l=images.importImage(new ClassPathResource("static/samples/university-logo.png").getContentAsByteArray());
                 var layout=doc.layout();
                 doc=new ResumeDocument(2,doc.content(),new ResumeDocument.Layout(layout.template(),layout.font(),layout.fontSize(),layout.lineHeight(),layout.sectionGapMm(),layout.marginMm(),false,

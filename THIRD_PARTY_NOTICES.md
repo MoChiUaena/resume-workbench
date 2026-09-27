@@ -35,4 +35,6 @@ Chromium 由 Playwright 官方安装器准备，保留浏览器分发物中的�
 
 ## 原创合成素材
 
-`scripts/generate-fixtures.py` 生成示例校徽和奶龙卡通证件照。校徽代表虚构学校，证件照由程序绘制，不含真实人物照片。文件采用本仓库 MIT 许可证。字体本身继续使用 OFL，不因用于合成图片而改用 MIT。
+`scripts/generate-fixtures.py` 生成虚构学校校徽和用于 JPEG / EXIF 测试的卡通图片。这些脚本绘制的素材采用本仓库 MIT 许可证。字体本身继续使用 OFL，不因用于合成图片而改用 MIT。
+
+新建简历示例使用 `src/main/resources/static/samples/nailong-portrait.png`，它是用户在本轮提供的图片的原样副本，不是脚本生成的素材。原图为 690 × 930 像素、648,656 字节；SHA-256 为 `759776674d2f4ef8f30ec1e3223f9e456b3871cc02518cea328eff266a926e2f`。本仓库的 MIT 许可证不对该图片授予额外权利。

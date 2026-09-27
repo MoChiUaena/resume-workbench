@@ -58,6 +58,6 @@ portrait.transpose(Image.Transpose.ROTATE_90).save(OUT / "portrait-exif-6.jpg", 
 (OUT / "unsupported.svg").write_text('<svg xmlns="http://www.w3.org/2000/svg"><rect width="8" height="8"/></svg>', encoding="utf-8")
 samples = ROOT / "src/main/resources/static/samples"
 samples.mkdir(parents=True, exist_ok=True)
-for name in ("university-logo.png", "portrait-exif-6.jpg"):
+for name in ("university-logo.png",):
     shutil.copyfile(OUT / name, samples / name)
 for f in sorted(OUT.iterdir()): print(f.name, f.stat().st_size)
