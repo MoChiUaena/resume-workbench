@@ -38,7 +38,7 @@ async function restore(version:Version){await ws.flush();if(!current.value)retur
 async function exportPdf(){
  await ws.flush();if(!current.value)return;
  exported.value=await api(`/api/resumes/${current.value.id}/export`,{expectedRevision:current.value.revision});
- const a=window.document.createElement('a');a.href='/api/exports/'+exported.value!.id+'/pdf';a.download='local-resume.pdf';a.click();if(tab.value==='versions')await loadVersions();
+ const a=window.document.createElement('a');a.href='/api/exports/'+exported.value!.id+'/pdf';a.download='resume-workbench.pdf';a.click();if(tab.value==='versions')await loadVersions();
 }
 function deleteResume(){if(confirm('删除当前简历及其历史版本？本地图片文件会保留。'))void action(ws.remove);}
 function reloadCurrent(){if(!dirty.value||confirm('重新载入会放弃当前页面尚未保存的修改。继续吗？'))void action(ws.reloadCurrent);}
@@ -52,7 +52,7 @@ onUnmounted(()=>{observer?.disconnect();clearTimeout(previewTimer);ws.dispose();
 </script>
 <template>
  <div class="workbench">
-  <header class="app-header"><a class="brand" href="/"><span class="brand-mark">纸</span><span>纸间<span class="brand-en">LOCAL RESUME</span></span></a><div class="header-middle"><span class="local-dot"></span>本地简历工作台<span class="stage-badge">阶段 B</span></div><button class="primary export-button" :disabled="busy||!current" @click="action(exportPdf)">{{busy?'正在处理…':'↓ 导出 PDF'}}</button></header>
+  <header class="app-header"><a class="brand" href="/"><span class="brand-mark">简</span><span>简历工作台<span class="brand-en">RESUME WORKBENCH</span></span></a><div class="header-middle"><span class="local-dot"></span>本地简历工作台<span class="stage-badge">阶段 B</span></div><button class="primary export-button" :disabled="busy||!current" @click="action(exportPdf)">{{busy?'正在处理…':'↓ 导出 PDF'}}</button></header>
   <div class="workspace-heading"><div><div class="eyebrow">YOUR NEXT CHAPTER</div><h1>把经历，写得清楚。</h1><p>从一份基础简历出发，为每一次机会保留一个版本。</p></div><div class="privacy-note"><span class="local-dot"></span>内容、照片和版本保存在本机<br><small>PostgreSQL · 本地附件 · 无需登录</small></div></div>
   <div v-if="problem" class="global-notice error" role="alert">{{problem}}<button class="text-button" @click="problem=''">收起提示</button></div>
   <div class="workspace-grid workspace-b">

@@ -44,6 +44,6 @@ public class WorkbenchController {
     }
     @GetMapping("/api/exports/{id}/pdf") public ResponseEntity<byte[]> pdf(@PathVariable String id) throws java.io.IOException {
         return ResponseEntity.ok().contentType(MediaType.APPLICATION_PDF).cacheControl(CacheControl.noStore())
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=local-resume.pdf").body(exports.read(id));
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=resume-workbench.pdf").body(exports.read(id));
     }
 }

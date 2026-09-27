@@ -22,5 +22,5 @@ if (-not $SkipBuild) {
     & ./mvnw.cmd -B exec:java '-Dexec.mainClass=com.microsoft.playwright.CLI' '-Dexec.args=install chromium'
     if ($LASTEXITCODE -ne 0) { throw 'Chromium install failed' }
 }
-if (-not (Test-Path 'target/local-resume-0.1.0-SNAPSHOT.jar')) { throw '请先不带 -SkipBuild 运行一次。' }
-& $javaExecutable -jar target/local-resume-0.1.0-SNAPSHOT.jar
+if (-not (Test-Path 'target/resume-workbench-0.1.0-SNAPSHOT.jar')) { throw '请先不带 -SkipBuild 运行一次。' }
+& $javaExecutable -jar target/resume-workbench-0.1.0-SNAPSHOT.jar

@@ -1,4 +1,4 @@
-# 纸间 · Local Resume
+# Resume Workbench · 简历工作台
 
 面向中文技术求职者的本地简历工作台。阶段 B 已实现结构化编辑、可靠自动保存、独立学校 Logo / 证件照、两个模板、中文 PDF、简历复制和版本恢复。
 
@@ -22,6 +22,8 @@
 需要 JDK 21、Node.js 22.12+、npm 和正在运行的 Docker Desktop。Maven Wrapper 固定 Maven 3.9.16；首次准备依赖和浏览器需要联网，应用运行使用项目内的字体。
 
 ```powershell
+git clone https://github.com/MoChiUaena/resume-workbench.git
+cd resume-workbench
 ./scripts/start.ps1 -JavaHome '你的 JDK 21 目录'
 ```
 
@@ -113,4 +115,4 @@ JDK 21 / Spring Boot 3.5.16 / PostgreSQL 16.10 / Flyway / Playwright Java 1.63.0
 - 分页按条目 / 段落边界切分，最多 10 页；超长单条内容会拒绝导出。不是通用文字处理器，也不提供任意画布。
 - 黑体和宋体均本地嵌入，修复共享字形的 Unicode 反向映射；不承诺所有 ATS 系统兼容。
 
-字体、来源散列与许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。原创代码与合成样本采用 MIT。当前没有远端发布镜像或 GitHub 发布。
+字体、来源散列与许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。原创代码与合成样本采用 MIT。当前提供阶段 A/B 的源码开发版，发布镜像和正式版本尚未交付。
