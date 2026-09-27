@@ -14,7 +14,7 @@ test.afterEach(async({request})=>{for(const id of created){const r=await request
 test('editable content, persistence, module controls, image version restore, copy and delete',async({page,request})=>{
  const resume=await create(request);await open(page,resume.id);
  await page.getByLabel('简历名称',{exact:true}).fill('Java 岗 · 验证');
- await page.getByLabel('姓名',{exact:true}).fill('陈明远');
+ await page.getByLabel('姓名',{exact:true}).fill('奶龙·验证');
  await page.getByTestId('nav-project').click();const project=page.getByTestId('section-project');
  await project.getByLabel('条目正文').first().fill('**Spring Boot** 实现事务与版本恢复。\n图片独立管理，中文原字符可提取。');await saved(page);
  await expect(page.frameLocator('iframe').locator('#pages strong').filter({hasText:'Spring Boot'})).toBeVisible();
@@ -23,7 +23,7 @@ test('editable content, persistence, module controls, image version restore, cop
  await project.getByLabel('显示模块').uncheck();await saved(page);
  await expect(page.frameLocator('iframe').locator('#pages h2').filter({hasText:'项目经历'})).toHaveCount(0);
  await project.getByLabel('显示模块').check();await saved(page);
- await page.reload();await expect(page.getByLabel('姓名',{exact:true})).toHaveValue('陈明远');await saved(page);
+ await page.reload();await expect(page.getByLabel('姓名',{exact:true})).toHaveValue('奶龙·验证');await saved(page);
  await page.getByRole('button',{name:'历史版本',exact:true}).click();await page.getByLabel('快照名称').fill('照片基线');await page.getByRole('button',{name:'保存版本快照'}).click();
  await expect(page.getByRole('listitem').filter({hasText:'照片基线'})).toBeVisible();
  await page.getByRole('button',{name:'照片与校徽',exact:true}).click();
@@ -47,7 +47,7 @@ test('editable content, persistence, module controls, image version restore, cop
  await page.getByLabel('简历名称',{exact:true}).fill('AI 岗 · 副本');await saved(page);
  expect((await (await request.get('/api/resumes/'+resume.id)).json()).title).toBe('Java 岗 · 验证');
  await page.locator('.rw-editor-top button').first().click();page.once('dialog',dialog=>dialog.accept());await page.getByTestId('resume-'+copyId).getByRole('button',{name:'删除',exact:true}).click();
- await expect(page.getByTestId('resume-'+resume.id)).toBeVisible();
+ await expect(page.getByTestId('resume-'+copyId)).toHaveCount(0);await expect(page.getByTestId('resume-'+resume.id)).toBeVisible();
  expect((await request.get('/api/resumes/'+copyId)).status()).toBe(404);
  await fs.mkdir(path.join(root,'output'),{recursive:true});await page.setViewportSize({width:1640,height:1150});await page.screenshot({path:path.join(root,'output/workbench-stage-b.png'),fullPage:true});
 });
@@ -57,7 +57,7 @@ test('failed save stays dirty and edits during an in-flight save are serialized'
  const url='**/api/resumes/'+resume.id;
  await page.route(url,async route=>{if(route.request().method()==='PUT')await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({code:'DATABASE_UNAVAILABLE',message:'测试：数据库不可用，本次修改尚未保存。'})});else await route.continue();});
  await page.getByLabel('姓名',{exact:true}).fill('失败时保留内容');await expect(page.getByTestId('save-status')).toHaveText('保存失败');
- expect((await (await request.get('/api/resumes/'+resume.id)).json()).document.content.name).toBe('林知行');
+ expect((await (await request.get('/api/resumes/'+resume.id)).json()).document.content.name).toBe('奶龙');
  await expect(page.getByLabel('姓名',{exact:true})).toHaveValue('失败时保留内容');await page.unroute(url);
  await page.getByRole('button',{name:'重试保存'}).click();await saved(page);
  let active=0,maxActive=0;await page.route(url,async route=>{if(route.request().method()!=='PUT'){await route.continue();return;}active++;maxActive=Math.max(maxActive,active);await new Promise(r=>setTimeout(r,1200));await route.continue();active--;});

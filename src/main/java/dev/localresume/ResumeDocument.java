@@ -50,8 +50,8 @@ public record ResumeDocument(@Min(2) @Max(2) int schemaVersion,
     public static ResumeDocument sample(String sample) {
         var photo = new ResumeDraft.ImageSlot(null,true,26,34,"cover",0,1,50,50);
         var logo = new ResumeDraft.ImageSlot(null,true,26,26,"contain",0,1,50,50);
-        var result = fromLegacy(new ResumeDraft(1,sample.equals("two") ? "two" : "one","林知行","Java 后端 / AI 应用开发实习",
-            "lin.zhixing@example.invalid","138 0000 0000","杭州 · 2027 届",false,photo,logo));
+        var result = fromLegacy(new ResumeDraft(1,sample.equals("two") ? "two" : "one","奶龙","Java 后端 / AI 应用开发实习",
+            "nailong@example.invalid","138 0000 0000","杭州 · 2027 届",false,photo,logo));
         if (!sample.equals("blank")) return result;
         return new ResumeDocument(2,new Content("姓名","求职方向","","","",List.of()),result.layout());
     }
