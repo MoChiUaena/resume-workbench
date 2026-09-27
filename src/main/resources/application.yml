@@ -1,0 +1,20 @@
+server:
+  address: 127.0.0.1
+  port: ${PORT:18765}
+  error:
+    include-message: never
+    include-stacktrace: never
+spring:
+  servlet:
+    multipart:
+      max-file-size: ${RESUME_MAX_UPLOAD_BYTES:5242880}B
+      max-request-size: 6MB
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          no-cache: true
+resume:
+  data-dir: ${RESUME_DATA_DIR:./data}
+  max-upload-bytes: ${RESUME_MAX_UPLOAD_BYTES:5242880}
+  max-pixels: 24000000
