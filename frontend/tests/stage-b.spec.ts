@@ -45,7 +45,7 @@ test('editable content, persistence, module controls, image version restore, cop
  expect((await (await request.get('/api/resumes/'+resume.id)).json()).title).toBe('Java 岗 · 验证');
  page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'删除简历',exact:true}).click();await expect(page.getByLabel('简历名称',{exact:true})).toHaveValue('Java 岗 · 验证');
  expect((await request.get('/api/resumes/'+copyId)).status()).toBe(404);
- await page.getByRole('button',{name:'内容',exact:true}).click();await fs.mkdir(path.join(root,'output'),{recursive:true});await page.setViewportSize({width:1640,height:1150});await page.screenshot({path:path.join(root,'output/workbench-stage-b.png'),fullPage:true});
+ await page.getByRole('button',{name:'内容编辑',exact:true}).click();await fs.mkdir(path.join(root,'output'),{recursive:true});await page.setViewportSize({width:1640,height:1150});await page.screenshot({path:path.join(root,'output/workbench-stage-b.png'),fullPage:true});
 });
 
 test('failed save stays dirty and edits during an in-flight save are serialized',async({page,request})=>{
@@ -101,7 +101,7 @@ test('long edited content paginates without clipping or dropping bullet items',a
 test('blank resume adds structured paragraphs and a late image response cannot change another resume',async({page,request})=>{
  const a=await create(request,'blank'),b=await create(request,'blank');await open(page,a.id);
  await page.getByLabel('新模块类型').selectOption('custom');await page.getByRole('button',{name:'＋ 添加模块'}).click();
- const section=page.getByTestId('section-custom');await section.locator('summary').click();await section.getByLabel('模块标题').fill('自我介绍');await section.getByLabel('条目标题').fill('关于我');
+ const section=page.getByTestId('section-custom');await section.getByLabel('模块标题').fill('自我介绍');await section.getByLabel('条目标题').fill('关于我');
  await section.getByLabel('使用项目列表').uncheck();await section.getByLabel('条目正文').fill('**自定义段落**：专注于 Java 后端。\n第二段说明。');await saved(page);
  await expect(page.frameLocator('iframe').locator('#pages .paragraphs p')).toHaveCount(2);
  await page.getByRole('button',{name:'图片',exact:true}).click();
