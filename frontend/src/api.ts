@@ -1,9 +1,18 @@
 export type Slot = { id: string | null; visible: boolean; widthMm: number; heightMm: number; fit: 'cover' | 'contain'; quarterTurns: number; zoom: number; positionX: number; positionY: number };
 export type Asset = { id: string; format: string; bytes: number; sourceWidth: number; sourceHeight: number; width: number; height: number; exifOrientation: number };
 export type Draft = { schemaVersion: number; sample: 'one' | 'two'; name: string; headline: string; email: string; phone: string; location: string; swapImages: boolean; photo: Slot; logo: Slot };
-export async function api<T>(url: string, body?: object | FormData): Promise<T> {
-  const response = await fetch(url, { method: body ? 'POST' : 'GET', headers: body instanceof FormData ? { 'X-Local-Resume': '1' } : body ? { 'Content-Type': 'application/json', 'X-Local-Resume': '1' } : {}, body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined });
-  if (!response.ok) { const e = await response.json().catch(() => ({ code: 'NETWORK_ERROR', message: '无法连接本地服务，请检查服务是否正在运行。' })); throw new Error(`${e.message}（${e.code}）`); }
+export class ApiFailure extends Error { constructor(public code: string, message: string) { super(`${message}（${code}）`); } }
+export type Entry = { id: string; title: string; meta: string; bulleted: boolean; bullets: string[] };
+export type Section = { id: string; type: 'education' | 'experience' | 'project' | 'skills' | 'custom'; title: string; visible: boolean; pageBreakBefore: boolean; entries: Entry[] };
+export type ResumeDocument = { schemaVersion: 2; content: { name: string; headline: string; email: string; phone: string; location: string; sections: Section[] }; layout: { template: 'classic' | 'banner'; font: 'sans' | 'serif'; fontSize: number; lineHeight: number; sectionGapMm: number; marginMm: number; swapImages: boolean; photo: Slot; logo: Slot } };
+export type Resume = { id: string; title: string; document: ResumeDocument; revision: number; lastMutationId: string | null; updatedAt: string };
+export type Summary = Omit<Resume, 'document' | 'lastMutationId'>;
+export type Version = { id: string; title: string; label: string; sourceRevision: number; createdAt: string };
+export async function api<T>(url: string, body?: object | FormData, method?: string): Promise<T> {
+  let response: Response;
+  try { response = await fetch(url, { method: method || (body ? 'POST' : 'GET'), headers: body instanceof FormData ? { 'X-Local-Resume': '1' } : body ? { 'Content-Type': 'application/json', 'X-Local-Resume': '1' } : {}, body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(url.endsWith('/export') ? 90000 : 15000) }); }
+  catch { throw new ApiFailure('NETWORK_ERROR', '无法连接本地服务，本次修改可能尚未保存。请保留页面并重试。'); }
+  if (!response.ok) { const e = await response.json().catch(() => ({ code: 'NETWORK_ERROR', message: '无法连接本地服务，请检查服务是否正在运行。' })); throw new ApiFailure(e.code,e.message); }
   return response.json();
 }
 export async function upload(file: File, maxBytes: number): Promise<Asset> {

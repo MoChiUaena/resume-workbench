@@ -10,6 +10,8 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class ApiErrors {
+    @ExceptionHandler({org.springframework.dao.DataAccessException.class,org.springframework.transaction.CannotCreateTransactionException.class})
+    ResponseEntity<?> database() { return error(503,"DATABASE_UNAVAILABLE","数据库暂时不可用，本次修改尚未保存。请保留页面，检查数据库后重试。"); }
     @ExceptionHandler(ApiException.class)
     ResponseEntity<?> known(ApiException e) { return error(e.status, e.code, e.getMessage()); }
     @ExceptionHandler(MaxUploadSizeExceededException.class)

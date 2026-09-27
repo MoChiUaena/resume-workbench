@@ -14,11 +14,15 @@ sys.path.insert(0, str(ROOT / '.tools/python'))
 from fontTools.ttLib import TTFont
 from fontTools.varLib.instancer import instantiateVariableFont
 
-source = ROOT / '.tools/fonts/NotoSansSC-variable.ttf'
-expected = 'a3041811a78c361b1de50f953c805e0244951c21c5bd412f7232ef0d899af0da'
+serif = '--serif' in sys.argv
+upstream = 'NotoSerifSC' if serif else 'NotoSansSC'
+family = 'LocalResumeSerif' if serif else 'LocalResumeSans'
+display_family = 'Local Resume Serif' if serif else 'Local Resume Sans'
+source = ROOT / f'.tools/fonts/{upstream}-variable.ttf'
+expected = '050080d9255a86808f2945bffac582b31ef32bc36411ce29563b4961670c66f9' if serif else 'a3041811a78c361b1de50f953c805e0244951c21c5bd412f7232ef0d899af0da'
 assert hashlib.sha256(source.read_bytes()).hexdigest() == expected
 out = ROOT / 'src/main/resources/static/fonts'
-manifest = {'source': 'https://raw.githubusercontent.com/google/fonts/main/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf', 'sourceSha256': expected, 'license': 'OFL-1.1', 'fonttools': '4.60.1', 'derived': []}
+manifest = {'source': f'https://raw.githubusercontent.com/google/fonts/main/ofl/{upstream.lower()}/{upstream}%5Bwght%5D.ttf', 'sourceSha256': expected, 'license': 'OFL-1.1', 'fonttools': '4.60.1', 'derived': []}
 for weight, label in [(400, 'Regular'), (700, 'Bold')]:
     font = instantiateVariableFont(TTFont(source), {'wght': weight}, inplace=True)
     # Skia's reverse cmap may prefer U+2F8F (Kangxi radical) for ordinary 行.
@@ -37,10 +41,10 @@ for weight, label in [(400, 'Regular'), (700, 'Bold')]:
             if nfkc_alias or radical_alias:
                 del table.cmap[cp]; removed.add(cp)
     for record in font['name'].names:
-        new = {1: 'Local Resume Sans', 2: label, 3: f'LocalResumeSans-{label}-StageA', 4: f'Local Resume Sans {label}', 6: f'LocalResumeSans-{label}', 16: 'Local Resume Sans', 17: label}.get(record.nameID)
+        new = {1: display_family, 2: label, 3: f'{family}-{label}-LocalResume', 4: f'{display_family} {label}', 6: f'{family}-{label}', 16: display_family, 17: label}.get(record.nameID)
         if new: record.string = new.encode(record.getEncoding(), errors='replace')
-    destination = out / f'LocalResumeSans-{label}.ttf'
+    destination = out / f'{family}-{label}.ttf'
     font.save(destination)
     manifest['derived'].append({'file': destination.name, 'weight': weight, 'sha256': hashlib.sha256(destination.read_bytes()).hexdigest(), 'removedCompatibilityAliases': len(removed)})
     print(destination.name, destination.stat().st_size, 'bytes;', len(removed), 'ambiguous compatibility aliases removed')
-(out / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+(out / ('manifest-serif.json' if serif else 'manifest.json')).write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')

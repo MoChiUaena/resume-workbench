@@ -8,6 +8,7 @@ $version = (& $javaExecutable -version 2>&1 | Out-String)
 if ($version -notmatch 'version "(2[1-9]|[3-9][0-9])\.') { throw '需要 JDK 21 或更新版本。请传入 -JavaHome 指向 JDK 21。' }
 $env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $projectRoot '.tools/ms-playwright'
 $env:PLAYWRIGHT_SKIP_BROWSER_GC = '1'
+. ./scripts/prepare-db.ps1
 if (-not $SkipBuild) {
     Push-Location frontend
     try {

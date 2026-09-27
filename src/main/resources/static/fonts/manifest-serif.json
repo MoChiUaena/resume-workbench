@@ -1,0 +1,20 @@
+{
+  "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifsc/NotoSerifSC%5Bwght%5D.ttf",
+  "sourceSha256": "050080d9255a86808f2945bffac582b31ef32bc36411ce29563b4961670c66f9",
+  "license": "OFL-1.1",
+  "fonttools": "4.60.1",
+  "derived": [
+    {
+      "file": "LocalResumeSerif-Regular.ttf",
+      "weight": 400,
+      "sha256": "929aa01a86cb40c32769b70ae28ce0f59b487dfa939c238af5e036bdf1506969",
+      "removedCompatibilityAliases": 405
+    },
+    {
+      "file": "LocalResumeSerif-Bold.ttf",
+      "weight": 700,
+      "sha256": "c300a82bec8f3a845edbcadf414afbf0b0884599ff937e93731f862d1d2357bc",
+      "removedCompatibilityAliases": 405
+    }
+  ]
+}

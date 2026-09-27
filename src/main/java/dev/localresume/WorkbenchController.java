@@ -12,16 +12,17 @@ public class WorkbenchController {
     private final AttachmentStorage storage;
     private final PreviewService previews;
     private final ExportService exports;
-    public WorkbenchController(ImageService images, AttachmentStorage storage, PreviewService previews, ExportService exports) {
-        this.images = images; this.storage = storage; this.previews = previews; this.exports = exports;
+    private final AssetCatalog catalog;
+    public WorkbenchController(ImageService images, AttachmentStorage storage, PreviewService previews, ExportService exports, AssetCatalog catalog) {
+        this.images = images; this.storage = storage; this.previews = previews; this.exports = exports; this.catalog=catalog;
     }
     @GetMapping("/api/config") public Object config() {
         return Map.of("maxUploadBytes", images.maxBytes, "maxPixels", images.maxPixels,
-            "formats", new String[]{"JPEG", "PNG"}, "stage", "A", "schemaVersion", 1);
+            "formats", new String[]{"JPEG", "PNG"}, "stage", "B", "schemaVersion", 2);
     }
     @PostMapping("/api/assets") public Object upload(@RequestParam MultipartFile file) throws java.io.IOException {
         if (file.getSize() > images.maxBytes) throw new ApiException("FILE_TOO_LARGE", "图片超过上传限制，请压缩后重试。", 413);
-        return images.importImage(file.getBytes());
+        var asset=images.importImage(file.getBytes()); catalog.register(asset); return asset;
     }
     @GetMapping("/api/assets/{id}/image") public ResponseEntity<byte[]> image(@PathVariable String id) throws java.io.IOException {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.IMAGE_PNG).body(storage.image(id));
@@ -30,6 +31,10 @@ public class WorkbenchController {
     @PostMapping("/api/previews") public Object preview(@Valid @RequestBody ResumeDraft draft) {
         var snap = previews.create(draft);
         return Map.of("id", snap.id(), "digest", snap.digest(), "url", "/render/" + snap.id(), "pages", Samples.pages(draft.sample()).size());
+    }
+    @PostMapping("/api/documents/preview") public Object documentPreview(@Valid @RequestBody ResumeDocument document) {
+        var snap=previews.create(document);
+        return Map.of("id",snap.id(),"digest",snap.digest(),"url","/render/"+snap.id());
     }
     @GetMapping(value="/render/{id}", produces="text/html;charset=UTF-8") public ResponseEntity<String> render(@PathVariable String id) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(previews.get(id).html());

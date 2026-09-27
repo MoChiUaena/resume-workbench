@@ -12,7 +12,7 @@ import java.util.concurrent.Semaphore;
 
 @Service
 public class ExportService {
-    public record Export(String id, String snapshotId, String digest, String sha256, Instant createdAt) {}
+    public record Export(String id, String snapshotId, String digest, String sha256, Instant createdAt, String resumeId, String versionId, Long revision) {}
     private final Semaphore capacity = new Semaphore(1);
     private final Path directory;
     private final int port;
@@ -20,7 +20,8 @@ public class ExportService {
     public ExportService(@Value("${resume.data-dir}") String data, @Value("${server.port}") int port, ObjectMapper mapper) {
         this.directory = Path.of(data).toAbsolutePath().resolve("exports"); this.port = port; this.mapper = mapper;
     }
-    public Export generate(PreviewService.Snapshot snapshot) {
+    public Export generate(PreviewService.Snapshot snapshot) { return generate(snapshot,null,null,null); }
+    public Export generate(PreviewService.Snapshot snapshot,String resumeId,String versionId,Long revision) {
         if (!capacity.tryAcquire()) throw new ApiException("EXPORT_BUSY", "另一个 PDF 正在生成，请稍后重试。", 429);
         String id = UUID.randomUUID().toString();
         Path pdf = directory.resolve(id + ".pdf");
@@ -29,15 +30,18 @@ public class ExportService {
              BrowserContext context = browser.newContext(new Browser.NewContextOptions().setServiceWorkers(ServiceWorkerPolicy.BLOCK))) {
             String base = "http://127.0.0.1:" + port;
             var allowed = new HashSet<String>(List.of(base + "/render/" + snapshot.id(), base + "/print.css",
-                base + "/fonts/LocalResumeSans-Regular.ttf", base + "/fonts/LocalResumeSans-Bold.ttf"));
-            for (var slot : List.of(snapshot.draft().photo(), snapshot.draft().logo()))
+                base + "/paginate.js", base + "/fonts/LocalResumeSans-Regular.ttf", base + "/fonts/LocalResumeSans-Bold.ttf",
+                base + "/fonts/LocalResumeSerif-Regular.ttf", base + "/fonts/LocalResumeSerif-Bold.ttf"));
+            for (var slot : List.of(snapshot.document().layout().photo(), snapshot.document().layout().logo()))
                 if (slot.shown()) allowed.add(base + "/api/assets/" + slot.id() + "/image");
             context.route("**/*", route -> { if (allowed.contains(route.request().url())) route.resume(); else route.abort(); });
             Page page = context.newPage();
             page.setDefaultTimeout(20000); page.setDefaultNavigationTimeout(25000);
             page.navigate(base + "/render/" + snapshot.id(), new Page.NavigateOptions().setWaitUntil(WaitUntilState.LOAD));
             page.emulateMedia(new Page.EmulateMediaOptions().setMedia(Media.PRINT));
-            page.waitForFunction("() => document.fonts.status === 'loaded' && document.fonts.check('12px ResumeSans') && Array.from(document.images).every(i => i.complete && i.naturalWidth > 0)");
+            page.waitForFunction("() => window.__resumeReady === true || window.__resumeError");
+            Object layoutError=page.evaluate("() => window.__resumeError || null");
+            if(layoutError!=null) throw new ApiException("LAYOUT_OVERFLOW","当前内容无法安全分页，请缩短单条内容或减小字号。",422);
             boolean fits = (boolean) page.evaluate("() => Array.from(document.querySelectorAll('.sheet')).every(s => s.querySelector('.page-content').getBoundingClientRect().bottom < s.querySelector('.page-footer').getBoundingClientRect().top - 8)");
             if (!fits) throw new ApiException("LAYOUT_OVERFLOW", "当前内容超出 A4 页面，请缩小图片或缩短页眉文字。", 422);
             byte[] bytes = page.pdf(new Page.PdfOptions().setPreferCSSPageSize(true).setPrintBackground(true));
@@ -46,7 +50,7 @@ public class ExportService {
             try {
                 Files.write(temp, bytes);
                 Files.move(temp, pdf, StandardCopyOption.ATOMIC_MOVE);
-                var result = new Export(id, snapshot.id(), snapshot.digest(), ImageService.sha(bytes), Instant.now());
+                var result = new Export(id, snapshot.id(), snapshot.digest(), ImageService.sha(bytes), Instant.now(),resumeId,versionId,revision);
                 mapper.writeValue(directory.resolve(id + ".json").toFile(), result);
                 return result;
             } finally { Files.deleteIfExists(temp); }

@@ -5,6 +5,15 @@ server:
     include-message: never
     include-stacktrace: never
 spring:
+  datasource:
+    url: ${RESUME_DB_URL:jdbc:postgresql://127.0.0.1:18766/local_resume}
+    username: ${RESUME_DB_USER:local_resume}
+    password: ${RESUME_DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: 4
+      connection-timeout: 3000
+  flyway:
+    enabled: true
   servlet:
     multipart:
       max-file-size: ${RESUME_MAX_UPLOAD_BYTES:5242880}B

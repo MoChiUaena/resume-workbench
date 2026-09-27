@@ -16,6 +16,10 @@
 
 ## 主要依赖
 
+阶段 B 新增 Noto Serif SC，来源 <https://github.com/google/fonts/tree/main/ofl/notoserifsc>。原始可变字体 SHA-256 为 `050080d9255a86808f2945bffac582b31ef32bc36411ce29563b4961670c66f9`，Copyright 2012 Google Inc.，SIL OFL 1.1，许可证保存在 `static/fonts/OFL-Serif.txt`。`prepare-fonts.py --serif` 派生 **Local Resume Serif** 的 400/700 字重，并消除 405 个重复映射；派生校验值见 `static/fonts/manifest-serif.json`。
+
+新增 PostgreSQL JDBC 和 Flyway（由 Spring Boot 3.5.16 BOM 固定，分别按 BSD-2-Clause / Apache-2.0 声明），PostgreSQL 服务镜像固定 `postgres:16.10-alpine`，数据库本身使用 PostgreSQL License。
+
 | 组件 | 版本 | 上游许可证 |
 | --- | --- | --- |
 | Spring Boot / Spring Framework | 3.5.16 / BOM 管理 | Apache-2.0 |

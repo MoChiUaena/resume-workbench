@@ -1,100 +1,116 @@
 # 纸间 · Local Resume
 
-面向中文技术求职者的本地简历工作台。当前交付 **阶段 A 技术验证**：独立学校 Logo、证件照、共享预览模板和可搜索的中文 A4 PDF。
+面向中文技术求职者的本地简历工作台。阶段 B 已实现结构化编辑、可靠自动保存、独立学校 Logo / 证件照、两个模板、中文 PDF、简历复制和版本恢复。
 
 ![实际运行截图](docs/workbench.png)
 
-## 当前可用
+## 现在可以做什么
 
-- 页眉左侧证件照、中间姓名与联系方式、右上角透明学校 Logo；可以互换左右槽位。
-- 两张图片独立上传、替换、隐藏、移除；可配置尺寸、contain/cover、旋转、缩放和裁剪位置。
-- JPEG / PNG 内容识别、EXIF 方向校正、透明度保留；默认 5 MiB 文件限制、2400 万像素限制、单边 12000 像素限制。
-- 一页 / 两页原创合成样本。预览和 PDF 使用相同服务端 HTML/CSS、字体和标准化图片。
-- 本地 Chromium 导出保留文字的 PDF，单任务并发、固定输入快照、明确错误提示。
-- 中文字体和许可随项目提供，基础流程无需模型 Key、账号或外部图片服务。
+- 新建、重命名、复制、删除简历；从一份基础简历复制 Java 岗和 AI 岗版本。
+- 编辑基本信息、教育、工作 / 实习、项目、技能和自定义模块；添加条目、排序、隐藏、按模块另起一页。
+- 正文支持段落、项目列表和 `**加粗**`。输入 HTML 会作为文字显示，不接受任意 HTML/CSS。
+- 两个模板：经典单栏、并列页眉。两张图片可以独立替换、隐藏、移除、调整尺寸、旋转和裁剪。
+- 本地黑体 / 宋体，字号 9–12 pt、行距 1.3–1.85、模块间距 2–8 mm、页边距 12–22 mm。
+- 700 ms 防抖自动保存，串行写入；数据库确认后才显示“已保存到本机”。失败可重试或另存副本，修订冲突不覆盖其他页面。
+- 手动版本快照和恢复；恢复前自动保留当前版本。导出时记录固定修订的版本快照。
+- 中文 A4 预览与 PDF 共用模板、字体、图片和分页脚本，PDF 保留可选择、可搜索的文字。
 
-**阶段 A 的边界：**正文是固定验收样本，不是完整编辑器；只提供一个模板的两种页眉位置。当前页面参数不持久保存，刷新后重置；尚未接入 PostgreSQL、自动保存、历史版本、完整备份恢复和发布版 Compose。不要用这个验证版保存唯一的一份正式简历。
+这是本地开发版本。完整备份恢复、发布镜像及普通用户的两服务 Compose 安装属于阶段 C；当前 `compose.dev.yml` 只启动开发数据库。没有账号、AI、云存储或公开分享功能。
 
 ## Windows 启动
 
-需要 JDK 21、Node.js 22.12+（本机验证为 24.18.0）、npm。Maven 由 Wrapper 固定到 3.9.16，不要求全局安装。首次准备依赖和浏览器需要联网。
-
-在项目根目录执行：
+需要 JDK 21、Node.js 22.12+、npm 和正在运行的 Docker Desktop。Maven Wrapper 固定 Maven 3.9.16；首次准备依赖和浏览器需要联网，应用运行使用项目内的字体。
 
 ```powershell
 ./scripts/start.ps1 -JavaHome '你的 JDK 21 目录'
 ```
 
-本次环境已经完成构建和浏览器准备，可直接：
+本次环境已完成依赖准备与构建，后续直接：
 
 ```powershell
 ./scripts/start.ps1 -JavaHome "$env:USERPROFILE/java/jdk-21" -SkipBuild
 ```
 
-访问 <http://127.0.0.1:18765>。页面会载入两张原创合成图片，切换“一页样本 / 两页样本”并点击“导出 PDF”即可验证。默认只监听 loopback；不要将该阶段版本作为无认证公网服务发布。
+访问 <http://127.0.0.1:18765>。首次空工作区自动准备一份合成示例，也可以点击“一页示例 / 两页示例”新建可编辑的样本。
 
-`Ctrl+C` 正常停止服务，不会删除本地图片或 PDF。脚本中的 JDK 和浏览器变量仅作用于当前进程。Chromium 使用项目 `.tools/ms-playwright`，同时禁止浏览器安装器清理共享缓存。
+脚本首次创建被 Git 忽略的 `.env`，生成随机本地数据库密码；启动 `local-resume-dev` Compose 项目的 PostgreSQL，执行 Flyway 迁移，然后启动应用。不会改变其他项目的 JDK 或浏览器配置。
 
-Linux/macOS 源码入口为 `scripts/start.sh`，需先具备 JDK 21、Node 和 Chromium 系统依赖；本阶段实际运行验收环境为 Windows，尚未声明跨平台安装验收通过。普通用户镜像及两服务 Compose 在阶段 C 实现。
+应用仅监听 `127.0.0.1:18765`；开发数据库仅映射 `127.0.0.1:18766`。不支持把此无认证版本直接暴露到公网。Chromium 使用项目 `.tools/ms-playwright` 并禁止共享缓存清理。
 
-## 数据位置与配置
-
-默认 `data/` 在项目内，可通过 `RESUME_DATA_DIR` 改到其他目录。
-
-```text
-data/
-  attachments/<稳定 UUID>/
-    original.jpeg 或 original.png  # 上传原文件
-    image.png                      # 已校正方向的标准化图片
-    metadata.json                  # 格式、字节数、尺寸、方向和 SHA-256
-  exports/<UUID>.pdf                # 导出产物
-  exports/<UUID>.json               # 输入快照摘要、PDF 摘要与生成时间
-```
-
-预览快照仅在内存中保留 30 分钟，最多 64 个。移除图片只解除当前页面引用，不物理删除已导入文件；本阶段没有垃圾回收、历史引用管理或备份协议。`data/`、`.tools/`、`target/`、`output/` 均被 Git 忽略。
-
-`RESUME_MAX_UPLOAD_BYTES` 同时决定后端限制及页面显示的限额，默认 `5242880`；multipart 请求额外预留 `524288` 字节，不把表单开销算作图片大小。`PORT` 默认 `18765`。
-
-## 重复验证
-
-先启动应用，再开另一个终端：
+`Ctrl+C` 停止应用，不删除数据。若需要同时停止开发数据库：
 
 ```powershell
+docker compose -f compose.dev.yml stop
+```
+
+重新运行启动脚本会继续使用原数据卷。不要删除 `local-resume-dev_resume_pgdata` 卷，也不要在已有数据卷上重新生成 `.env` 密码。删除卷会丢失简历正文和历史版本。备份恢复闭环尚未交付。
+
+Linux/macOS 提供 `scripts/start.sh`，需要 Docker、JDK 21、Node 和 Chromium 系统依赖；本轮实际验证为 Windows。前端开发可在后端启动后运行 `cd frontend; npm run dev`，本机开发端口为 5173，API、字体和渲染资源由 Vite 代理到后端。
+
+## 使用流程
+
+1. 新建空白简历，或从合成示例开始；在“内容”中填写模块。
+2. “图片”中分别导入校徽和照片。支持 JPEG/PNG，默认 5 MiB、2400 万像素、单边 12000 px；透明 PNG 与 EXIF 方向已验证。
+3. “版式”选择模板与字体，查看右侧分页。短段落 / 列表条目之间可以自动续页；单条过高时明确报错，避免静默裁掉文字。
+4. 等到“已保存到本机”。修改正在保存时可以继续输入；新内容排队保存。两个页面同时编辑发生冲突时，保留当前页面内容并选择“另存副本”或“重新载入”。
+5. 在“版本”保存快照，或“复制简历”创建岗位变体。恢复旧版会先保留当前版，旧照片仍可读取。
+6. “导出 PDF”会先保存最新输入，再为对应修订创建持久快照。导出文件元数据包含简历 ID、快照 ID、修订号及校验值。
+
+## 数据在哪里
+
+| 数据 | 位置 |
+| --- | --- |
+| 正文、版式、修订、版本快照、附件元数据和引用 | PostgreSQL `local_resume`，Docker 卷 `local-resume-dev_resume_pgdata` |
+| 上传原图、标准化图片和附属 metadata.json | `data/attachments/<UUID>/` |
+| PDF 与对应元数据 | `data/exports/<UUID>.pdf` / `.json` |
+| 本地数据库凭据 | `.env`（不入 Git） |
+| 浏览器依赖 | `.tools/ms-playwright`（不入 Git） |
+
+`RESUME_DATA_DIR` 可指定附件和导出目录；`RESUME_DB_URL`、`RESUME_DB_USER`、`RESUME_DB_PASSWORD` 配置 PostgreSQL；`PORT` 默认为 18765。`RESUME_MAX_UPLOAD_BYTES` 默认 5242880，前后端共用，multipart 额外预留 524288 字节。
+
+结构化文档采用 `schemaVersion: 2`，分离 `content` 与 `layout`。文件只通过 UUID 引用，不在正文中保存宿主机路径。移除当前照片不会删除历史文件；删除整份简历会删除它的历史记录，但仍保留图片文件。本阶段没有附件垃圾回收。
+
+内存中的短期渲染快照保留 30 分钟、最多 64 个；它与 PostgreSQL 中可长期恢复的版本快照不同。浏览器只记住所选简历 ID，不用 localStorage 保存正文。
+
+## 验证与测试
+
+后端测试使用真实 PostgreSQL，在独立 `resume_test` schema 内执行并回滚事务，不使用第二种数据库：
+
+```powershell
+. ./scripts/prepare-db.ps1
 $env:JAVA_HOME='你的 JDK 21 目录'
 ./mvnw.cmd test
+```
+
+先启动应用，然后另开终端：
+
+```powershell
 cd frontend
 npm ci
 npm run build
 npm run test:e2e
 ```
 
-E2E 会真实上传图片、操作隐藏/替换/移除/布局切换，并调用 Java 导出器，生成：
+E2E 只删除测试自己创建的简历 ID，不清空工作区。测试覆盖编辑、重开、排序隐藏、照片历史、复制删除、失败重试、保存中的继续输入、双窗口冲突、两个模板 PDF 和长内容分页。数据目录可能保留测试上传文件，尚未实现垃圾回收。
 
-- `output/pdf/resume-one-page.pdf`
-- `output/pdf/resume-two-page.pdf`
-- `output/workbench-one-page.png`
-- `output/e2e-results.json` 与 `output/network-check.json`
-
-额外的 PDF 检查需要 Python 的 `pypdf` 和 Poppler（`pdftoppm`、`pdffonts`）：
+PDF QA 需要 Python `pypdf` 以及 Poppler 的 `pdftoppm`、`pdffonts`：
 
 ```powershell
 python scripts/verify-pdfs.py
 ```
 
-它检查 A4 尺寸、实际页数、中文原字符、阅读顺序和嵌入字体，并渲染每页 PNG 供视觉复核。**不对提取文本做 NFKC 归一化**，避免把部首映射错误掩盖成成功。验证记录见 [docs/stage-a-verification.md](docs/stage-a-verification.md)。
+产物在 `output/pdf/stage-b-{classic|banner}-{one|two}.pdf`，报告在 `output/pdf-verification-stage-b.json`，E2E 报告在 `output/e2e-results.json`。逐字检查中文和标题顺序，不用 NFKC 归一化掩盖部首替换错误。`--stage-a` 只用于检查保留的阶段 A 旧样本。
 
-前端测试禁止所有非 loopback 请求，Java 导出器只允许当前快照和它引用的本地图片/字体。此证据范围不等于整个操作系统断网验收；完整离线运行检查留在阶段 C。
+详情见 [阶段 B 验收记录](docs/stage-b-verification.md) 和 [阶段 A 记录](docs/stage-a-verification.md)。浏览器已做禁止非本机请求的检查；完整系统级离线验收留待阶段 C。
 
-## 技术选择
+## 技术与取舍
 
-Java 21 / Spring Boot 3.5.16 / Playwright Java 1.63.0；Vue 3.5.43 / Vite 8.3.1 / TypeScript 5.9.3。依赖固定在 POM 和 npm lockfile。使用 JDK ImageIO 解码 JPEG/PNG，metadata-extractor 2.21.0 读取 EXIF。
+JDK 21 / Spring Boot 3.5.16 / PostgreSQL 16.10 / Flyway / Playwright Java 1.63.0；Vue 3.5.43 / Vite 8.3.1 / TypeScript 5.9.3。依赖由 POM、Boot BOM 与 npm lockfile 固定。
 
-模板在 `src/main/resources/templates/resume.html`，打印样式在 `static/print.css`。Vue 编辑参数后生成不可变预览快照，iframe 和导出器访问同一个渲染地址。当前样本使用明确分页，不代表任意长文档的自动分页已经完成。
+- `ResumeService` 用事务与修订号控制更新；mutation ID 处理最近一次保存重试。
+- `AttachmentStorage` 隔离图片存储实现，当前只使用本地文件；当前简历与版本各自保留外键引用。
+- `PreviewService` 将输入深拷贝为渲染快照；`paginate.js` 在字体、图片就绪后测量排版，预览与导出共用。
+- 分页按条目 / 段落边界切分，最多 10 页；超长单条内容会拒绝导出。不是通用文字处理器，也不提供任意画布。
+- 黑体和宋体均本地嵌入，修复共享字形的 Unicode 反向映射；不承诺所有 ATS 系统兼容。
 
-当前字体由 Noto Sans SC 派生为两个静态字重，并删除与标准字符共享同一字形的兼容字符别名，修复 Chromium PDF 提取中文时出现康熙部首的问题。原始来源、SHA-256、处理脚本与 OFL 许可均保留，详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
-
-## 下一阶段
-
-阶段 B 接入 PostgreSQL/Flyway、本地结构化编辑与自动保存，再实现第二模板和版本快照。阶段 C 完成两服务部署、重启持久化、完整备份恢复和离线验收；阶段 D 完成发布流程与 CI。AI 和对象存储均不作为这些阶段的前置条件。
-
-原创代码和合成样本采用 MIT；第三方字体和依赖各自保留原许可证。项目尚未创建远端仓库或发布镜像。
+字体、来源散列与许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。原创代码与合成样本采用 MIT。当前没有远端发布镜像或 GitHub 发布。

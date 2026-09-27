@@ -1,35 +1,25 @@
 <!doctype html>
 <html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>中文简历 · 本地预览</title><link rel="stylesheet" href="/print.css"></head>
-<body>
-<article class="sheet" th:each="sections, page : ${pages}" th:attr="data-page=${page.count}">
- <div class="page-content">
-  <header class="resume-header" th:if="${page.first}">
-   <div class="image-cell left-cell">
-    <div class="image-frame" th:if="${left.shown()}" th:style="${left.frameStyle()}" th:attr="data-kind=${draft.swapImages() ? 'logo' : 'photo'}">
-     <img th:src="${'/api/assets/' + left.id() + '/image'}" th:alt="${draft.swapImages() ? '学校 Logo' : '证件照'}" th:style="${left.imageStyle()}">
-    </div>
-   </div>
-   <div class="identity"><h1 th:text="${draft.name}"></h1><p class="headline" th:text="${draft.headline}"></p>
-    <div class="contacts"><span th:text="${draft.phone}"></span><span th:text="${draft.email}"></span><span th:text="${draft.location}"></span></div>
-   </div>
-   <div class="image-cell right-cell">
-    <div class="image-frame" th:if="${right.shown()}" th:style="${right.frameStyle()}" th:attr="data-kind=${draft.swapImages() ? 'photo' : 'logo'}">
-     <img th:src="${'/api/assets/' + right.id() + '/image'}" th:alt="${draft.swapImages() ? '证件照' : '学校 Logo'}" th:style="${right.imageStyle()}">
-    </div>
-   </div>
-  </header>
-  <header class="continuation" th:unless="${page.first}"><strong th:text="${draft.name}"></strong><span th:text="${draft.headline}"></span><small>经历补充 / CONTINUED</small></header>
-  <main>
-   <section class="resume-section" th:each="section : ${sections}">
-    <h2 th:text="${section.title}"></h2>
-    <div class="entry" th:each="entry : ${section.entries}">
-     <div class="entry-heading"><h3 th:text="${entry.title}"></h3><span th:text="${entry.meta}"></span></div>
-     <ul><li th:each="bullet : ${entry.bullets}" th:text="${bullet}"></li></ul>
-    </div>
-   </section>
-  </main>
- </div>
- <footer class="page-footer"><span>合成示例 · 仅用于版式验证</span><span th:text="${page.count + ' / ' + page.size}"></span></footer>
-</article>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>中文简历 · 本地预览</title><link rel="stylesheet" href="/print.css"><script src="/paginate.js" defer></script></head>
+<body th:class="${'template-' + layout.template()}" th:style="${layout.cssVariables()}">
+<template id="first-header">
+ <header class="resume-header">
+  <div class="image-cell left-cell"><div class="image-frame" th:if="${left.shown()}" th:style="${left.frameStyle()}" th:attr="data-kind=${layout.swapImages() ? 'logo' : 'photo'}"><img th:src="${'/api/assets/' + left.id() + '/image'}" th:alt="${layout.swapImages() ? '学校 Logo' : '证件照'}" th:style="${left.imageStyle()}"></div></div>
+  <div class="identity"><h1 th:text="${content.name}"></h1><p class="headline" th:text="${content.headline}"></p><div class="contacts"><span th:text="${content.phone}"></span><span th:text="${content.email}"></span><span th:text="${content.location}"></span></div></div>
+  <div class="image-cell right-cell"><div class="image-frame" th:if="${right.shown()}" th:style="${right.frameStyle()}" th:attr="data-kind=${layout.swapImages() ? 'photo' : 'logo'}"><img th:src="${'/api/assets/' + right.id() + '/image'}" th:alt="${layout.swapImages() ? '证件照' : '学校 Logo'}" th:style="${right.imageStyle()}"></div></div>
+ </header>
+</template>
+<template id="continuation-header"><header class="continuation"><strong th:text="${content.name}"></strong><span th:text="${content.headline}"></span><small>经历补充 / CONTINUED</small></header></template>
+<template id="footer"><footer class="page-footer"><span th:text="${content.name}"></span><span class="page-number"></span></footer></template>
+<div id="source" hidden>
+ <section class="resume-section" th:each="section : ${sections}" th:if="${section.visible}" th:attr="data-section=${section.id},data-break=${section.pageBreakBefore}">
+  <h2 th:text="${section.title}"></h2>
+  <div class="entry" th:each="entry : ${section.entries}">
+   <div class="entry-heading"><h3 th:text="${entry.title}"></h3><span th:text="${entry.meta}"></span></div>
+   <ul th:if="${entry.bulleted}"><li th:each="bullet : ${entry.bullets}" th:if="${!#strings.isEmpty(bullet)}" th:utext="${bullet}"></li></ul>
+   <div class="paragraphs" th:unless="${entry.bulleted}"><p th:each="bullet : ${entry.bullets}" th:if="${!#strings.isEmpty(bullet)}" th:utext="${bullet}"></p></div>
+  </div>
+ </section>
+</div>
+<div id="pages"></div><p id="layout-error" hidden>当前内容无法安全分页，请缩短单条内容或减小字号。</p>
 </body></html>

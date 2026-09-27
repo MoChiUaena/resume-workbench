@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onUnmounted } from 'vue';
 import { upload, type Asset, type Slot } from './api';
 const props = defineProps<{ kind: 'photo' | 'logo'; title: string; slot: Slot; asset?: Asset; maxBytes: number }>();
 const emit = defineEmits<{ imported: [Asset]; removed: [] }>();
 const busy = ref(false), error = ref('');
+let alive=true; onUnmounted(()=>{alive=false;});
 async function select(event: Event) {
   const input = event.target as HTMLInputElement, file = input.files?.[0]; if (!file) return;
-  error.value = ''; busy.value = true;
-  try { emit('imported', await upload(file, props.maxBytes)); }
-  catch (e) { error.value = e instanceof Error ? e.message : '图片导入失败，请重试。'; }
+  error.value = ''; busy.value = true; const targetSlot=props.slot;
+  try { const asset=await upload(file, props.maxBytes); if(alive && props.slot===targetSlot) emit('imported', asset); }
+  catch (e) { if(alive && props.slot===targetSlot) error.value = e instanceof Error ? e.message : '图片导入失败，请重试。'; }
   finally { busy.value = false; input.value = ''; }
 }
 </script>
