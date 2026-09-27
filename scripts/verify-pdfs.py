@@ -20,9 +20,9 @@ for name, count, font_name in cases:
     texts = [page.extract_text() for page in reader.pages]
     first = texts[0]
     # No NFKC normalization: literal ordinary Chinese must survive extraction.
-    for text in ['林知行', '教育背景', '专业技能', '项目经历', '本地简历工作台', '补充信息']:
+    for text in ['奶龙', '教育背景', '专业技能', '项目经历', '本地简历工作台', '补充信息']:
         assert text in first, f'{name}: literal text missing: {text!r}'
-    positions = [first.index(text) for text in ['林知行', '教育背景', '专业技能', '项目经历', '实践与学习', '补充信息']]
+    positions = [first.index(text) for text in ['奶龙', '教育背景', '专业技能', '项目经历', '实践与学习', '补充信息']]
     assert positions == sorted(positions), 'Unexpected reading order'
     if count == 2:
         for text in ['项目细节', '接口与错误处理', '测试与验证', '后续计划', '长中文段落样本']:

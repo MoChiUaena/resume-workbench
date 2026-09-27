@@ -68,10 +68,8 @@ export function useWorkspace() {
   }
   async function initialize() {
     await reloadList();
-    if(!resumes.value.length) { if(!localStorage.getItem('local-resume-selected')) await create('one'); }
-    else await open(resumes.value.find(r=>r.id===localStorage.getItem('local-resume-selected'))?.id || resumes.value[0].id);
   }
   function beforeUnload(e:BeforeUnloadEvent) { if(dirty.value || saving.value) { e.preventDefault(); e.returnValue=''; } }
   function dispose() {clearTimeout(timer);}
-  return {resumes,current,document,title,dirty,saving,saveError,saveStatus,flush,open,create,duplicate,preserveAsCopy,reloadCurrent,remove,initialize,install,beforeUnload,dispose};
+  return {resumes,current,document,title,dirty,saving,saveError,saveStatus,flush,open,create,duplicate,preserveAsCopy,reloadCurrent,reloadList,remove,initialize,install,beforeUnload,dispose};
 }
