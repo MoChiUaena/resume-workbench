@@ -32,8 +32,8 @@ public class ResumeController {
                 var p=images.importImage(new ClassPathResource("static/samples/nailong-portrait.png").getContentAsByteArray());
                 var l=images.importImage(new ClassPathResource("static/samples/university-logo.png").getContentAsByteArray());
                 var layout=doc.layout();
-                doc=new ResumeDocument(2,doc.content(),new ResumeDocument.Layout(layout.template(),layout.font(),layout.fontSize(),layout.lineHeight(),layout.sectionGapMm(),layout.marginMm(),false,
-                    new ResumeDraft.ImageSlot(p.id(),true,26,34,"cover",0,1,50,50),new ResumeDraft.ImageSlot(l.id(),true,26,26,"contain",0,1,50,50)));
+                doc=new ResumeDocument(ResumeDocument.SCHEMA_VERSION,doc.content(),new ResumeDocument.Layout(layout.template(),layout.font(),layout.fontSize(),layout.lineHeight(),layout.sectionGapMm(),layout.marginMm(),false,
+                    new ResumeDraft.ImageSlot(p.id(),true,26,34,"cover",0,1,50,50),new ResumeDraft.ImageSlot(l.id(),true,26,26,"contain",0,1,50,50),layout.presentation()));
             }
         }
         return resumes.create(input.title(),doc);

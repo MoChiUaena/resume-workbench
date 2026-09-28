@@ -91,6 +91,7 @@ jobs:
         run: |
           python scripts/verify-backup.py --isolated
           python scripts/verify-pdfs.py --stage-c
+          python scripts/verify-layout-pdfs.py
       - name: Recreate containers without deleting volumes
         run: |
           for side in source target; do

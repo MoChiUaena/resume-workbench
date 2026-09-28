@@ -20,7 +20,7 @@ public class WorkbenchController {
     }
     @GetMapping("/api/config") public Object config() {
         return Map.of("maxUploadBytes", images.maxBytes, "maxPixels", images.maxPixels,
-            "formats", new String[]{"JPEG", "PNG"}, "stage", "C", "schemaVersion", 2,
+            "formats", new String[]{"JPEG", "PNG"}, "stage", "C", "schemaVersion", ResumeDocument.SCHEMA_VERSION,
             "maxBackupBytes",maxBackupBytes);
     }
     @GetMapping("/api/health") public Object health(){jdbc.queryForObject("SELECT 1",Integer.class);return java.util.Map.of("status","ok");}

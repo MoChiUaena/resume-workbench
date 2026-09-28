@@ -14,10 +14,26 @@ ul{margin:1mm 0 0;padding-left:4.5mm}li{padding-left:.3mm;margin:.9mm 0;overflow
 @font-face{font-family:ResumeSerif;src:url('/fonts/LocalResumeSerif-Regular.ttf') format('truetype');font-weight:100 500;font-display:block}
 @font-face{font-family:ResumeSerif;src:url('/fonts/LocalResumeSerif-Bold.ttf') format('truetype');font-weight:600 900;font-display:block}
 body{font-family:var(--resume-font,ResumeSans),sans-serif;font-size:var(--body-size,9.4pt);line-height:var(--leading,1.68)}
-.sheet{padding:var(--page-margin,16mm)}.page-footer{left:var(--page-margin,16mm);right:var(--page-margin,16mm)}
+.sheet{padding:var(--margin-top,16mm) var(--margin-horizontal,16mm) var(--margin-bottom,16mm)}.page-footer{left:var(--margin-horizontal,16mm);right:var(--margin-horizontal,16mm);bottom:calc(var(--margin-bottom,16mm) / 2)}
 .resume-section{margin-top:var(--section-gap,4mm)}.entry-heading h3{flex-shrink:1;overflow-wrap:anywhere}.entry-heading span{max-width:52%;flex-shrink:0}
 .paragraphs p{margin:1mm 0;overflow-wrap:anywhere}.contacts span:empty{display:none}
 .template-banner .resume-header{grid-template-columns:minmax(0,1fr) 36mm 36mm;background:#f4f7f7;padding-top:3mm;padding-left:3mm;padding-right:3mm;border-bottom:2pt solid #244f63}
 .template-banner .identity{grid-column:1;grid-row:1}.template-banner .left-cell{grid-column:2;grid-row:1;justify-content:flex-end}.template-banner .right-cell{grid-column:3;grid-row:1}
 .template-banner h2{border-left:2pt solid #244f63;padding-left:2mm}.template-banner h2:after{background:#e3e8e9}
 #layout-error{font-size:14px;padding:20px;background:#fee;color:#923b31}
+/* These same rules are measured by the preview and the PDF paginator. */
+.identity h1{font-size:calc(25pt * var(--font-scale,1))}.headline{font-size:calc(10.5pt * var(--font-scale,1));color:var(--accent,#244f63)}.contacts{font-size:calc(8.3pt * var(--font-scale,1))}
+h2{font-size:calc(11.4pt * var(--font-scale,1));color:var(--accent,#244f63)}h2:after{background:color-mix(in srgb,var(--accent,#244f63) 18%,white)}
+.entry-heading h3{font-size:calc(9.7pt * var(--font-scale,1))}.entry-heading span{font-size:calc(8.1pt * var(--font-scale,1))}
+.continuation strong{font-size:calc(17pt * var(--font-scale,1))}.continuation span{font-size:calc(9pt * var(--font-scale,1))}.continuation small,.page-footer{font-size:calc(7pt * var(--font-scale,1))}
+.resume-header,.continuation,.template-banner .resume-header{border-bottom-color:var(--accent,#244f63)}.template-banner .resume-header{background:color-mix(in srgb,var(--accent,#244f63) 4%,white)}.template-banner h2{border-left-color:var(--accent,#244f63)}
+.entry+.entry{margin-top:var(--entry-gap,3mm)}li{margin:var(--paragraph-gap,.9mm) 0}li::marker{color:var(--accent,#537486);font-size:calc(8pt * var(--font-scale,1))}.paragraphs p{margin:var(--paragraph-gap,.9mm) 0}
+.contact-line{display:flex;align-items:baseline;gap:0}.contact-label{font-weight:600;white-space:nowrap}.contact-icon{height:.95em;width:.95em;flex:none;margin-right:1mm;stroke:var(--accent,#244f63);stroke-width:1.7;fill:none;align-self:center;stroke-linecap:round;stroke-linejoin:round}
+.alignment-center .identity{text-align:center}.alignment-center .contacts{align-items:center}.alignment-center h2{justify-content:center}.alignment-center h2:before{content:'';height:.25mm;background:color-mix(in srgb,var(--accent,#244f63) 18%,white);flex:1}
+.alignment-center .entry-heading{flex-direction:column;align-items:center;gap:0}.alignment-center .entry-heading span{max-width:100%;text-align:center}.alignment-center .paragraphs,.alignment-center li{text-align:center}
+.alignment-justify .paragraphs p,.alignment-justify li{text-align:justify}
+.headings-line h2{border-left:0;padding-left:0}.headings-line h2:after{content:'';display:block;background:color-mix(in srgb,var(--accent,#244f63) 18%,white)}
+.headings-bar h2{border-left:2pt solid var(--accent,#244f63);padding-left:2mm}.headings-bar h2:after,.headings-bar h2:before{display:none}
+.headings-plain h2{border-left:0;padding-left:0}.headings-plain h2:after,.headings-plain h2:before{display:none}
+.alignment-center ul{padding-left:0}.alignment-center li{list-style-position:inside;padding-left:0}
+.alignment-center.headings-bar h2{border-left:0;padding-left:0}.alignment-center.headings-bar h2:before{display:block;content:'';flex:none;width:.7mm;height:1.05em;background:var(--accent,#244f63)}

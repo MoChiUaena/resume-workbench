@@ -20,4 +20,11 @@ class PreviewServiceTest {
         previews.create(new ResumeDraft(1,"one","新名称","Java","","","",true,photo,logo));
         assertThat(previews.get(first.id()).html()).isEqualTo(first.html()).doesNotContain("新名称");
     }
+    @Test void customPresentationUsesTheSameTemplateVariablesForPreviewAndExport() {
+        var doc=ResumeDocument.sample("one");var l=doc.layout();
+        var style=new ResumeDocument.Presentation("en","#c65c19","center","icons","bar",18,22,20,4,1.2);
+        var snapshot=previews.create(new ResumeDocument(3,doc.content(),new ResumeDocument.Layout(l.template(),"serif",10,1.4,5,l.marginMm(),l.swapImages(),l.photo(),l.logo(),style)));
+        assertThat(snapshot.html()).contains("lang=\"en\"","alignment-center contacts-icons headings-bar","--accent:#c65c19","--margin-top:22mm","--margin-bottom:20mm","--resume-font:ResumeSerif","contact-icon");
+        assertThat(snapshot.document().layout().presentation()).isEqualTo(style);
+    }
 }

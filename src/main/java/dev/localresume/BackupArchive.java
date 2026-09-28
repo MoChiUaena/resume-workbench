@@ -49,7 +49,7 @@ public final class BackupArchive {
                     throw invalid("本地文件与元数据校验值不一致，请保留原文件并检查数据目录。");
                 entries.add(new FileEntry(name, size, hash)); out.closeEntry();
             }
-            var manifest = new Manifest(FORMAT, VERSION, 2, Instant.now(), List.copyOf(entries));
+            var manifest = new Manifest(FORMAT, VERSION, ResumeDocument.SCHEMA_VERSION, Instant.now(), List.copyOf(entries));
             byte[] manifestBytes = mapper.writeValueAsBytes(manifest);
             if (manifestBytes.length > 1048576) throw invalid("备份清单过大，请拆分工作区。");
             out.putNextEntry(new ZipEntry("manifest.json"));
@@ -100,7 +100,7 @@ public final class BackupArchive {
                 }
                 zip.closeEntry();
             }
-            if (manifest == null || !FORMAT.equals(manifest.format()) || manifest.formatVersion() != VERSION || manifest.documentSchemaVersion() != 2)
+            if (manifest == null || !FORMAT.equals(manifest.format()) || manifest.formatVersion() != VERSION || !Set.of(2,ResumeDocument.SCHEMA_VERSION).contains(manifest.documentSchemaVersion()))
                 throw new ApiException("BACKUP_VERSION_UNSUPPORTED", "备份格式或版本不受支持，请使用匹配的应用版本。", 422);
             if (manifest.files() == null || manifest.files().size() != actual.size()) throw invalid("备份清单与文件数量不一致。");
             var unique = new HashSet<String>();

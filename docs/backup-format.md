@@ -14,7 +14,7 @@
 
 ## 格式边界
 
-`manifest.json` 的 `format` 为 `resume-workbench-backup`，`formatVersion` 为 1，`documentSchemaVersion` 为 2。文件只允许这些路径：
+`manifest.json` 的 `format` 为 `resume-workbench-backup`，`formatVersion` 为 1。当前源码的 `documentSchemaVersion` 为 3，恢复时同时支持旧版本 2；发布版 `0.1.0-rc.1` 使用 2。新备份以 3 标识，旧应用会明确拒绝，避免遗漏新样式。文件只允许这些路径：
 
 ```text
 manifest.json
@@ -28,6 +28,8 @@ exports/<UUID>.json
 ```
 
 `settings.json` 记录来源实例的 schema、图片大小和像素限制，作为迁移说明；恢复不会覆盖目标实例的部署设置。目标像素限制更低或格式版本不匹配时，会明确拒绝导入。
+
+schema 3 的 `layout.presentation` 包含主题色、语言、对齐、信息展示、模块标题和独立边距 / 间距。它与字体、字号等一起保存到当前简历、历史版本和工作区 ZIP；附件 UUID 重映射不会改变这些设置。旧 schema 2 文档读取时继承原 `marginMm`，填充原来的配色、居左和纯内容默认值，不自动改写现有数据库记录。
 
 默认 ZIP 大小与解压后的文件总大小分别限制为 256 MiB，可用 `RESUME_MAX_BACKUP_BYTES` 调整。单个二进制文件最多 128 MiB，工作区 JSON 16 MiB，设置 64 KiB，其他 JSON 和 manifest 各 1 MiB；最多 10,000 个数据文件、2,000 份简历、10,000 个历史版本。备份与导入均检查限制，避免生成自己无法读取的包。
 

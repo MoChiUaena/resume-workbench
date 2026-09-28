@@ -4,7 +4,9 @@ export type Draft = { schemaVersion: number; sample: 'one' | 'two'; name: string
 export class ApiFailure extends Error { constructor(public code: string, message: string) { super(`${message}（${code}）`); } }
 export type Entry = { id: string; title: string; meta: string; bulleted: boolean; bullets: string[] };
 export type Section = { id: string; type: 'education' | 'experience' | 'project' | 'skills' | 'custom'; title: string; visible: boolean; pageBreakBefore: boolean; entries: Entry[] };
-export type ResumeDocument = { schemaVersion: 2; content: { name: string; headline: string; email: string; phone: string; location: string; sections: Section[] }; layout: { template: 'classic' | 'banner'; font: 'sans' | 'serif'; fontSize: number; lineHeight: number; sectionGapMm: number; marginMm: number; swapImages: boolean; photo: Slot; logo: Slot } };
+export type Presentation = { language:'zh'|'en'; accentColor:string; alignment:'left'|'center'|'justify'; contactStyle:'labels'|'icons'|'plain'; headingStyle:'template'|'line'|'bar'|'plain'; marginHorizontalMm:number; marginTopMm:number; marginBottomMm:number; entryGapMm:number; paragraphGapMm:number };
+export type ResumeLayout = { template:'classic'|'banner'; font:'sans'|'serif'; fontSize:number; lineHeight:number; sectionGapMm:number; marginMm:number; swapImages:boolean; photo:Slot; logo:Slot; presentation:Presentation };
+export type ResumeDocument = { schemaVersion: 3; content: { name: string; headline: string; email: string; phone: string; location: string; sections: Section[] }; layout: ResumeLayout };
 export type Resume = { id: string; title: string; document: ResumeDocument; revision: number; lastMutationId: string | null; updatedAt: string };
 export type Summary = Omit<Resume, 'document' | 'lastMutationId'>;
 export type Version = { id: string; title: string; label: string; sourceRevision: number; createdAt: string };
