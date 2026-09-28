@@ -10,6 +10,7 @@ export type ResumeDocument = { schemaVersion: 3; content: { name: string; headli
 export type Resume = { id: string; title: string; document: ResumeDocument; revision: number; lastMutationId: string | null; updatedAt: string };
 export type Summary = Omit<Resume, 'document' | 'lastMutationId'>;
 export type Version = { id: string; title: string; label: string; sourceRevision: number; createdAt: string };
+export type VersionDetail = Version & { document: ResumeDocument };
 export async function api<T>(url: string, body?: object | FormData, method?: string): Promise<T> {
   let response: Response;
   try { response = await fetch(url, { method: method || (body ? 'POST' : 'GET'), headers: body instanceof FormData ? { 'X-Local-Resume': '1' } : body ? { 'Content-Type': 'application/json', 'X-Local-Resume': '1' } : {}, body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(url.startsWith('/api/backups') ? 120000 : url.endsWith('/export') ? 90000 : 15000) }); }

@@ -3,9 +3,11 @@ from pathlib import Path
 import hashlib
 import json
 import zipfile
+import xml.etree.ElementTree as ET
 ROOT=Path(__file__).resolve().parents[1]
 inventory=json.loads((ROOT/'src/main/resources/META-INF/third-party/inventory.json').read_text(encoding='utf-8'))
-assert inventory['applicationVersion']=='0.1.0' and not inventory['unresolvedDeclarations']
+application_version=ET.parse(ROOT/'pom.xml').getroot().find('{http://maven.apache.org/POM/4.0.0}version').text
+assert inventory['applicationVersion']==application_version and not inventory['unresolvedDeclarations']
 with zipfile.ZipFile(ROOT/'target/resume-workbench.jar') as archive:
     expected=set()
     for dependency in inventory['java']:
@@ -19,5 +21,6 @@ with zipfile.ZipFile(ROOT/'target/resume-workbench.jar') as archive:
     assert actual==expected,(actual-expected,expected-actual)
     assert b'Start-Class: dev.localresume.LocalResumeApplication' in archive.read('META-INF/MANIFEST.MF')
     assert b'Spring-Boot-Version: 3.5.16' in archive.read('META-INF/MANIFEST.MF')
+    assert f'Implementation-Version: {application_version}'.encode() in archive.read('META-INF/MANIFEST.MF')
     assert not any(name.endswith('.class') for name in archive.namelist() if name.startswith('META-INF/third-party/'))
 print(f'Distribution verified: {len(expected)} runtime JARs, exact hashes, notices and fixed entry point.')

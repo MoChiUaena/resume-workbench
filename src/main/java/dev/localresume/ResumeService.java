@@ -15,6 +15,7 @@ public class ResumeService {
     public record Resume(UUID id, String title, ResumeDocument document, long revision, UUID lastMutationId, Instant updatedAt) {}
     public record Summary(UUID id, String title, long revision, Instant updatedAt) {}
     public record Version(UUID id, String label, String title, long sourceRevision, Instant createdAt) {}
+    public record VersionDetail(UUID id, String label, String title, ResumeDocument document, long sourceRevision, Instant createdAt) {}
     public record Save(String title, ResumeDocument document, long expectedRevision, UUID mutationId) {}
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
@@ -70,6 +71,15 @@ public class ResumeService {
     public List<Version> versions(UUID id) {
         load(id,false);
         return jdbc.query("SELECT id,label,title,source_revision,created_at FROM resume_versions WHERE resume_id=? ORDER BY created_at DESC,id",(rs,n)->new Version(rs.getObject(1,UUID.class),rs.getString(2),rs.getString(3),rs.getLong(4),rs.getTimestamp(5).toInstant()),id);
+    }
+    @Transactional(readOnly=true)
+    public VersionDetail version(UUID id,UUID versionId) {
+        load(id,false);
+        var found=jdbc.query("SELECT * FROM resume_versions WHERE id=? AND resume_id=?",(rs,n)->
+            new VersionDetail(rs.getObject("id",UUID.class),rs.getString("label"),rs.getString("title"),parse(rs.getString("document")),
+                rs.getLong("source_revision"),rs.getTimestamp("created_at").toInstant()),versionId,id);
+        if(found.isEmpty()) throw new ApiException("VERSION_NOT_FOUND","该版本不存在或不属于当前简历。",404);
+        return found.getFirst();
     }
     public Version checkpoint(UUID id,long revision,String label) {
         var existing=load(id,true); requireRevision(existing,revision); return snapshot(existing,label);

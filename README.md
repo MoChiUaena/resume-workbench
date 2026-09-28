@@ -6,9 +6,9 @@
 
 编辑页和深色模式的实际截图：[纸张文档风格](docs/workbench-editor.png) · [深色模式](docs/workbench-dark.png)。
 
-![19 秒实际操作演示](docs/demo.gif)
+![26 秒实际操作演示](docs/demo.gif)
 
-演示使用合成奶龙简历，展示选简历、编辑、样式与间距、PDF 和完整备份。[最新版本与部署配置](https://github.com/MoChiUaena/resume-workbench/releases/tag/v0.1.0)。
+演示使用合成奶龙简历，展示选简历、编辑、撤销、样式与间距、版本对比、PDF 和完整备份。[最新版本与部署配置](https://github.com/MoChiUaena/resume-workbench/releases/tag/v0.2.0)。
 
 ## 现在可以做什么
 
@@ -22,6 +22,8 @@
 - 行距 1.2–2.0、模块间距 0–12 mm，左右 / 上 / 下边距分别为 8–32 mm；还能调整条目和段落间距，并一键恢复默认样式或间距。设置会自动保存，进入历史版本和完整备份。
 - 700 ms 防抖自动保存，串行写入；数据库确认后才显示“已保存到本机”。失败可重试或另存副本，修订冲突不覆盖其他页面。
 - 手动版本快照和恢复；恢复前自动保留当前版本。导出时记录固定修订的版本快照。
+- 顶部“撤销 / 重做”覆盖正文、简历名称、模块、图片与排版，连续输入合并为一步，撤销后的内容仍会自动保存。支持 Ctrl / ⌘ Z、Ctrl Y 和 Ctrl / ⌘ Shift Z；最近 100 步仅保留在当前编辑页面，刷新或重新打开简历会清空，长期保存请使用版本快照。
+- 在“历史版本”点击“对比”，查看旧版与当前编辑内容的文字、模块、照片 / 校徽及版式变化，可筛选后恢复；查看不会保存或覆盖草稿。恢复后的结果也能撤销，数据库修订号继续递增。
 - 中文 A4 预览与 PDF 共用模板、字体、图片和分页脚本，PDF 保留可选择、可搜索的文字。
 - “备份与恢复”下载包含正文、版式、历史版本、原图、标准化图片和相关 PDF 的 ZIP；可以在全新实例恢复，再继续修改。导入会新增记录，保留现有简历。
 
@@ -29,7 +31,7 @@
 
 ## Docker 启动
 
-只需要 Docker Desktop / Docker Compose，无需在宿主机安装 Node、JDK 或 Maven。当前版本为 `0.1.0`，包含完整排版控制和 schema 3；镜像由版本标签触发 CI，全部检查通过后推送到 GHCR。
+只需要 Docker Desktop / Docker Compose，无需在宿主机安装 Node、JDK 或 Maven。当前版本为 `0.2.0`，新增撤销 / 重做与历史版本对比，文档仍为 schema 3；镜像由版本标签触发 CI，全部检查通过后推送到 GHCR。
 
 从 Release 下载 `resume-workbench-config.zip`，解压后有版本对应的 `compose.yml` 和 `.env.example`。在这个新目录运行：
 
@@ -131,7 +133,7 @@ Compose 的 `.env` 保存部署设置，应与下载的备份分别保留。服�
 
 当前源码的结构化文档采用 `schemaVersion: 3`，分离 `content` 与 `layout`；新增样式位于 `layout.presentation`。读取 schema 2 简历时按原统一边距填充新设置，不批量改写已保存的数据。文件只通过 UUID 引用，不在正文中保存宿主机路径。移除当前照片不会删除历史文件；删除整份简历会删除它的历史记录，但仍保留图片文件。本阶段没有附件垃圾回收。
 
-`0.1.0` 可恢复 schema 2 / 3 备份；新备份使用 schema 3，旧应用会明确拒绝，避免悄悄丢失样式。旧的 `0.1.0-rc.1` 使用 schema 2。升级前备份并保留 .env 和两个数据卷；读取旧文档不会批量改写记录，保存修改时才写入新文档。不能用旧应用恢复新备份。
+`0.2.0` 可恢复 schema 2 / 3 备份，与 `0.1.0` 使用相同文档和数据库结构。撤销记录属于当前页面，不进入备份；历史版本仍完整备份。旧的 `0.1.0-rc.1` 使用 schema 2，不能导入 schema 3 备份。升级前备份并保留 .env 和两个数据卷；读取旧文档不会批量改写记录，保存修改时才写入新文档。
 
 内存中的短期渲染快照保留 30 分钟、最多 64 个；它与 PostgreSQL 中可长期恢复的版本快照不同。浏览器只记住所选简历 ID，不用 localStorage 保存正文。
 
@@ -150,6 +152,7 @@ $env:JAVA_HOME='你的 JDK 21 目录'
 ```powershell
 cd frontend
 npm ci
+npm run test:unit
 npm run build
 npm run test:e2e
 ```
@@ -164,7 +167,7 @@ python scripts/verify-pdfs.py
 
 产物在 `output/pdf/stage-b-{classic|banner}-{one|two}.pdf`，报告在 `output/pdf-verification-stage-b.json`，E2E 报告在 `output/e2e-results.json`。逐字检查中文和标题顺序，不用 NFKC 归一化掩盖部首替换错误。`--stage-a` 只用于检查保留的阶段 A 旧样本。
 
-当前源码本地实际结果：34 项 Java 测试、11 项浏览器测试；原有中文 PDF、全新实例恢复和新增排版 PDF 均通过。`scripts/verify-backup.py --isolated` 在两个空实例执行恢复检查；`scripts/verify-pdfs.py --stage-c` 检查两模板与恢复样本；`scripts/verify-layout-pdfs.py` 检查自定义样式、重置和七页边界样本。详情见 [排版控制验收](docs/layout-verification.md)。
+当前源码的验证包含 9 项前端逻辑测试、35 项 Java 测试、15 项浏览器测试，以及中文 PDF、全新实例恢复和排版边界检查。`scripts/verify-backup.py --isolated` 在两个空实例执行恢复检查；`scripts/verify-pdfs.py --stage-c` 检查两模板与恢复样本；`scripts/verify-layout-pdfs.py` 检查自定义样式、重置和七页边界样本。详情见 [排版控制验收](docs/layout-verification.md) 和 [撤销与版本对比验收](docs/history-verification.md)。
 
 详情见 [阶段 C 验收记录](docs/stage-c-verification.md)、[阶段 B 验收记录](docs/stage-b-verification.md) 和 [阶段 A 记录](docs/stage-a-verification.md)。GitHub Actions 自动运行这些检查并保存合成数据的报告；它们的远端结果需查看实际运行记录。
 

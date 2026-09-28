@@ -52,6 +52,19 @@ class ResumeServiceTest {
         var a=service.create("A",ResumeDocument.sample("one")); var b=service.create("B",ResumeDocument.sample("one"));
         var v=service.versions(a.id()).getFirst();
         assertThatThrownBy(()->service.restore(b.id(),v.id(),1)).isInstanceOfSatisfying(ApiException.class,e->assertThat(e.code).isEqualTo("VERSION_NOT_FOUND"));
+        assertThatThrownBy(()->service.version(b.id(),v.id())).isInstanceOfSatisfying(ApiException.class,e->assertThat(e.code).isEqualTo("VERSION_NOT_FOUND"));
+        assertThatThrownBy(()->service.version(a.id(),UUID.randomUUID())).isInstanceOfSatisfying(ApiException.class,e->assertThat(e.code).isEqualTo("VERSION_NOT_FOUND"));
+    }
+    @Test void viewingVersionReadsItsOriginalDocumentWithoutChangingCurrentState() {
+        var original=service.create("原始名称",ResumeDocument.sample("one"));
+        var snapshot=service.checkpoint(original.id(),1,"投递前");
+        service.save(original.id(),new ResumeService.Save("新版名称",ResumeDocument.sample("two"),1,UUID.randomUUID()));
+        var current=service.get(original.id());var versions=service.versions(original.id());
+        var detail=service.version(original.id(),snapshot.id());
+        assertThat(detail.title()).isEqualTo("原始名称");assertThat(detail.label()).isEqualTo("投递前");
+        assertThat(detail.document()).isEqualTo(original.document());assertThat(detail.sourceRevision()).isEqualTo(1);
+        assertThat(detail.createdAt()).isEqualTo(versions.stream().filter(v->v.id().equals(snapshot.id())).findFirst().orElseThrow().createdAt());
+        assertThat(service.get(original.id())).isEqualTo(current);assertThat(service.versions(original.id())).isEqualTo(versions);
     }
     @Test void markupOnlyAllowsBoldAndEscapesHtml() {
         String html=new RichText().render("**重点** <img src=x onerror=alert(1)> [link](javascript:alert(1))");
