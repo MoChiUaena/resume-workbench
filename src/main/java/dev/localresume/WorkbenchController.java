@@ -13,13 +13,17 @@ public class WorkbenchController {
     private final PreviewService previews;
     private final ExportService exports;
     private final AssetCatalog catalog;
-    public WorkbenchController(ImageService images, AttachmentStorage storage, PreviewService previews, ExportService exports, AssetCatalog catalog) {
-        this.images = images; this.storage = storage; this.previews = previews; this.exports = exports; this.catalog=catalog;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+    private final long maxBackupBytes;
+    public WorkbenchController(ImageService images, AttachmentStorage storage, PreviewService previews, ExportService exports, AssetCatalog catalog,org.springframework.jdbc.core.JdbcTemplate jdbc,@org.springframework.beans.factory.annotation.Value("${resume.max-backup-bytes}") long maxBackupBytes) {
+        this.images = images; this.storage = storage; this.previews = previews; this.exports = exports; this.catalog=catalog;this.jdbc=jdbc;this.maxBackupBytes=maxBackupBytes;
     }
     @GetMapping("/api/config") public Object config() {
         return Map.of("maxUploadBytes", images.maxBytes, "maxPixels", images.maxPixels,
-            "formats", new String[]{"JPEG", "PNG"}, "stage", "B", "schemaVersion", 2);
+            "formats", new String[]{"JPEG", "PNG"}, "stage", "C", "schemaVersion", 2,
+            "maxBackupBytes",maxBackupBytes);
     }
+    @GetMapping("/api/health") public Object health(){jdbc.queryForObject("SELECT 1",Integer.class);return java.util.Map.of("status","ok");}
     @PostMapping("/api/assets") public Object upload(@RequestParam MultipartFile file) throws java.io.IOException {
         if (file.getSize() > images.maxBytes) throw new ApiException("FILE_TOO_LARGE", "图片超过上传限制，请压缩后重试。", 413);
         var asset=images.importImage(file.getBytes()); catalog.register(asset); return asset;

@@ -10,7 +10,7 @@ export type Summary = Omit<Resume, 'document' | 'lastMutationId'>;
 export type Version = { id: string; title: string; label: string; sourceRevision: number; createdAt: string };
 export async function api<T>(url: string, body?: object | FormData, method?: string): Promise<T> {
   let response: Response;
-  try { response = await fetch(url, { method: method || (body ? 'POST' : 'GET'), headers: body instanceof FormData ? { 'X-Local-Resume': '1' } : body ? { 'Content-Type': 'application/json', 'X-Local-Resume': '1' } : {}, body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(url.endsWith('/export') ? 90000 : 15000) }); }
+  try { response = await fetch(url, { method: method || (body ? 'POST' : 'GET'), headers: body instanceof FormData ? { 'X-Local-Resume': '1' } : body ? { 'Content-Type': 'application/json', 'X-Local-Resume': '1' } : {}, body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(url.startsWith('/api/backups') ? 120000 : url.endsWith('/export') ? 90000 : 15000) }); }
   catch { throw new ApiFailure('NETWORK_ERROR', '无法连接本地服务，本次修改可能尚未保存。请保留页面并重试。'); }
   if (!response.ok) { const e = await response.json().catch(() => ({ code: 'NETWORK_ERROR', message: '无法连接本地服务，请检查服务是否正在运行。' })); throw new ApiFailure(e.code,e.message); }
   return response.json();

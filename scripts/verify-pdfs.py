@@ -13,12 +13,16 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'output/pdf'
 report = []
 cases = [(f'resume-{n}-page', c, 'LocalResumeSans') for n,c in [('one',1),('two',2)]] if '--stage-a' in sys.argv else [(f'stage-b-{template}-{n}', c, 'LocalResumeSerif' if template=='banner' else 'LocalResumeSans') for template in ['classic','banner'] for n,c in [('one',1),('two',2)]]
+if '--stage-c' in sys.argv:
+    cases += [('restored-editable', 1, 'LocalResumeSans'), ('restored-new-instance', 2, 'LocalResumeSans')]
 for name, count, font_name in cases:
     path = OUT / f'{name}.pdf'
     reader = PdfReader(path)
     assert len(reader.pages) == count, f'{name}: unexpected page count'
     texts = [page.extract_text() for page in reader.pages]
     first = texts[0]
+    if name == 'restored-new-instance':
+        assert '全新实例恢复后继续编辑' in first, 'Restored edits missing from PDF'
     # No NFKC normalization: literal ordinary Chinese must survive extraction.
     for text in ['奶龙', '教育背景', '专业技能', '项目经历', '本地简历工作台', '补充信息']:
         assert text in first, f'{name}: literal text missing: {text!r}'
@@ -38,5 +42,6 @@ for name, count, font_name in cases:
     subprocess.run(['pdftoppm', '-scale-to', '1500', '-png', str(path), str(OUT / name)], check=True, capture_output=True)
     (OUT / f'{name}-text.txt').write_text('\n\f\n'.join(texts), encoding='utf-8')
     report.append({'file': path.name, 'pages': count, 'bytes': path.stat().st_size, 'sha256': hashlib.sha256(path.read_bytes()).hexdigest(), 'literalChinese': True, 'readingOrder': True, 'a4': True, 'textCharactersPerPage': [len(t) for t in texts], 'fonts': font_info})
-(ROOT / ('output/pdf-verification.json' if '--stage-a' in sys.argv else 'output/pdf-verification-stage-b.json')).write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+report_file = 'output/pdf-verification.json' if '--stage-a' in sys.argv else 'output/pdf-verification-stage-c.json' if '--stage-c' in sys.argv else 'output/pdf-verification-stage-b.json'
+(ROOT / report_file).write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
 print(json.dumps([{k:v for k,v in r.items() if k != 'fonts'} for r in report], indent=2))

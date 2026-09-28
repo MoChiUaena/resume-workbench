@@ -1,6 +1,6 @@
 # Resume Workbench · 简历工作台
 
-面向中文技术求职者的本地简历工作台。阶段 B 已实现结构化编辑、可靠自动保存、独立学校 Logo / 证件照、两个模板、中文 PDF、简历复制和版本恢复。
+面向中文技术求职者的本地简历工作台。结构化编辑、实时预览、独立学校 Logo / 证件照、中文 PDF、版本恢复和完整本地备份，不需要注册或模型 Key。
 
 ![我的简历列表](docs/workbench.png)
 
@@ -18,10 +18,55 @@
 - 700 ms 防抖自动保存，串行写入；数据库确认后才显示“已保存到本机”。失败可重试或另存副本，修订冲突不覆盖其他页面。
 - 手动版本快照和恢复；恢复前自动保留当前版本。导出时记录固定修订的版本快照。
 - 中文 A4 预览与 PDF 共用模板、字体、图片和分页脚本，PDF 保留可选择、可搜索的文字。
+- “备份与恢复”下载包含正文、版式、历史版本、原图、标准化图片和相关 PDF 的 ZIP；可以在全新实例恢复，再继续修改。导入会新增记录，保留现有简历。
 
-这是本地开发版本。完整备份恢复、发布镜像及普通用户的两服务 Compose 安装属于阶段 C；当前 `compose.dev.yml` 只启动开发数据库。没有账号、AI、云存储或公开分享功能。
+阶段 C 的部署、备份和离线闭环已在独立容器中验证。首版为单人本地使用，没有账号、AI、云存储或公开分享功能。`compose.yml` 运行 app / db 两个服务；`compose.dev.yml` 只供源码开发时启动数据库。
 
-## Windows 启动
+## Docker 启动
+
+只需要 Docker Desktop / Docker Compose，无需在宿主机安装 Node、JDK 或 Maven。发布镜像由版本标签触发 CI，全部测试通过后推送到 GHCR；候选版本为 `0.1.0-rc.1`。预构建镜像的可用性以对应 Release 和 Actions 结果为准。
+
+拿到版本对应的 `compose.yml` 和 `.env.example` 后，放入一个新目录：
+
+```powershell
+Copy-Item .env.example .env
+# 修改 .env 的 RESUME_DB_PASSWORD，使用自己生成的长随机密码
+docker compose up -d --wait
+```
+
+访问 <http://127.0.0.1:18765>。两个服务会自动初始化数据库；应用端口仅绑定本机，数据库不发布端口。不要将此无认证应用直接暴露到公网。
+
+也可以在本仓库目录从源码构建，工具链全部在 Docker 内：
+
+```powershell
+Copy-Item .env.example .env
+# 修改 .env 中的默认密码
+docker compose up -d --build --wait
+```
+
+首次准备镜像、依赖和浏览器需要联网；字体、Chromium 和前端随应用镜像提供。运行时编辑、保存、图片、备份与 PDF 已通过切断外网出口的实际检查。当前镜像验证平台为 Linux amd64 / Docker Desktop，尚未声明 ARM64 支持。
+
+### 停止与升级
+
+```powershell
+docker compose stop
+docker compose up -d --wait
+```
+
+停止、重启或重建容器不会删除数据卷。升级前先在页面下载完整备份并保存到数据卷之外，保留 `.env` 密码；将 `RESUME_APP_IMAGE` 改为目标版本，更新该版本的 Compose 配置，再运行：
+
+```powershell
+docker compose pull
+docker compose up -d --wait
+```
+
+Flyway 自动执行迁移。不要在已有数据库卷上重新生成密码；不要在普通停止 / 升级时删除数据卷。删除 `resume-workbench_resume_pgdata` 会丢失正文和历史，删除 `resume-workbench_resume_data` 会丢失原图、处理图、PDF 和服务器备份。发生不兼容升级时，优先在新实例中恢复备份，不能保证新数据库可直接切回旧镜像。
+
+![备份与恢复](docs/backup-recovery.png)
+
+完整范围、格式版本、大小限制和一致性取舍见 [备份格式说明](docs/backup-format.md)。
+
+## Windows 源码开发
 
 需要 JDK 21、Node.js 22.12+、npm 和正在运行的 Docker Desktop。Maven Wrapper 固定 Maven 3.9.16；首次准备依赖和浏览器需要联网，应用运行使用项目内的字体。
 
@@ -49,7 +94,7 @@ cd resume-workbench
 docker compose -f compose.dev.yml stop
 ```
 
-重新运行启动脚本会继续使用原数据卷。不要删除 `local-resume-dev_resume_pgdata` 卷，也不要在已有数据卷上重新生成 `.env` 密码。删除卷会丢失简历正文和历史版本。备份恢复闭环尚未交付。
+重新运行启动脚本会继续使用原数据卷。不要删除 `local-resume-dev_resume_pgdata` 卷，也不要在已有数据卷上重新生成 `.env` 密码。删除卷会丢失简历正文和历史版本。开发模式同样支持页面完整备份。
 
 Linux/macOS 提供 `scripts/start.sh`，需要 Docker、JDK 21、Node 和 Chromium 系统依赖；本轮实际验证为 Windows。前端开发可在后端启动后运行 `cd frontend; npm run dev`，本机开发端口为 5173，API、字体和渲染资源由 Vite 代理到后端。
 
@@ -61,18 +106,22 @@ Linux/macOS 提供 `scripts/start.sh`，需要 Docker、JDK 21、Node 和 Chromi
 4. 等到“已保存到本机”。修改正在保存时可以继续输入；新内容排队保存。两个页面同时编辑发生冲突时，保留当前页面内容并选择“另存副本”或“重新载入”。
 5. 在“版本”保存快照，或“复制简历”创建岗位变体。恢复旧版会先保留当前版，旧照片仍可读取。
 6. “导出 PDF”会先保存最新输入，再为对应修订创建持久快照。导出文件元数据包含简历 ID、快照 ID、修订号及校验值。
+7. “备份与恢复”下载完整 ZIP，在新实例中恢复为新记录。文件清单和校验值通过后才导入，历史版本里的旧照片也会保留。
 
 ## 数据在哪里
 
 | 数据 | 位置 |
 | --- | --- |
-| 正文、版式、修订、版本快照、附件元数据和引用 | PostgreSQL `local_resume`，Docker 卷 `local-resume-dev_resume_pgdata` |
-| 上传原图、标准化图片和附属 metadata.json | `data/attachments/<UUID>/` |
+| 正文、版式、修订、版本快照、附件元数据和引用 | PostgreSQL `local_resume`；部署卷 `resume-workbench_resume_pgdata`，开发卷 `local-resume-dev_resume_pgdata` |
+| 上传原图、标准化图片和附属 metadata.json | `data/attachments/<UUID>/`；部署时 `/app/data` 挂载 `resume-workbench_resume_data` |
 | PDF 与对应元数据 | `data/exports/<UUID>.pdf` / `.json` |
+| 创建的备份 ZIP | `data/backups/<UUID>.zip`，并下载到浏览器；ZIP 无加密 |
 | 本地数据库凭据 | `.env`（不入 Git） |
-| 浏览器依赖 | `.tools/ms-playwright`（不入 Git） |
+| 浏览器依赖 | 部署镜像中的 `/ms-playwright`；源码开发为 `.tools/ms-playwright`（不入 Git） |
 
-`RESUME_DATA_DIR` 可指定附件和导出目录；`RESUME_DB_URL`、`RESUME_DB_USER`、`RESUME_DB_PASSWORD` 配置 PostgreSQL；`PORT` 默认为 18765。`RESUME_MAX_UPLOAD_BYTES` 默认 5242880，前后端共用，multipart 额外预留 524288 字节。
+`RESUME_DATA_DIR` 可指定附件和导出目录；`RESUME_DB_URL`、`RESUME_DB_USER`、`RESUME_DB_PASSWORD` 配置 PostgreSQL；源码 `PORT` 默认为 18765，Compose 宿主机端口通过 `.env` 的 `RESUME_PORT` 调整。`RESUME_MAX_UPLOAD_BYTES` 默认 5242880，前后端共用；备份限制 `RESUME_MAX_BACKUP_BYTES` 默认 268435456。multipart 为较大的图片 / 备份限制额外预留 524288 字节，图片接口仍单独执行 5 MiB 检查。
+
+Compose 的 `.env` 保存部署设置，应与下载的备份分别保留。服务器密码和主机目录不进入 ZIP；界面风格 / 深色偏好仍保存在本机浏览器。自定义 `-p` 项目名时卷名前缀也会变化。
 
 结构化文档采用 `schemaVersion: 2`，分离 `content` 与 `layout`。文件只通过 UUID 引用，不在正文中保存宿主机路径。移除当前照片不会删除历史文件；删除整份简历会删除它的历史记录，但仍保留图片文件。本阶段没有附件垃圾回收。
 
@@ -97,7 +146,7 @@ npm run build
 npm run test:e2e
 ```
 
-E2E 只删除测试自己创建的简历 ID，不清空工作区。测试覆盖编辑、重开、排序隐藏、照片历史、复制删除、失败重试、保存中的继续输入、双窗口冲突、两个模板 PDF 和长内容分页。数据目录可能保留测试上传文件，尚未实现垃圾回收。
+E2E 只删除测试自己创建的简历 ID，不清空工作区。备份界面测试仅在 `RESUME_TEST_ISOLATED=1` 的独立实例启用，避免复制真实用户的工作区。测试覆盖编辑、重开、排序隐藏、照片历史、复制删除、失败重试、保存中的继续输入、双窗口冲突、两个模板 PDF 和长内容分页。数据目录可能保留测试上传文件，尚未实现垃圾回收。
 
 PDF QA 需要 Python `pypdf` 以及 Poppler 的 `pdftoppm`、`pdffonts`：
 
@@ -107,7 +156,9 @@ python scripts/verify-pdfs.py
 
 产物在 `output/pdf/stage-b-{classic|banner}-{one|two}.pdf`，报告在 `output/pdf-verification-stage-b.json`，E2E 报告在 `output/e2e-results.json`。逐字检查中文和标题顺序，不用 NFKC 归一化掩盖部首替换错误。`--stage-a` 只用于检查保留的阶段 A 旧样本。
 
-详情见 [阶段 B 验收记录](docs/stage-b-verification.md) 和 [阶段 A 记录](docs/stage-a-verification.md)。浏览器已做禁止非本机请求的检查；完整系统级离线验收留待阶段 C。
+本地实际结果：30 项 Java 测试、9 项浏览器测试，6 份中文 PDF / 9 页；全新实例恢复及容器重建保留数据均通过。`scripts/verify-backup.py --isolated` 在两个空实例执行恢复检查；`scripts/verify-pdfs.py --stage-c` 额外检查恢复后的两份 PDF。
+
+详情见 [阶段 C 验收记录](docs/stage-c-verification.md)、[阶段 B 验收记录](docs/stage-b-verification.md) 和 [阶段 A 记录](docs/stage-a-verification.md)。GitHub Actions 自动运行这些检查并保存合成数据的报告；它们的远端结果需查看实际运行记录。
 
 ## 技术与取舍
 
@@ -119,4 +170,4 @@ JDK 21 / Spring Boot 3.5.16 / PostgreSQL 16.10 / Flyway / Playwright Java 1.63.0
 - 分页按条目 / 段落边界切分，最多 10 页；超长单条内容会拒绝导出。不是通用文字处理器，也不提供任意画布。
 - 黑体和宋体均本地嵌入，修复共享字形的 Unicode 反向映射；不承诺所有 ATS 系统兼容。
 
-字体、来源散列与许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。原创代码和脚本绘制的合成素材采用 MIT；用户提供的示例证件照不在此许可范围内。当前提供阶段 A/B 的源码开发版，发布镜像和正式版本尚未交付。
+字体、来源散列与许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。原创代码和脚本绘制的合成素材采用 MIT；用户提供的示例证件照不在此许可范围内。版本发布流程见 [发布说明](docs/releasing.md)。

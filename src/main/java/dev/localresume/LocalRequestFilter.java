@@ -10,6 +10,10 @@ import java.util.Set;
 /** Loopback binding + host checks + same-origin requests; no public hosting in Stage A. */
 @Component
 public class LocalRequestFilter extends OncePerRequestFilter {
+    private final WorkspaceGate gate;
+    public LocalRequestFilter() { this(new WorkspaceGate()); }
+    @org.springframework.beans.factory.annotation.Autowired
+    public LocalRequestFilter(WorkspaceGate gate) { this.gate = gate; }
     @Override protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain)
             throws ServletException, IOException {
         var hosts = Set.of("127.0.0.1", "localhost", "[::1]");
@@ -26,6 +30,13 @@ public class LocalRequestFilter extends OncePerRequestFilter {
         res.setHeader("Referrer-Policy", "no-referrer");
         res.setHeader("X-Frame-Options", "SAMEORIGIN");
         res.setHeader("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; connect-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'self'");
-        chain.doFilter(req, res);
+        if (req.getRequestURI().startsWith("/api/")) res.setHeader("Cache-Control", "no-store");
+        try (WorkspaceGate.Lease lease = mutation && !req.getRequestURI().startsWith("/api/backups") ? gate.mutation() : null) {
+            chain.doFilter(req, res);
+        } catch (ApiException e) {
+            if (res.isCommitted()) throw e;
+            res.setStatus(e.status); res.setContentType("application/json;charset=UTF-8");
+            res.getWriter().write("{\"code\":\"WORKSPACE_BUSY\",\"message\":\"备份或恢复正在进行，本次修改尚未保存，请稍后重试。\"}");
+        }
     }
 }

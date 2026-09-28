@@ -8,10 +8,12 @@ import org.springframework.util.unit.DataSize;
 
 @Configuration
 public class UploadConfiguration {
-    @Bean MultipartConfigElement multipartConfigElement(@Value("${resume.max-upload-bytes}") long maxBytes) {
+    @Bean MultipartConfigElement multipartConfigElement(@Value("${resume.max-upload-bytes}") long maxBytes,
+        @Value("${resume.max-backup-bytes}") long maxBackupBytes) {
         var factory = new MultipartConfigFactory();
-        factory.setMaxFileSize(DataSize.ofBytes(maxBytes));
-        factory.setMaxRequestSize(DataSize.ofBytes(maxBytes + 524288));
+        long envelope = Math.max(maxBytes, maxBackupBytes);
+        factory.setMaxFileSize(DataSize.ofBytes(envelope));
+        factory.setMaxRequestSize(DataSize.ofBytes(envelope + 524288));
         return factory.createMultipartConfig();
     }
 }

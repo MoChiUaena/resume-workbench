@@ -11,6 +11,7 @@ class PreviewServiceTest {
     @Autowired PreviewService previews;
     @MockitoBean AttachmentStorage storage;
     @MockitoBean org.springframework.jdbc.core.JdbcTemplate jdbc;
+    @MockitoBean org.springframework.transaction.PlatformTransactionManager transactions;
     @Test void rendersBothAssetsEscapesTextAndKeepsPreviousSnapshotStable() {
         var photo = new ResumeDraft.ImageSlot("00000000-0000-0000-0000-000000000001", true, 26, 34, "cover", 0, 1, 50, 50);
         var logo = new ResumeDraft.ImageSlot("00000000-0000-0000-0000-000000000002", true, 26, 26, "contain", 0, 1, 50, 50);
