@@ -1,12 +1,13 @@
 {
   "name": "resume-workbench-ui",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "packageManager": "npm@11.16.0",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vue-tsc --noEmit && vite build",
+    "test:unit": "node --test unit/*.test.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {

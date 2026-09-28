@@ -50,7 +50,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Build frontend
         working-directory: frontend
-        run: npm ci --no-audit --no-fund && npm run build
+        run: npm ci --no-audit --no-fund && npm run test:unit && npm run build
       - name: Test backend with PostgreSQL
         run: chmod +x mvnw && ./mvnw -B -ntp package
       - name: Verify packaged dependencies and notices

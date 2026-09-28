@@ -5,11 +5,12 @@ import BackupPanel from './BackupPanel.vue';
 import LayoutControls from './LayoutControls.vue';
 import FocusedSection from './FocusedSection.vue';
 import ImageControls from './ImageControls.vue';
-import { api, type Asset, type Resume, type Section, type Summary, type Version } from './api';
+import VersionCompare from './VersionCompare.vue';
+import { api, type Asset, type Resume, type Section, type Summary, type Version, type VersionDetail } from './api';
 import { useWorkspace } from './useWorkspace';
 
 const ws=useWorkspace();
-const {resumes,current,document:doc,title,dirty,saving,saveError,saveStatus}=ws;
+const {resumes,current,document:doc,title,dirty,saving,saveError,saveStatus,canUndo,canRedo}=ws;
 const uiTheme=ref<'a'|'b'>(localStorage.getItem('rw-ui-theme')==='b'?'b':'a');
 const darkMode=ref(localStorage.getItem('rw-dark-mode')==='1');
 watch([uiTheme,darkMode],([theme,dark])=>{
@@ -29,12 +30,15 @@ const showBackup=ref(false);
 async function openBackup(){await ws.flush();showBackup.value=true;}
 async function restoredWorkspace(){view.value='list';routeList();await ws.reloadList();await hydrateCards();}
 const versions=ref<Version[]>([]),versionLabel=ref(''),exported=ref<{id:string;revision:number}>();
+const compared=ref<VersionDetail>();
+const comparisonFocus=ref<HTMLElement>();
 const previewUrl=ref(''),previewState=ref('准备预览'),pageCount=ref(1),scale=ref(.85),problem=ref(''),busy=ref(false);
 const previewPane=ref<HTMLElement>(),previewFrame=ref<HTMLIFrameElement>();
 const paperHeight=computed(()=>1123*pageCount.value+(pageCount.value-1)*23);
 let generation=0,previewTimer:ReturnType<typeof setTimeout>,observer:ResizeObserver|undefined;
+let pendingNavigation=false;
 
-async function action(fn:()=>Promise<unknown>){busy.value=true;problem.value='';try{await fn();}catch(e){problem.value=e instanceof Error?e.message:String(e);}finally{busy.value=false;}}
+async function action(fn:()=>Promise<unknown>){if(busy.value)return;ws.breakUndoGroup();busy.value=true;problem.value='';try{await fn();}catch(e){problem.value=e instanceof Error?e.message:String(e);}finally{busy.value=false;}}
 async function hydrateCards(){
   const results=await Promise.allSettled(resumes.value.map(async item=>{
     if(cache[item.id]?.revision===item.revision)return;
@@ -77,22 +81,35 @@ function addSection(){
 function removeSection(){if(!doc.value||!selectedSection.value)return;doc.value.content.sections.splice(doc.value.content.sections.findIndex(s=>s.id===selected.value),1);selected.value='basic';}
 async function selectPanel(id:string){selected.value=id;if(id==='versions'&&current.value)versions.value=await api(`/api/resumes/${current.value.id}/versions`);}
 async function checkpoint(){await ws.flush();if(!current.value)return;await api(`/api/resumes/${current.value.id}/versions`,{expectedRevision:current.value.revision,title:versionLabel.value||'手动快照'});versionLabel.value='';versions.value=await api(`/api/resumes/${current.value.id}/versions`);}
-async function restore(version:Version){await ws.flush();if(!current.value)return;await ws.install(await api<Resume>(`/api/resumes/${current.value.id}/versions/${version.id}/restore`,{expectedRevision:current.value.revision}));versions.value=await api(`/api/resumes/${current.value.id}/versions`);selected.value='versions';}
+async function restore(version:Version){await ws.flush();if(!current.value)return;await ws.install(await api<Resume>(`/api/resumes/${current.value.id}/versions/${version.id}/restore`,{expectedRevision:current.value.revision}),true);versions.value=await api(`/api/resumes/${current.value.id}/versions`);selected.value='versions';}
+async function compareVersion(version:Version){if(!current.value)return;const id=current.value.id,trigger=document.activeElement instanceof HTMLElement?document.activeElement:undefined;const result=await api<VersionDetail>(`/api/resumes/${id}/versions/${version.id}`);if(current.value?.id===id&&view.value==='editor'){comparisonFocus.value=trigger;compared.value=result;}}
+async function restoreCompared(){if(!compared.value)return;await restore(compared.value);compared.value=undefined;}
+function closeComparison(){if(!busy.value)compared.value=undefined;}
+function historyKeys(event:KeyboardEvent){
+ if(event.defaultPrevented||event.isComposing||event.altKey||!(event.ctrlKey||event.metaKey)||view.value!=='editor'||busy.value||showBackup.value||compared.value)return;
+ const key=event.key.toLowerCase();if(key!=='z'&&key!=='y')return;
+ const target=event.target instanceof HTMLElement?event.target:undefined;
+ const editing=target?.closest('input,textarea,[contenteditable=true]');
+ if(editing&&((!target?.closest('.rw-form-pane')&&editing.getAttribute('aria-label')!=='简历名称')||(selected.value==='versions'&&editing.getAttribute('aria-label')!=='简历名称')))return;
+ event.preventDefault();if(key==='y'||event.shiftKey)ws.redo();else ws.undo();
+}
 async function exportPdf(){await ws.flush();if(!current.value)return;const result=await api<{id:string;revision:number}>(`/api/resumes/${current.value.id}/export`,{expectedRevision:current.value.revision});exported.value=result;const link=document.createElement('a');link.href=`/api/exports/${result.id}/pdf`;link.download='resume-workbench.pdf';link.click();if(selected.value==='versions')versions.value=await api(`/api/resumes/${current.value.id}/versions`);}
 function imported(kind:'photo'|'logo',asset:Asset){if(!doc.value)return;assets[kind]=asset;Object.assign(doc.value.layout[kind],{id:asset.id,visible:true,zoom:1,quarterTurns:0,positionX:50,positionY:50});}
 function layoutMessage(event:MessageEvent){if(event.origin!==location.origin||event.source!==previewFrame.value?.contentWindow||event.data?.type!=='resume-layout')return;pageCount.value=event.data.pages||1;previewState.value=event.data.error?'排版超限':'预览已更新';if(event.data.error)problem.value='当前内容无法安全分页，请缩短单条内容或减小字号。';}
 async function refresh(){if(!doc.value||view.value!=='editor')return;const currentGeneration=++generation;previewState.value='更新预览中';try{const result=await api<{url:string}>('/api/documents/preview',JSON.parse(JSON.stringify(doc.value)));if(currentGeneration===generation)previewUrl.value=result.url;}catch(e){if(currentGeneration===generation){previewState.value='预览失败';problem.value=e instanceof Error?e.message:String(e);}}}
 watch(doc,()=>{generation++;previewState.value='更新预览中';clearTimeout(previewTimer);previewTimer=setTimeout(refresh,350);},{deep:true});
-watch(()=>current.value?.id,()=>{previewUrl.value='';pageCount.value=1;exported.value=undefined;versions.value=[];});
+watch(()=>current.value?.id,()=>{previewUrl.value='';pageCount.value=1;exported.value=undefined;versions.value=[];compared.value=undefined;});
+watch(()=>doc.value?.content.sections.map(section=>section.id),ids=>{if(!['basic','images','layout','versions'].includes(selected.value)&&!ids?.includes(selected.value))selected.value='basic';});
 watch(()=>[doc.value?.layout.photo.id,doc.value?.layout.logo.id],async ids=>{for(const [index,kind] of (['photo','logo'] as const).entries()){const id=ids[index];if(!id){assets[kind]=undefined;continue;}try{const asset=await api<Asset>('/api/assets/'+id);if(doc.value?.layout[kind].id===id)assets[kind]=asset;}catch{assets[kind]=undefined;}}});
 function resizePreview(){if(!previewPane.value)return;scale.value=Math.max(.25,Math.min(1,(previewPane.value.clientWidth-48)/794));}
-watch(view,async()=>{await nextTick();observer?.disconnect();if(view.value==='editor'&&previewPane.value){observer=new ResizeObserver(resizePreview);observer.observe(previewPane.value);resizePreview();if(doc.value)await refresh();}});
-async function popstate(){await action(async()=>{const query=new URLSearchParams(location.search),id=query.get('resume');if(query.get('view')==='editor'&&id)await editResume(id,false);else await backToList(false);});}
-onMounted(async()=>{window.addEventListener('message',layoutMessage);window.addEventListener('beforeunload',ws.beforeUnload);window.addEventListener('popstate',popstate);await action(async()=>{config.value=await api('/api/config');await ws.initialize();const query=new URLSearchParams(location.search),id=query.get('resume');if(query.get('view')==='editor'&&id&&resumes.value.some(item=>item.id===id))await editResume(id,false);else await hydrateCards();});});
-onUnmounted(()=>{observer?.disconnect();clearTimeout(previewTimer);ws.dispose();window.removeEventListener('message',layoutMessage);window.removeEventListener('beforeunload',ws.beforeUnload);window.removeEventListener('popstate',popstate);});
+watch(view,async()=>{if(view.value!=='editor')compared.value=undefined;await nextTick();observer?.disconnect();if(view.value==='editor'&&previewPane.value){observer=new ResizeObserver(resizePreview);observer.observe(previewPane.value);resizePreview();if(doc.value)await refresh();}});
+async function popstate(){if(busy.value){pendingNavigation=true;return;}pendingNavigation=false;await action(async()=>{const query=new URLSearchParams(location.search),id=query.get('resume');if(query.get('view')==='editor'&&id)await editResume(id,false);else await backToList(false);});}
+watch(busy,value=>{if(!value&&pendingNavigation)void popstate();});
+onMounted(async()=>{window.addEventListener('keydown',historyKeys);window.addEventListener('message',layoutMessage);window.addEventListener('beforeunload',ws.beforeUnload);window.addEventListener('popstate',popstate);await action(async()=>{config.value=await api('/api/config');await ws.initialize();const query=new URLSearchParams(location.search),id=query.get('resume');if(query.get('view')==='editor'&&id&&resumes.value.some(item=>item.id===id))await editResume(id,false);else await hydrateCards();});});
+onUnmounted(()=>{observer?.disconnect();clearTimeout(previewTimer);ws.dispose();window.removeEventListener('keydown',historyKeys);window.removeEventListener('message',layoutMessage);window.removeEventListener('beforeunload',ws.beforeUnload);window.removeEventListener('popstate',popstate);});
 </script>
 <template>
- <div class="rw-app" :inert="showBackup">
+ <div class="rw-app" :inert="showBackup||!!compared" @input.capture="ws.editInput" @change.capture="ws.editInput" @click.capture="ws.breakUndoGroup" @focusout.capture="ws.breakUndoGroup">
   <header class="rw-header"><div class="rw-header-inner"><button class="rw-brand" @click="view==='editor'?action(()=>backToList()):undefined"><span class="rw-mark">简</span><span>简历工作台<small>RESUME WORKBENCH</small></span></button><nav><button :class="{active:view==='list'}" @click="view==='editor'?action(()=>backToList()):undefined">我的简历</button><span v-if="view==='editor'" class="active">简历编辑</span></nav><button class="backup-open" :disabled="busy" @click="action(openBackup)">备份与恢复</button><div class="rw-local">● 数据保存在本机</div><AppearanceControls v-model:theme="uiTheme" v-model:dark="darkMode"/></div></header>
   <p v-if="problem" class="rw-error" role="alert">{{problem}} <button @click="problem=''">收起</button></p>
 
@@ -103,7 +120,7 @@ onUnmounted(()=>{observer?.disconnect();clearTimeout(previewTimer);ws.dispose();
    <div v-if="resumes.length" class="rw-list-extras"><button @click="action(()=>createResume('one'))">＋ 一页合成示例</button><button @click="action(()=>createResume('two'))">＋ 两页合成示例</button></div>
   </main>
 
-  <div v-else-if="doc&&current" class="rw-editor-page"><div class="rw-editor-top"><button @click="action(()=>backToList())">← 我的简历</button><input v-model="title" aria-label="简历名称" maxlength="120" :disabled="busy"><span data-testid="save-status" role="status" :class="{failed:!!saveError}">{{saveStatus}}</span><span class="rw-revision">r{{current.revision}}</span><button @click="action(checkpoint)">保存版本</button><button class="rw-primary" :disabled="busy" @click="action(exportPdf)">导出 PDF</button></div>
+  <div v-else-if="doc&&current" class="rw-editor-page"><div class="rw-editor-top"><button :disabled="busy" @click="action(()=>backToList())">← 我的简历</button><input v-model="title" aria-label="简历名称" maxlength="120" :disabled="busy"><div class="rw-undo-tools" role="group" aria-label="撤销与重做"><button :disabled="busy||!canUndo" aria-label="撤销" aria-keyshortcuts="Control+z Meta+z" title="撤销（Ctrl / ⌘ Z）" @click="ws.undo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5 4 10l5 5M4 10h10a6 6 0 0 1 0 12" transform="translate(0 -3)"/></svg>撤销</button><button :disabled="busy||!canRedo" aria-label="重做" aria-keyshortcuts="Control+y Control+Shift+z Meta+Shift+z" title="重做（Ctrl Y / Ctrl ⇧ Z / ⌘ ⇧ Z）" @click="ws.redo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5 5 5-5 5m5-5H10a6 6 0 0 0 0 12" transform="translate(0 -3)"/></svg>重做</button></div><span data-testid="save-status" role="status" :class="{failed:!!saveError}">{{saveStatus}}</span><span class="rw-revision">r{{current.revision}}</span><button :disabled="busy" @click="action(checkpoint)">保存版本</button><button class="rw-primary" :disabled="busy" @click="action(exportPdf)">导出 PDF</button></div>
    <div v-if="saveError" class="rw-save-error" role="alert">{{saveError}}<button @click="action(ws.flush)">重试保存</button><button @click="action(ws.preserveAsCopy)">另存副本</button><button @click="action(ws.reloadCurrent)">重新载入</button></div>
    <div class="rw-editor-grid"><aside class="rw-module-nav"><div class="rw-module-heading"><strong>修改简历</strong><small>选择左边模块，右边实时预览</small></div><div class="rw-module-list"><span class="rw-menu-caption">简历内容</span><button :class="{active:selected==='basic'}" @click="selected='basic'">基本信息 <span aria-hidden="true">›</span></button><button v-for="section in doc.content.sections" :key="section.id" :class="{active:selected===section.id,hidden:!section.visible}" :data-testid="'nav-'+section.type" @click="selected=section.id">{{section.title}} <span aria-hidden="true">›</span></button><div class="rw-add-module"><select v-model="newType" aria-label="新模块类型"><option v-for="(label,key) in names" :key="key" :value="key">{{label}}</option></select><button :disabled="doc.content.sections.length>=20" @click="addSection">＋ 添加模块</button></div><span class="rw-menu-caption">版式与文件</span><button :class="{active:selected==='images'}" @click="selected='images'">照片与校徽 <span aria-hidden="true">›</span></button><button :class="{active:selected==='layout'}" @click="selected='layout'">版式设置 <span aria-hidden="true">›</span></button><button :class="{active:selected==='versions'}" @click="action(()=>selectPanel('versions'))">历史版本 <span aria-hidden="true">›</span></button></div></aside>
     <section class="rw-form-pane"><fieldset :disabled="busy"><div class="rw-form-heading"><span class="rw-overline">简历内容 / EDITOR</span><h1>{{selectedSection?.title||({basic:'基本信息',images:'照片与校徽',layout:'版式设置',versions:'历史版本'} as Record<string,string>)[selected]}}</h1><p>修改后会自动保存，右侧简历随输入更新。</p></div>
@@ -111,10 +128,11 @@ onUnmounted(()=>{observer?.disconnect();clearTimeout(previewTimer);ws.dispose();
       <FocusedSection v-else-if="selectedSection" :section="selectedSection" :content="doc.content" @removed="removeSection"/>
       <div v-else-if="selected==='images'" class="rw-image-fields"><ImageControls kind="photo" title="证件照" :slot="doc.layout.photo" :asset="assets.photo" :max-bytes="config.maxUploadBytes" @imported="imported('photo',$event)" @removed="doc.layout.photo.id=null"/><ImageControls kind="logo" title="学校 Logo" :slot="doc.layout.logo" :asset="assets.logo" :max-bytes="config.maxUploadBytes" @imported="imported('logo',$event)" @removed="doc.layout.logo.id=null"/></div>
       <LayoutControls v-else-if="selected==='layout'" :layout="doc.layout"/>
-      <div v-else-if="selected==='versions'" class="rw-version-fields"><label class="form-label">快照名称<input v-model="versionLabel" placeholder="例如：Java 岗投递前" aria-label="快照名称"></label><button class="rw-primary" @click="action(checkpoint)">保存版本快照</button><p>恢复前会自动保留当前版本。</p><ol><li v-for="version in versions" :key="version.id"><span><strong>{{version.label}}</strong><small>r{{version.sourceRevision}} · {{new Date(version.createdAt).toLocaleString('zh-CN')}}</small></span><button @click="action(()=>restore(version))">恢复</button></li></ol></div>
+      <div v-else-if="selected==='versions'" class="rw-version-fields"><label class="form-label">快照名称<input v-model="versionLabel" placeholder="例如：Java 岗投递前" aria-label="快照名称"></label><button class="rw-primary" @click="action(checkpoint)">保存版本快照</button><p>先查看对比，再选择需要恢复的版本。恢复前会自动保留当前版本。</p><ol><li v-for="version in versions" :key="version.id"><span><strong>{{version.label}}</strong><small>r{{version.sourceRevision}} · {{new Date(version.createdAt).toLocaleString('zh-CN')}}</small></span><div class="rw-version-actions"><button @click="action(()=>compareVersion(version))">对比</button><button @click="action(()=>restore(version))">恢复</button></div></li></ol></div>
      </fieldset></section>
     <section class="rw-preview-area" ref="previewPane"><div class="rw-preview-heading"><span data-testid="preview-status" role="status">{{previewState}}</span><span>A4 · {{pageCount}} 页</span></div><div class="rw-paper-wrap" :style="{width:794*scale+'px',height:paperHeight*scale+'px'}"><iframe v-if="previewUrl" ref="previewFrame" title="简历实时预览" :src="previewUrl" :style="{width:'794px',height:paperHeight+'px',transform:`scale(${scale})`}"></iframe><div v-else class="rw-preview-empty">正在生成预览…</div></div><p v-if="exported" class="rw-export-result">PDF 已生成 · 修订 r{{exported.revision}} <a :href="'/api/exports/'+exported.id+'/pdf'">重新下载</a></p></section>
    </div></div>
  </div>
  <BackupPanel v-if="showBackup" :max-bytes="config.maxBackupBytes" @close="showBackup=false" @restored="action(restoredWorkspace)"/>
+ <VersionCompare v-if="compared&&doc&&current" :version="compared" :title="title" :document="doc" :revision="current.revision" :dirty="dirty" :busy="busy" :error="problem" :return-focus="comparisonFocus" @close="closeComparison" @restore="action(restoreCompared)"/>
 </template>

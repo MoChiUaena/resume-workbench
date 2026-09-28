@@ -48,6 +48,7 @@ public class ResumeController {
         resumes.delete(id,input.expectedRevision()); return Map.of("deleted",true);
     }
     @GetMapping("/{id}/versions") public Object versions(@PathVariable UUID id) { return resumes.versions(id); }
+    @GetMapping("/{id}/versions/{versionId}") public Object version(@PathVariable UUID id,@PathVariable UUID versionId) { return resumes.version(id,versionId); }
     @PostMapping("/{id}/versions") public Object checkpoint(@PathVariable UUID id,@Valid @RequestBody NamedRevision input) {
         return resumes.checkpoint(id,input.expectedRevision(),input.title());
     }

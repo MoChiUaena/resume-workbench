@@ -91,7 +91,8 @@ def generate(args):
         npm.append({'name':name,'version':version,'license':license_id,'role':'build/test' if package.get('dev') else 'production dependency tree','optional':package.get('optional',False),'integrity':package.get('integrity',''),'upstreamTexts':texts})
     if missing: raise SystemExit('Unresolved license declarations: '+', '.join(missing))
     java.sort(key=lambda x:x['coordinate'])
-    result={'inventoryVersion':1,'applicationVersion':'0.1.0','scope':'Resolved Maven runtime JARs and entire npm lockfile; OS/JDK/browser retain their own notices in the image.','java':java,'npm':npm,'unresolvedDeclarations':missing}
+    version=ET.parse(ROOT/'pom.xml').getroot().find('{http://maven.apache.org/POM/4.0.0}version').text
+    result={'inventoryVersion':1,'applicationVersion':version,'scope':'Resolved Maven runtime JARs and entire npm lockfile; OS/JDK/browser retain their own notices in the image.','java':java,'npm':npm,'unresolvedDeclarations':missing}
     DEST.mkdir(parents=True,exist_ok=True)
     (DEST/'inventory.json').write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
     lines=['# 依赖许可证清单','',f'解析结果：{len(java)} 个 Maven 运行期依赖（其中 {sum(x["packaged"] for x in java)} 个实际 JAR 随应用分发）、{len(npm)} 个 npm 锁定包，未识别声明为 0。','',

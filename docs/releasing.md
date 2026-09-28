@@ -1,10 +1,10 @@
 # 验证与发布流程
 
-GitHub Actions 在 `main`、PR 和手动运行时检查前端构建、34 项 Java 测试、可执行 JAR / 许可证清单、Docker 镜像、11 项浏览器测试、离线使用、全新实例备份恢复、中文 PDF 和容器重建持久化。测试只在合成数据的独立 PostgreSQL schema / Compose 项目执行。
+GitHub Actions 在 `main`、PR 和手动运行时检查 9 项前端逻辑测试与构建、35 项 Java 测试、可执行 JAR / 许可证清单、Docker 镜像、15 项浏览器测试、离线使用、全新实例备份恢复、中文 PDF 和容器重建持久化。测试只在合成数据的独立 PostgreSQL schema / Compose 项目执行。
 
 推送 `v<版本>` 标签会运行同一套检查。全部通过后，将**刚测试的同一份镜像**推送到 `ghcr.io/mochiuaena/resume-workbench:<版本>`；失败不会发布。工作流使用仓库自带 `GITHUB_TOKEN` 的 packages 写入权限，不需要用户提供 Token。Action 与基础镜像均固定到 commit / digest。
 
-首个候选版本为 `v0.1.0-rc.1`，正式首版为 `v0.1.0`，当前容器平台为 Linux amd64。发布前更新 POM、Compose、.env.example、README 和 published-image 工作流默认版本。可执行文件固定为 target/resume-workbench.jar，避免每次发布修改启动路径。已发布版本不复用标签覆盖；需要修改时使用新版本。
+首个候选版本为 `v0.1.0-rc.1`，正式首版为 `v0.1.0`，当前版本为 `v0.2.0`，容器平台为 Linux amd64。发布前更新 POM、前端 package / lockfile、依赖清单的 applicationVersion、Compose、.env.example、README 和 published-image 工作流默认版本。可执行文件固定为 target/resume-workbench.jar，避免每次发布修改启动路径。已发布版本不复用标签覆盖；需要修改时使用新版本。
 
 发布前检查：
 
