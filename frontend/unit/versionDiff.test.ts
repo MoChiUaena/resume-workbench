@@ -26,6 +26,7 @@ test('module and entry reordering follows stable IDs instead of reporting replac
 test('insertions, removals, hidden modules and raw text remain understandable and intact', () => {
   const next = structuredClone(baseline); next.title = '改名'; next.document.content.sections.pop();
   const section = next.document.content.sections[0]; section.visible = false; section.entries.pop();
+  next.document.content.sections.push({ id: 'untitled', type: 'custom', title: '', visible: true, pageBreakBefore: false, entries: [] });
   section.entries[0].bullets = ['<img src=x onerror=alert(1)>', '中文段落'];
   section.entries.push({ id: 'new', title: '新项目', meta: '', bulleted: false, bullets: ['新增正文'] });
   const groups = compareDrafts(baseline, next); const changes = groups.flatMap(g => g.changes);
@@ -34,6 +35,7 @@ test('insertions, removals, hidden modules and raw text remain understandable an
   assert.ok(changes.some(c => c.field.includes('新增') && c.after.includes('新增正文')));
   assert.ok(changes.some(c => c.field.includes('正文') && c.after === '<img src=x onerror=alert(1)>\n中文段落'));
   assert.ok(changes.some(c => c.field === '显示模块' && c.after === '否'));
+  assert.ok(groups.some(g => g.id === 'section-untitled' && g.title === '未命名模块'));
 });
 test('image replacement, crop changes, zero spacing and layout values are independently reported', () => {
   const next = structuredClone(baseline); next.document.layout.photo.id = 'photo-id';

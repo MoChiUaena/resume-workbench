@@ -70,6 +70,7 @@ test('undo during an in-flight save is serialized and a rejected edit can be und
  const peer=await(await request.put('/api/resumes/'+resume.id,{headers,data:{title:committed.title,document:committed.document,expectedRevision:committed.revision,mutationId:crypto.randomUUID()}})).json();
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(page.getByRole('alert')).toContainText('REVISION_CONFLICT');await expect(page.getByLabel('姓名',{exact:true})).toHaveValue('奶龙');expect((await(await request.get('/api/resumes/'+resume.id)).json()).document).toEqual(peer.document);
  const copied=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/resumes'&&r.request().method()==='POST');await page.getByRole('button',{name:'另存副本',exact:true}).click();const copy=await(await copied).json();owned.push(copy.id);await ready(page);expect(copy.document).toEqual(resume.document);expect((await(await request.get('/api/resumes/'+resume.id)).json()).document).toEqual(peer.document);
+ await page.reload();await ready(page);expect(new URL(page.url()).searchParams.get('resume')).toBe(copy.id);await expect(page.getByLabel('姓名',{exact:true})).toHaveValue('奶龙');
 });
 
 test('comparison includes an unsaved draft without retrying or overwriting it',async({page,request})=>{

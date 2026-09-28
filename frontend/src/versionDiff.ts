@@ -35,7 +35,7 @@ export function compareDrafts(before: DraftState, after: DraftState): DiffGroup[
   const ids = [...new Set([...newSections.map(s => s.id), ...oldSections.map(s => s.id)])];
   for (const id of ids) {
     const old = oldSections.find(s => s.id === id), next = newSections.find(s => s.id === id);
-    const group: DiffGroup = { id: `section-${id}`, title: next?.title || old!.title, category: 'content', changes: [] };
+    const group: DiffGroup = { id: `section-${id}`, title: next?.title || old?.title || '未命名模块', category: 'content', changes: [] };
     if (!old || !next) group.changes.push({ field: old ? '删除模块' : '新增模块', before: old ? sectionText(old) : '（未添加）', after: next ? sectionText(next) : '（已删除）' });
     else {
       change(group, '模块标题', old.title, next.title);
