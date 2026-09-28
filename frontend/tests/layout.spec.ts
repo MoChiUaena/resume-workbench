@@ -25,7 +25,21 @@ test('text, style and spacing are live, persisted, versioned and exported consis
  await page.getByRole('button',{name:'版式设置',exact:true}).click();await page.getByRole('tab',{name:'样式',exact:true}).click();await page.getByRole('button',{name:'恢复默认样式'}).click();await page.getByRole('tab',{name:'间距',exact:true}).click();await page.getByRole('button',{name:'恢复默认间距'}).click();await ready(page);
  let current=await(await request.get('/api/resumes/'+resume.id)).json();expect(current.document.layout.presentation).toMatchObject({accentColor:'#244f63',alignment:'left',contactStyle:'plain',marginHorizontalMm:16,marginTopMm:16,marginBottomMm:16});expect(current.document.layout.font).toBe('serif');expect(current.document.content).toEqual(resume.document.content);
  download=page.waitForEvent('download');await page.getByRole('button',{name:'导出 PDF',exact:true}).click();await(await download).saveAs(path.join(root,'output/pdf/layout-reset.pdf'));
- await page.getByRole('button',{name:'历史版本',exact:true}).click();await page.getByRole('listitem').filter({hasText:'排版基线'}).getByRole('button',{name:'恢复',exact:true}).click();await ready(page);
+ await page.getByRole('button',{name:'历史版本',exact:true}).click();
+ // Hold the mutation so the old saved/preview labels cannot hide an unfinished restore.
+ let releaseRestore!:()=>void;
+ const restoreGate=new Promise<void>(resolve=>{releaseRestore=resolve;});
+ await page.route(`**/api/resumes/${resume.id}/versions/*/restore`,async route=>{await restoreGate;await route.continue();},{times:1});
+ const restored=page.waitForResponse(response=>response.request().method()==='POST'&&new URL(response.url()).pathname.startsWith(`/api/resumes/${resume.id}/versions/`)&&new URL(response.url()).pathname.endsWith('/restore'));
+ try{
+  await page.getByRole('listitem').filter({hasText:'排版基线'}).getByRole('button',{name:'恢复',exact:true}).click();
+  await expect(page.getByLabel('快照名称')).toBeDisabled();
+  expect((await(await request.get('/api/resumes/'+resume.id)).json()).document.layout).toEqual(current.document.layout);
+ }finally{releaseRestore();}
+ const restoredResponse=await restored;expect(restoredResponse.ok()).toBeTruthy();
+ const restoredResume=await restoredResponse.json();expect(restoredResume.document.layout).toEqual(saved.document.layout);expect(restoredResume.revision).toBeGreaterThan(current.revision);
+ await expect(page.getByLabel('快照名称')).toBeEnabled();await ready(page);
+ await expect(frame.locator('body')).toHaveClass(/alignment-center contacts-icons headings-bar/);await expect(frame.locator('#pages .contact-icon')).toHaveCount(3);
  current=await(await request.get('/api/resumes/'+resume.id)).json();expect(current.document.layout).toEqual(saved.document.layout);
  await page.reload();await ready(page);await page.getByRole('button',{name:'版式设置',exact:true}).click();await page.getByRole('tab',{name:'间距',exact:true}).click();await expect(page.getByLabel('上页边距',{exact:true})).toHaveValue('22');
  await page.setViewportSize({width:1640,height:1100});
