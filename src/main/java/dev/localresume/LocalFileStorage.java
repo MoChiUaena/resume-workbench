@@ -44,4 +44,14 @@ public class LocalFileStorage implements AttachmentStorage {
         metadata(id);
         return Files.readAllBytes(directory(id).resolve("image.png"));
     }
+    @Override public byte[] original(String id) throws IOException {
+        var asset = metadata(id);
+        return Files.readAllBytes(directory(id).resolve("original." + asset.format().toLowerCase(java.util.Locale.ROOT)));
+    }
+    @Override public void delete(String id) throws IOException {
+        Path path = directory(id);
+        if (!Files.exists(path)) return;
+        try (var files = Files.list(path)) { for (Path file : files.toList()) Files.deleteIfExists(file); }
+        Files.deleteIfExists(path);
+    }
 }

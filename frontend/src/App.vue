@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import AppearanceControls from './AppearanceControls.vue';
+import BackupPanel from './BackupPanel.vue';
 import FocusedSection from './FocusedSection.vue';
 import ImageControls from './ImageControls.vue';
 import { api, type Asset, type Resume, type Section, type Summary, type Version } from './api';
@@ -22,7 +23,10 @@ const cache=reactive<Record<string,Resume>>({});
 const selected=ref('basic'), newType=ref<Section['type']>('project');
 const names:Record<Section['type'],string>={education:'教育背景',experience:'工作 / 实习经历',project:'项目经历',skills:'专业技能',custom:'自定义文本'};
 const selectedSection=computed(()=>doc.value?.content.sections.find(section=>section.id===selected.value));
-const config=ref({maxUploadBytes:5242880}), assets=reactive<{photo?:Asset;logo?:Asset}>({});
+const config=ref({maxUploadBytes:5242880,maxBackupBytes:268435456}), assets=reactive<{photo?:Asset;logo?:Asset}>({});
+const showBackup=ref(false);
+async function openBackup(){await ws.flush();showBackup.value=true;}
+async function restoredWorkspace(){view.value='list';routeList();await ws.reloadList();await hydrateCards();}
 const versions=ref<Version[]>([]),versionLabel=ref(''),exported=ref<{id:string;revision:number}>();
 const previewUrl=ref(''),previewState=ref('准备预览'),pageCount=ref(1),scale=ref(.85),problem=ref(''),busy=ref(false);
 const previewPane=ref<HTMLElement>(),previewFrame=ref<HTMLIFrameElement>();
@@ -87,8 +91,8 @@ onMounted(async()=>{window.addEventListener('message',layoutMessage);window.addE
 onUnmounted(()=>{observer?.disconnect();clearTimeout(previewTimer);ws.dispose();window.removeEventListener('message',layoutMessage);window.removeEventListener('beforeunload',ws.beforeUnload);window.removeEventListener('popstate',popstate);});
 </script>
 <template>
- <div class="rw-app">
-  <header class="rw-header"><div class="rw-header-inner"><button class="rw-brand" @click="view==='editor'?action(()=>backToList()):undefined"><span class="rw-mark">简</span><span>简历工作台<small>RESUME WORKBENCH</small></span></button><nav><button :class="{active:view==='list'}" @click="view==='editor'?action(()=>backToList()):undefined">我的简历</button><span v-if="view==='editor'" class="active">简历编辑</span></nav><div class="rw-local">● 数据保存在本机</div><AppearanceControls v-model:theme="uiTheme" v-model:dark="darkMode"/></div></header>
+ <div class="rw-app" :inert="showBackup">
+  <header class="rw-header"><div class="rw-header-inner"><button class="rw-brand" @click="view==='editor'?action(()=>backToList()):undefined"><span class="rw-mark">简</span><span>简历工作台<small>RESUME WORKBENCH</small></span></button><nav><button :class="{active:view==='list'}" @click="view==='editor'?action(()=>backToList()):undefined">我的简历</button><span v-if="view==='editor'" class="active">简历编辑</span></nav><button class="backup-open" :disabled="busy" @click="action(openBackup)">备份与恢复</button><div class="rw-local">● 数据保存在本机</div><AppearanceControls v-model:theme="uiTheme" v-model:dark="darkMode"/></div></header>
   <p v-if="problem" class="rw-error" role="alert">{{problem}} <button @click="problem=''">收起</button></p>
 
   <main v-if="view==='list'" class="rw-list-page"><div class="rw-list-heading"><div><span class="rw-overline">简历管理</span><h1>我的简历 <small>{{String(resumes.length).padStart(2,'0')}}</small></h1><p>从已有版本继续编辑，或为新岗位复制一份。</p></div><button class="rw-primary" :disabled="busy" @click="action(()=>createResume('blank'))">＋ 新建简历</button></div>
@@ -111,4 +115,5 @@ onUnmounted(()=>{observer?.disconnect();clearTimeout(previewTimer);ws.dispose();
     <section class="rw-preview-area" ref="previewPane"><div class="rw-preview-heading"><span data-testid="preview-status" role="status">{{previewState}}</span><span>A4 · {{pageCount}} 页</span></div><div class="rw-paper-wrap" :style="{width:794*scale+'px',height:paperHeight*scale+'px'}"><iframe v-if="previewUrl" ref="previewFrame" title="简历实时预览" :src="previewUrl" :style="{width:'794px',height:paperHeight+'px',transform:`scale(${scale})`}"></iframe><div v-else class="rw-preview-empty">正在生成预览…</div></div><p v-if="exported" class="rw-export-result">PDF 已生成 · 修订 r{{exported.revision}} <a :href="'/api/exports/'+exported.id+'/pdf'">重新下载</a></p></section>
    </div></div>
  </div>
+ <BackupPanel v-if="showBackup" :max-bytes="config.maxBackupBytes" @close="showBackup=false" @restored="action(restoredWorkspace)"/>
 </template>

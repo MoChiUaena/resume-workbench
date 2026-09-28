@@ -1,0 +1,13 @@
+.git
+.env
+.env.*
+.tools
+data
+output
+tmp
+target
+frontend/node_modules
+frontend/dist
+frontend/test-results
+frontend/playwright-report
+*.log

@@ -1,5 +1,5 @@
 server:
-  address: 127.0.0.1
+  address: ${SERVER_ADDRESS:127.0.0.1}
   port: ${PORT:18765}
   error:
     include-message: never
@@ -27,3 +27,4 @@ resume:
   data-dir: ${RESUME_DATA_DIR:./data}
   max-upload-bytes: ${RESUME_MAX_UPLOAD_BYTES:5242880}
   max-pixels: 24000000
+  max-backup-bytes: ${RESUME_MAX_BACKUP_BYTES:268435456}
