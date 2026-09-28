@@ -1,0 +1,67 @@
+name: Verify published image
+on:
+  push:
+    branches: [deployment-backup]
+    paths: ['.github/workflows/verify-published.yml']
+  workflow_dispatch:
+    inputs:
+      image:
+        description: Published version to verify anonymously
+        default: ghcr.io/mochiuaena/resume-workbench:0.1.0-rc.1
+        required: true
+permissions:
+  contents: read
+jobs:
+  published:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      RESUME_APP_IMAGE: ${{ inputs.image || 'ghcr.io/mochiuaena/resume-workbench:0.1.0-rc.1' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Pull the published image without registry credentials
+        run: |
+          [[ "$RESUME_APP_IMAGE" =~ ^ghcr\.io/mochiuaena/resume-workbench:[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.]+)?$ ]]
+          mkdir -p .tools/anonymous
+          docker --config .tools/anonymous pull "$RESUME_APP_IMAGE"
+          docker image inspect "$RESUME_APP_IMAGE" --format '{{json .RepoDigests}}'
+      - name: Start from configuration files in empty directories
+        run: |
+          for side in source target; do
+            mkdir -p .tools/published/$side
+            cp compose.yml .tools/published/$side/compose.yml
+            port=18767
+            if [ "$side" = target ]; then port=18769; fi
+            password=$(openssl rand -hex 24)
+            printf 'RESUME_DB_PASSWORD=%s\nRESUME_PORT=%s\n' "$password" "$port" > .tools/published/$side/.env
+            docker compose -p resume-published-$side -f .tools/published/$side/compose.yml --env-file .tools/published/$side/.env up -d --wait --wait-timeout 120
+          done
+      - name: Verify editable backup restoration and searchable PDF
+        run: |
+          python3 scripts/verify-backup.py --isolated
+          python3 -m pip install pypdf==6.10.0
+          python3 - <<'PY'
+          from pypdf import PdfReader
+          reader = PdfReader('output/pdf/restored-new-instance.pdf')
+          assert len(reader.pages) == 2
+          assert '全新实例恢复后继续编辑' in reader.pages[0].extract_text()
+          assert '奶龙' in reader.pages[0].extract_text()
+          print('Published image: editable restoration and two-page Chinese PDF passed.')
+          PY
+      - name: Upload published-image evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: published-image-evidence
+          retention-days: 14
+          path: |
+            output/stage-c-backup-verification.json
+            output/pdf/restored-new-instance.pdf
+      - name: Stop disposable workspaces
+        if: always()
+        run: |
+          for side in source target; do
+            if [ -f .tools/published/$side/compose.yml ]; then
+              docker compose -p resume-published-$side -f .tools/published/$side/compose.yml --env-file .tools/published/$side/.env down
+            fi
+          done
