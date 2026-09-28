@@ -99,7 +99,7 @@ test('both templates export searchable one/two-page PDFs with local images and f
 
 test('long edited content paginates without clipping or dropping bullet items',async({page,request})=>{
  const resume=await create(request);const doc=resume.document;doc.content.sections=doc.content.sections.filter((s:any)=>s.type==='project');
- doc.layout.fontSize=12;doc.layout.lineHeight=1.85;doc.layout.marginMm=22;
+ doc.layout.fontSize=12;doc.layout.lineHeight=1.85;Object.assign(doc.layout.presentation,{marginHorizontalMm:22,marginTopMm:22,marginBottomMm:22});
  const entry=doc.content.sections[0].entries[0];doc.content.sections[0].entries=[entry];entry.bullets=Array.from({length:30},(_,i)=>`唯一条目${String(i).padStart(2,'0')}：`+'中文长内容与 Spring Boot 项目设计说明，验证自动续页时每条内容完整保留。'.repeat(3));
  const response=await request.post('/api/documents/preview',{headers,data:doc});expect(response.ok()).toBeTruthy();await page.goto((await response.json()).url);await page.waitForFunction(()=>(window as any).__resumeReady || (window as any).__resumeError);
  expect(await page.evaluate(()=>(window as any).__resumeError)).toBeUndefined();expect(await page.locator('.sheet').count()).toBeGreaterThan(2);

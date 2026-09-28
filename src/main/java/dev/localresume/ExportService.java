@@ -42,7 +42,7 @@ public class ExportService {
             page.waitForFunction("() => window.__resumeReady === true || window.__resumeError");
             Object layoutError=page.evaluate("() => window.__resumeError || null");
             if(layoutError!=null) throw new ApiException("LAYOUT_OVERFLOW","当前内容无法安全分页，请缩短单条内容或减小字号。",422);
-            boolean fits = (boolean) page.evaluate("() => Array.from(document.querySelectorAll('.sheet')).every(s => s.querySelector('.page-content').getBoundingClientRect().bottom < s.querySelector('.page-footer').getBoundingClientRect().top - 8)");
+            boolean fits = (boolean) page.evaluate("() => Array.from(document.querySelectorAll('.sheet')).every(s => s.querySelector('.page-content').getBoundingClientRect().bottom < Math.min(s.querySelector('.page-footer').getBoundingClientRect().top - 8, s.getBoundingClientRect().bottom - parseFloat(getComputedStyle(s).paddingBottom)))");
             if (!fits) throw new ApiException("LAYOUT_OVERFLOW", "当前内容超出 A4 页面，请缩小图片或缩短页眉文字。", 422);
             byte[] bytes = page.pdf(new Page.PdfOptions().setPreferCSSPageSize(true).setPrintBackground(true));
             Files.createDirectories(directory);

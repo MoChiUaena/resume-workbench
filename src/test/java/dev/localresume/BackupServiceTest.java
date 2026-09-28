@@ -40,9 +40,12 @@ class BackupServiceTest {
             new ResumeDraft.ImageSlot(photo.id(),true,26,34,"cover",0,1,50,50),new ResumeDraft.ImageSlot(logo.id(),true,26,26,"contain",0,1,50,50)));
     }
     @Test void completeBackupRestoresEditableDataVersionsOriginalsAndExportsWithoutOverwrite()throws Exception{
-        var doc=withImages();var original=resumes.create("基础简历",doc);
+        var base=withImages();var layout=base.layout();
+        var style=new ResumeDocument.Presentation("en","#c65c19","center","icons","bar",18,22,20,4,1.2);
+        var doc=new ResumeDocument(3,base.content(),new ResumeDocument.Layout(layout.template(),layout.font(),layout.fontSize(),layout.lineHeight(),layout.sectionGapMm(),layout.marginMm(),layout.swapImages(),layout.photo(),layout.logo(),style));
+        var original=resumes.create("基础简历",doc);
         var checkpoint=resumes.checkpoint(original.id(),1,"首次投递");
-        var l=doc.layout();var withoutPhoto=new ResumeDocument(2,doc.content(),new ResumeDocument.Layout(l.template(),l.font(),l.fontSize(),l.lineHeight(),l.sectionGapMm(),l.marginMm(),false,new ResumeDraft.ImageSlot(null,true,26,34,"cover",0,1,50,50),l.logo()));
+        var l=doc.layout();var withoutPhoto=new ResumeDocument(3,doc.content(),new ResumeDocument.Layout(l.template(),l.font(),l.fontSize(),l.lineHeight(),l.sectionGapMm(),l.marginMm(),false,new ResumeDraft.ImageSlot(null,true,26,34,"cover",0,1,50,50),l.logo(),l.presentation()));
         resumes.save(original.id(),new ResumeService.Save("当前版",withoutPhoto,1,UUID.randomUUID()));
         Files.createDirectories(data.resolve("exports"));String exportId=UUID.randomUUID().toString();byte[] pdf="%PDF-1.4\nfixture\n%%EOF".getBytes();
         Files.write(data.resolve("exports/"+exportId+".pdf"),pdf);mapper.writeValue(data.resolve("exports/"+exportId+".json").toFile(),new ExportService.Export(exportId,UUID.randomUUID().toString(),"0".repeat(64),ImageService.sha(pdf),Instant.now(),original.id().toString(),checkpoint.id().toString(),1L));
@@ -53,9 +56,32 @@ class BackupServiceTest {
         assertThat(resumes.list()).hasSize(2);assertThat(resumes.get(original.id()).title()).isEqualTo("当前版");
         UUID importedId=restored.resumeIds().getFirst();var imported=resumes.get(importedId);
         assertThat(importedId).isNotEqualTo(original.id());assertThat(imported.document().content()).isEqualTo(doc.content());assertThat(imported.document().layout().photo().id()).isNull();
+        assertThat(imported.document().layout().presentation()).isEqualTo(style);
         var importedVersion=resumes.versions(importedId).stream().filter(v->v.label().equals("首次投递")).findFirst().orElseThrow();
         var recovered=resumes.restore(importedId,importedVersion.id(),imported.revision());String photoId=recovered.document().layout().photo().id();
         assertThat(photoId).isNotEqualTo(doc.layout().photo().id());assertThat(storage.image(photoId)).isEqualTo(storage.image(doc.layout().photo().id()));assertThat(storage.original(photoId)).isEqualTo(storage.original(doc.layout().photo().id()));
+        assertThat(recovered.document().layout().presentation()).isEqualTo(style);
+    }
+    @Test void schemaTwoBackupsRestoreWithTheirOriginalAppearance()throws Exception {
+        var doc=withImages();resumes.create("旧版本简历",doc);
+        var created=backups.create();var files=new LinkedHashMap<String,byte[]>();
+        try(var zip=new java.util.zip.ZipInputStream(Files.newInputStream(backups.download(created.id())))){
+            java.util.zip.ZipEntry entry;while((entry=zip.getNextEntry())!=null)if(!entry.getName().equals("manifest.json"))files.put(entry.getName(),zip.readAllBytes());
+        }
+        var workspace=(com.fasterxml.jackson.databind.node.ObjectNode)mapper.readTree(files.get("workspace.json"));workspace.put("schemaVersion",2);
+        for(String group:List.of("resumes","versions"))for(var record:workspace.path(group)){
+            var document=(com.fasterxml.jackson.databind.node.ObjectNode)record.path("document");document.put("schemaVersion",2);
+            ((com.fasterxml.jackson.databind.node.ObjectNode)document.path("layout")).remove("presentation");
+        }
+        files.put("workspace.json",mapper.writeValueAsBytes(workspace));files.put("settings.json",mapper.writeValueAsBytes(new BackupData.Settings(2,5242880,24000000)));
+        var entries=files.entrySet().stream().map(e->new BackupArchive.FileEntry(e.getKey(),e.getValue().length,ImageService.sha(e.getValue()))).toList();
+        files.put("manifest.json",mapper.writeValueAsBytes(new BackupArchive.Manifest(BackupArchive.FORMAT,1,2,Instant.now(),entries)));
+        var bytes=new ByteArrayOutputStream();try(var zip=new java.util.zip.ZipOutputStream(bytes)){
+            for(var entry:files.entrySet()){zip.putNextEntry(new java.util.zip.ZipEntry(entry.getKey()));zip.write(entry.getValue());zip.closeEntry();}
+        }
+        var result=backups.restore(new ByteArrayInputStream(bytes.toByteArray()));var recovered=resumes.get(result.resumeIds().getFirst());
+        assertThat(recovered.document().schemaVersion()).isEqualTo(3);
+        assertThat(recovered.document().layout().presentation()).isEqualTo(ResumeDocument.Presentation.defaults(doc.layout().marginMm()));
     }
     @Test void corruptionFailsBeforeImportAndPreservesExistingRows()throws Exception{
         resumes.create("唯一简历",withImages());var created=backups.create();byte[] bytes=Files.readAllBytes(backups.download(created.id()));bytes[bytes.length/2]^=1;

@@ -49,7 +49,7 @@ public class BackupService {
             Path temp=directory.resolve(id+".tmp"), destination=directory.resolve(id+".zip");
             var files=new LinkedHashMap<String,BackupArchive.Source>();
             files.put("workspace.json",BackupArchive.Source.json(mapper.writeValueAsBytes(snapshot)));
-            files.put("settings.json",BackupArchive.Source.json(mapper.writeValueAsBytes(new BackupData.Settings(2,maxUploadBytes,maxPixels))));
+            files.put("settings.json",BackupArchive.Source.json(mapper.writeValueAsBytes(new BackupData.Settings(ResumeDocument.SCHEMA_VERSION,maxUploadBytes,maxPixels))));
             for(var asset:snapshot.attachments()) {
                 String prefix="attachments/"+asset.id()+"/";
                 files.put(prefix+"metadata.json",BackupArchive.Source.json(mapper.writeValueAsBytes(asset)));
@@ -105,7 +105,7 @@ public class BackupService {
                 }
             } catch(IOException e) { throw BackupArchive.invalid("导出文件读取失败，备份未完成。"); }
         }
-        return new BackupData(2,List.copyOf(resumes),List.copyOf(versions),List.copyOf(assets),List.copyOf(exports));
+        return new BackupData(ResumeDocument.SCHEMA_VERSION,List.copyOf(resumes),List.copyOf(versions),List.copyOf(assets),List.copyOf(exports));
     }
     private Path attachmentPath(ImageService.Asset asset,String filename) { requireUuid(asset.id()); return data.resolve("attachments").resolve(asset.id()).resolve(filename); }
     public Restored restore(InputStream input) {
@@ -123,7 +123,7 @@ public class BackupService {
         }
     }
     private void validate(BackupData backup,BackupArchive.Staged staged) throws IOException {
-        if(backup==null || backup.schemaVersion()!=2 || backup.resumes()==null || backup.versions()==null || backup.attachments()==null || backup.exports()==null
+        if(backup==null || !Set.of(2,ResumeDocument.SCHEMA_VERSION).contains(backup.schemaVersion()) || backup.resumes()==null || backup.versions()==null || backup.attachments()==null || backup.exports()==null
             || backup.resumes().size()>2000 || backup.versions().size()>10000) throw BackupArchive.invalid("工作区数据无效或数量超限。");
         var resumeIds=new HashSet<UUID>();var versionIds=new HashSet<UUID>();var assetIds=new HashSet<String>();
         var versionOwners=new HashMap<UUID,BackupData.SavedVersion>();
@@ -161,7 +161,7 @@ public class BackupService {
         var actual=new TreeSet<String>();staged.manifest().files().forEach(file->actual.add(file.path()));
         if(!required.equals(actual))throw BackupArchive.invalid("备份清单含多余或缺失文件。");
         var settings=mapper.readValue(staged.file("settings.json").toFile(),BackupData.Settings.class);
-        if(settings.schemaVersion()!=2)throw BackupArchive.invalid("备份设置版本无效。");
+        if(settings==null || settings.schemaVersion()!=backup.schemaVersion() || settings.schemaVersion()!=staged.manifest().documentSchemaVersion())throw BackupArchive.invalid("备份设置版本无效或不一致。");
     }
     private Restored importData(BackupData backup,BackupArchive.Staged staged,List<String> createdAssets,List<Path> createdExports) {
         var assets=new HashMap<String,String>();var resumes=new HashMap<UUID,UUID>();var versions=new HashMap<UUID,UUID>();
@@ -198,7 +198,7 @@ public class BackupService {
         } catch(IOException e) { throw new ApiException("RESTORE_STORAGE_FAILED","无法写入恢复文件，原有简历未被覆盖。请检查磁盘空间和权限。",507); }
     }
     private void refs(String table,String key,UUID owner,ResumeDocument doc) {for(var pair:List.of(Map.entry("photo",doc.layout().photo()),Map.entry("logo",doc.layout().logo())))if(pair.getValue().id()!=null)jdbc.update("INSERT INTO "+table+"("+key+",slot,asset_id) VALUES (?,?,?)",owner,pair.getKey(),UUID.fromString(pair.getValue().id()));}
-    private ResumeDocument remap(ResumeDocument doc,Map<String,String> ids) {var l=doc.layout();return new ResumeDocument(2,doc.content(),new ResumeDocument.Layout(l.template(),l.font(),l.fontSize(),l.lineHeight(),l.sectionGapMm(),l.marginMm(),l.swapImages(),slot(l.photo(),ids),slot(l.logo(),ids)));}
+    private ResumeDocument remap(ResumeDocument doc,Map<String,String> ids) {var l=doc.layout();return new ResumeDocument(ResumeDocument.SCHEMA_VERSION,doc.content(),new ResumeDocument.Layout(l.template(),l.font(),l.fontSize(),l.lineHeight(),l.sectionGapMm(),l.marginMm(),l.swapImages(),slot(l.photo(),ids),slot(l.logo(),ids),l.presentation()));}
     private ResumeDraft.ImageSlot slot(ResumeDraft.ImageSlot old,Map<String,String> ids) {return new ResumeDraft.ImageSlot(old.id()==null?null:ids.get(old.id()),old.visible(),old.widthMm(),old.heightMm(),old.fit(),old.quarterTurns(),old.zoom(),old.positionX(),old.positionY());}
     private static void collect(Set<String> ids,ResumeDocument doc) {for(var slot:List.of(doc.layout().photo(),doc.layout().logo()))if(slot.id()!=null)ids.add(slot.id());}
     private void validateDocument(ResumeDocument doc) {if(doc==null||!validator.validate(doc).isEmpty())throw BackupArchive.invalid("简历内容或版式参数无效。");try{if(mapper.writeValueAsString(doc).length()>200000)throw BackupArchive.invalid("单份简历内容过大。");}catch(IOException e){throw BackupArchive.invalid("简历内容无效。");}}

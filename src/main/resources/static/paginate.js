@@ -12,7 +12,9 @@
     main = document.createElement('main'); content.append(main);
     sheet.append(content, cloneTemplate('footer')); root.append(sheet);
   };
-  const fits = () => content.getBoundingClientRect().bottom < sheet.querySelector('.page-footer').getBoundingClientRect().top - 8;
+  const bottomLimit = s => Math.min(s.querySelector('.page-footer').getBoundingClientRect().top-8,
+    s.getBoundingClientRect().bottom-parseFloat(getComputedStyle(s).paddingBottom));
+  const fits = () => content.getBoundingClientRect().bottom < bottomLimit(sheet);
   const sectionShell = source => { const s=source.cloneNode(false); s.append(source.querySelector('h2').cloneNode(true)); main.append(s); return s; };
   const entryShell = (source, section) => {
     const entry=source.cloneNode(false); entry.append(source.querySelector('.entry-heading').cloneNode(true));
@@ -55,7 +57,7 @@
       if(!source.querySelector('.entry') && !fits()) { section.remove(); page(); section=sectionShell(source); }
     }
     root.querySelectorAll('.page-number').forEach((el,i) => el.textContent=`${i+1} / ${root.children.length}`);
-    if(!Array.from(root.children).every(s=>s.querySelector('.page-content').getBoundingClientRect().bottom < s.querySelector('.page-footer').getBoundingClientRect().top-8)) throw new Error('OVERFLOW');
+    if(!Array.from(root.children).every(s=>s.querySelector('.page-content').getBoundingClientRect().bottom < bottomLimit(s))) throw new Error('OVERFLOW');
     window.__resumePages=root.children.length; window.__resumeReady=true;
   } catch (e) { window.__resumeError=String(e); document.querySelector('#layout-error').hidden=false; }
   window.parent.postMessage({type:'resume-layout',pages:root.children.length,error:window.__resumeError || null},window.location.origin);
