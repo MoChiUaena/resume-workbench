@@ -7,7 +7,7 @@ on:
     inputs:
       image:
         description: Published version to verify anonymously
-        default: ghcr.io/mochiuaena/resume-workbench:0.1.0-rc.1
+        default: ghcr.io/mochiuaena/resume-workbench:0.1.0
         required: true
 permissions:
   contents: read
@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
-      RESUME_APP_IMAGE: ${{ inputs.image || 'ghcr.io/mochiuaena/resume-workbench:0.1.0-rc.1' }}
+      RESUME_APP_IMAGE: ${{ inputs.image || 'ghcr.io/mochiuaena/resume-workbench:0.1.0' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Pull the published image without registry credentials

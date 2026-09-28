@@ -1,0 +1,1882 @@
+{
+  "inventoryVersion": 1,
+  "applicationVersion": "0.1.0",
+  "scope": "Resolved Maven runtime JARs and entire npm lockfile; OS/JDK/browser retain their own notices in the image.",
+  "java": [
+    {
+      "coordinate": "ch.qos.logback:logback-classic:1.5.34",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "b65e05076a5c1aadb659b4fe4bc5fee31cb26cd70390292eb03e4a7a24cff10f",
+      "licenses": [
+        {
+          "name": "EPL-2.0",
+          "url": "https://www.eclipse.org/legal/epl-v20.html"
+        },
+        {
+          "name": "LGPL-2.1-only",
+          "url": "https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html"
+        }
+      ],
+      "projectUrl": "http://logback.qos.ch",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/ch/qos/logback/logback-classic/1.5.34/logback-classic-1.5.34-sources.jar",
+      "upstreamTexts": [
+        "texts/java-logback-classic-1.5.34/SOURCE-COPYRIGHT.txt"
+      ]
+    },
+    {
+      "coordinate": "ch.qos.logback:logback-core:1.5.34",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "42eda264c0c650c2bec59e66151a88b708a8663dc1b49d788202d53e78b8caae",
+      "licenses": [
+        {
+          "name": "EPL-2.0",
+          "url": "https://www.eclipse.org/legal/epl-v20.html"
+        },
+        {
+          "name": "LGPL-2.1-only",
+          "url": "https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html"
+        }
+      ],
+      "projectUrl": "http://logback.qos.ch",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/ch/qos/logback/logback-core/1.5.34/logback-core-1.5.34-sources.jar",
+      "upstreamTexts": [
+        "texts/java-logback-core-1.5.34/SOURCE-COPYRIGHT.txt"
+      ]
+    },
+    {
+      "coordinate": "com.adobe.xmp:xmpcore:6.1.11",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "8f7033c579b99fa0d9d6ddcb9448875b5e4b577c350002278ce46997d678b737",
+      "licenses": [
+        {
+          "name": "The BSD 3-Clause License (BSD3)",
+          "url": "https://opensource.org/licenses/BSD-3-Clause"
+        }
+      ],
+      "projectUrl": "https://www.adobe.com/devnet/xmp/library/eula-xmp-library-java.html",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/com/adobe/xmp/xmpcore/6.1.11/xmpcore-6.1.11-sources.jar",
+      "upstreamTexts": [
+        "texts/java-xmpcore-6.1.11/LICENSE-SDK.txt"
+      ]
+    },
+    {
+      "coordinate": "com.drewnoakes:metadata-extractor:2.21.0",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "cfb4730e2794af29ff86bc91ba5e22a843b269299089c83c9b057c98e1055710",
+      "licenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://drewnoakes.com/code/exif/",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/com/drewnoakes/metadata-extractor/2.21.0/metadata-extractor-2.21.0-sources.jar",
+      "upstreamTexts": [
+        "texts/java-metadata-extractor-2.21.0/SOURCE-COPYRIGHT.txt"
+      ]
+    },
+    {
+      "coordinate": "com.fasterxml.jackson.core:jackson-annotations:2.21",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "53ca085f4a150f703f49e1aabd935bd03b43e1ea3d55d135438292af22cef56b",
+      "licenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://github.com/FasterXML/jackson",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-annotations/2.21/jackson-annotations-2.21-sources.jar",
+      "upstreamTexts": [
+        "texts/java-jackson-annotations-2.21/META-INF-LICENSE.txt",
+        "texts/java-jackson-annotations-2.21/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "com.fasterxml.jackson.core:jackson-core:2.21.4",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "4b40a06396f239f8de2da57419adde6e94e5edc18a2171d471ea05eeed4e5c2d",
+      "licenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://github.com/FasterXML/jackson-core",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-core/2.21.4/jackson-core-2.21.4-sources.jar",
+      "upstreamTexts": [
+        "texts/java-jackson-core-2.21.4/META-INF-LICENSE.txt",
+        "texts/java-jackson-core-2.21.4/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "com.fasterxml.jackson.core:jackson-databind:2.21.4",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "3888e9e69ab66fbacaacc9aea0e9ffbf15368288e4aca468b024dba11c09fbf9",
+      "licenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://github.com/FasterXML/jackson",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-databind/2.21.4/jackson-databind-2.21.4-sources.jar",
+      "upstreamTexts": [
+        "texts/java-jackson-databind-2.21.4/META-INF-LICENSE.txt",
+        "texts/java-jackson-databind-2.21.4/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.21.4",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "c22e9f650a45d5697116e9beb85cb218792f03d19cf79134e692fe1a65f50cc6",
+      "licenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://github.com/FasterXML/jackson-dataformats-text",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/dataformat/jackson-dataformat-toml/2.21.4/jackson-dataformat-toml-2.21.4-sources.jar",
+      "upstreamTexts": [
+        "texts/java-jackson-dataformat-toml-2.21.4/META-INF-LICENSE.txt",
+        "texts/java-jackson-dataformat-toml-2.21.4/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.21.4",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "2dde4a8f1aad3306c040f56ff40da81c6d58dcef3434c00849c9bce09f56a074",
+      "licenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://github.com/FasterXML/jackson-modules-java8",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/datatype/jackson-datatype-jdk8/2.21.4/jackson-datatype-jdk8-2.21.4-sources.jar",
+      "upstreamTexts": [
+        "texts/java-jackson-datatype-jdk8-2.21.4/META-INF-LICENSE.txt",
+        "texts/java-jackson-datatype-jdk8-2.21.4/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.21.4",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "d1ac4b98b70304e56448423589fde5e775b100889643ad1ead62cc7811633684",
+      "licenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://github.com/FasterXML/jackson-modules-java8",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/datatype/jackson-datatype-jsr310/2.21.4/jackson-datatype-jsr310-2.21.4-sources.jar",
+      "upstreamTexts": [
+        "texts/java-jackson-datatype-jsr310-2.21.4/META-INF-LICENSE.txt",
+        "texts/java-jackson-datatype-jsr310-2.21.4/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "com.fasterxml.jackson.module:jackson-module-parameter-names:2.21.4",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "9510f91a4be2c700753ad244596b67424cb32c23659db1dc534219226e5df3a3",
+      "licenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://github.com/FasterXML/jackson-modules-java8",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/module/jackson-module-parameter-names/2.21.4/jackson-module-parameter-names-2.21.4-sources.jar",
+      "upstreamTexts": [
+        "texts/java-jackson-module-parameter-names-2.21.4/META-INF-LICENSE.txt",
+        "texts/java-jackson-module-parameter-names-2.21.4/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "com.fasterxml:classmate:1.7.3",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "75fbda45456f123fb6e2028a6189442d8d0730b357adce4c0a6d7e789f70669b",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://github.com/FasterXML/java-classmate",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/com/fasterxml/classmate/1.7.3/classmate-1.7.3-sources.jar",
+      "upstreamTexts": [
+        "texts/java-classmate-1.7.3/META-INF-LICENSE.txt",
+        "texts/java-classmate-1.7.3/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "com.google.code.gson:gson:2.13.2",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "dd0ce1b55a3ed2080cb70f9c655850cda86c206862310009dcb5e5c95265a5e0",
+      "licenses": [
+        {
+          "name": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://github.com/google/gson",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/com/google/code/gson/gson/2.13.2/gson-2.13.2-sources.jar",
+      "upstreamTexts": [
+        "texts/java-gson-2.13.2/SOURCE-COPYRIGHT.txt"
+      ]
+    },
+    {
+      "coordinate": "com.google.errorprone:error_prone_annotations:2.41.0",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "a56e782b5b50811ac204073a355a21d915a2107fce13ec711331ad036f660fcc",
+      "licenses": [
+        {
+          "name": "Apache 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://errorprone.info",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/com/google/errorprone/error_prone_annotations/2.41.0/error_prone_annotations-2.41.0-sources.jar",
+      "upstreamTexts": [
+        "texts/java-error_prone_annotations-2.41.0/SOURCE-COPYRIGHT.txt"
+      ]
+    },
+    {
+      "coordinate": "com.microsoft.playwright:driver-bundle:1.63.0",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "239c3bd78ff9ac929d128970679bd0868b5f5a698dcc1e64fd120fc8dd8cec48",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://github.com/microsoft/playwright-java",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/com/microsoft/playwright/driver-bundle/1.63.0/driver-bundle-1.63.0-sources.jar",
+      "upstreamTexts": [
+        "texts/java-driver-bundle-1.63.0/driver-mac-arm64-LICENSE.txt",
+        "texts/java-driver-bundle-1.63.0/driver-win32_x64-LICENSE.txt",
+        "texts/java-driver-bundle-1.63.0/driver-linux-arm64-LICENSE.txt",
+        "texts/java-driver-bundle-1.63.0/driver-linux-LICENSE.txt",
+        "texts/java-driver-bundle-1.63.0/driver-mac-LICENSE.txt"
+      ]
+    },
+    {
+      "coordinate": "com.microsoft.playwright:driver:1.63.0",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "cba6e279073ca5d84e514bdea87809cb0fe761a8eaa6a1d37097e08c441cb410",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://github.com/microsoft/playwright-java",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/com/microsoft/playwright/driver/1.63.0/driver-1.63.0-sources.jar",
+      "upstreamTexts": [
+        "texts/java-driver-1.63.0/driver-package-LICENSE.txt",
+        "texts/java-driver-1.63.0/driver-package-ThirdPartyNotices.txt",
+        "texts/java-driver-1.63.0/driver-package-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "com.microsoft.playwright:playwright:1.63.0",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "f7bf1cb0fcc15d3de5e2d4f490cf9a8187cb03f14a43de625d1a03e03334e45a",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://github.com/microsoft/playwright-java",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/com/microsoft/playwright/playwright/1.63.0/playwright-1.63.0-sources.jar",
+      "upstreamTexts": [
+        "texts/java-playwright-1.63.0/SOURCE-COPYRIGHT.txt"
+      ]
+    },
+    {
+      "coordinate": "com.zaxxer:HikariCP:6.3.3",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "709f378c05756280939ce50fc1b1f1a53bb8e1899dc1b249f21f12703640b48b",
+      "licenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://github.com/brettwooldridge/HikariCP",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/com/zaxxer/HikariCP/6.3.3/HikariCP-6.3.3-sources.jar",
+      "upstreamTexts": [
+        "texts/java-HikariCP-6.3.3/SOURCE-COPYRIGHT.txt"
+      ]
+    },
+    {
+      "coordinate": "io.micrometer:micrometer-commons:1.15.12",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "4b779cf7acb0534bb1f8e964f25200037ecb3944368f859a630fa637d6d5d7c0",
+      "licenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://github.com/micrometer-metrics/micrometer",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/io/micrometer/micrometer-commons/1.15.12/micrometer-commons-1.15.12-sources.jar",
+      "upstreamTexts": [
+        "texts/java-micrometer-commons-1.15.12/META-INF-LICENSE.txt",
+        "texts/java-micrometer-commons-1.15.12/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "io.micrometer:micrometer-observation:1.15.12",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "54483e68ed44af1bb0c36d1df2235d36f233e459d52f5a3be3e69813827a6300",
+      "licenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://github.com/micrometer-metrics/micrometer",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/io/micrometer/micrometer-observation/1.15.12/micrometer-observation-1.15.12-sources.jar",
+      "upstreamTexts": [
+        "texts/java-micrometer-observation-1.15.12/META-INF-LICENSE.txt",
+        "texts/java-micrometer-observation-1.15.12/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "jakarta.annotation:jakarta.annotation-api:2.1.1",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "5f65fdaf424eee2b55e1d882ba9bb376be93fb09b37b808be6e22e8851c909fe",
+      "licenses": [
+        {
+          "name": "EPL 2.0",
+          "url": "http://www.eclipse.org/legal/epl-2.0"
+        },
+        {
+          "name": "GPL2 w/ CPE",
+          "url": "https://www.gnu.org/software/classpath/license.html"
+        }
+      ],
+      "projectUrl": "https://projects.eclipse.org/projects/ee4j.ca",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/jakarta/annotation/jakarta.annotation-api/2.1.1/jakarta.annotation-api-2.1.1-sources.jar",
+      "upstreamTexts": [
+        "texts/java-jakarta.annotation-api-2.1.1/META-INF-LICENSE.md.txt",
+        "texts/java-jakarta.annotation-api-2.1.1/META-INF-NOTICE.md.txt"
+      ]
+    },
+    {
+      "coordinate": "jakarta.validation:jakarta.validation-api:3.0.2",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "291c25e6910cc6a7ebd96d4c6baebf6d7c37676c5482c2d96146e901b62c1fc9",
+      "licenses": [
+        {
+          "name": "Apache License 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://beanvalidation.org",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/jakarta/validation/jakarta.validation-api/3.0.2/jakarta.validation-api-3.0.2-sources.jar",
+      "upstreamTexts": []
+    },
+    {
+      "coordinate": "org.apache.logging.log4j:log4j-api:2.24.3",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "5b4a0a0cd0e751ded431c162442bdbdd53328d1f8bb2bae5fc1bbeee0f66d80f",
+      "licenses": [
+        {
+          "name": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://logging.apache.org/log4j/2.x/",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/apache/logging/log4j/log4j-api/2.24.3/log4j-api-2.24.3-sources.jar",
+      "upstreamTexts": [
+        "texts/java-log4j-api-2.24.3/META-INF-LICENSE.txt",
+        "texts/java-log4j-api-2.24.3/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "org.apache.logging.log4j:log4j-to-slf4j:2.24.3",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "c7f2b0c612a4eb05b1587d1c880eb4cf5f4f53850676a8ede8da2b8fabb4f73f",
+      "licenses": [
+        {
+          "name": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://logging.apache.org/log4j/2.x/",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/apache/logging/log4j/log4j-to-slf4j/2.24.3/log4j-to-slf4j-2.24.3-sources.jar",
+      "upstreamTexts": [
+        "texts/java-log4j-to-slf4j-2.24.3/META-INF-LICENSE.txt",
+        "texts/java-log4j-to-slf4j-2.24.3/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "org.apache.tomcat.embed:tomcat-embed-core:10.1.55",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "82473f841824095e03f2c938c18707e44e388e34fb1735b2b338bb4f22fd54f0",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://tomcat.apache.org/",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/apache/tomcat/embed/tomcat-embed-core/10.1.55/tomcat-embed-core-10.1.55-sources.jar",
+      "upstreamTexts": [
+        "texts/java-tomcat-embed-core-10.1.55/META-INF-LICENSE.txt",
+        "texts/java-tomcat-embed-core-10.1.55/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "org.apache.tomcat.embed:tomcat-embed-el:10.1.55",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "a527fe51c6f9428c5116f78fe28588e55357b4492309b51fb0453372da16fa5f",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://tomcat.apache.org/",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/apache/tomcat/embed/tomcat-embed-el/10.1.55/tomcat-embed-el-10.1.55-sources.jar",
+      "upstreamTexts": [
+        "texts/java-tomcat-embed-el-10.1.55/META-INF-LICENSE.txt",
+        "texts/java-tomcat-embed-el-10.1.55/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "org.apache.tomcat.embed:tomcat-embed-websocket:10.1.55",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "81800431395fe2ef317fc14075ed49faaa64679a3458ee8791159111a1aa1b37",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://tomcat.apache.org/",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/apache/tomcat/embed/tomcat-embed-websocket/10.1.55/tomcat-embed-websocket-10.1.55-sources.jar",
+      "upstreamTexts": [
+        "texts/java-tomcat-embed-websocket-10.1.55/META-INF-LICENSE.txt",
+        "texts/java-tomcat-embed-websocket-10.1.55/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "org.attoparser:attoparser:2.0.7.RELEASE",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "75dd1c045492bff8e1963aabb28bfe903c2064e11e27fe2f0f0aff1ad3d84476",
+      "licenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://www.attoparser.org",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/attoparser/attoparser/2.0.7.RELEASE/attoparser-2.0.7.RELEASE-sources.jar",
+      "upstreamTexts": [
+        "texts/java-attoparser-2.0.7.RELEASE/META-INF-LICENSE.txt",
+        "texts/java-attoparser-2.0.7.RELEASE/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "org.flywaydb:flyway-core:11.7.2",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "ff01fab3bcfd79e9345df191ecf82cbe1f9f65a757266158bd691564b1c1282c",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "https://flywaydb.org/licenses/flyway-oss"
+        }
+      ],
+      "projectUrl": "https://flywaydb.org",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/flywaydb/flyway-core/11.7.2/flyway-core-11.7.2-sources.jar",
+      "upstreamTexts": [
+        "texts/java-flyway-core-11.7.2/META-INF-LICENSE.txt"
+      ]
+    },
+    {
+      "coordinate": "org.flywaydb:flyway-database-postgresql:11.7.2",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "1d586e14ea772c75613df2c27ddc20f5c065e8a32283815338611af82e48f9a2",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "https://flywaydb.org/licenses/flyway-oss"
+        }
+      ],
+      "projectUrl": "https://flywaydb.org",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/flywaydb/flyway-database-postgresql/11.7.2/flyway-database-postgresql-11.7.2-sources.jar",
+      "upstreamTexts": [
+        "texts/java-flyway-database-postgresql-11.7.2/SOURCE-COPYRIGHT.txt"
+      ]
+    },
+    {
+      "coordinate": "org.hibernate.validator:hibernate-validator:8.0.3.Final",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "2ad24670fd08e21d3f43d3105d5326bd5ef6b01e819c5cd103823866b954517e",
+      "licenses": [
+        {
+          "name": "Apache License 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://hibernate.org/validator",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/hibernate/validator/hibernate-validator/8.0.3.Final/hibernate-validator-8.0.3.Final-sources.jar",
+      "upstreamTexts": [
+        "texts/java-hibernate-validator-8.0.3.Final/SOURCE-COPYRIGHT.txt"
+      ]
+    },
+    {
+      "coordinate": "org.jboss.logging:jboss-logging:3.6.3.Final",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "7c12ee575508f81e22b1db9334b969d0ec54ef0fd1dcba24eeab1a44235fc366",
+      "licenses": [
+        {
+          "name": "Apache License 2.0",
+          "url": "https://repository.jboss.org/licenses/apache-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://www.jboss.org",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/jboss/logging/jboss-logging/3.6.3.Final/jboss-logging-3.6.3.Final-sources.jar",
+      "upstreamTexts": [
+        "texts/java-jboss-logging-3.6.3.Final/SOURCE-COPYRIGHT.txt"
+      ]
+    },
+    {
+      "coordinate": "org.jspecify:jspecify:1.0.0",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab",
+      "licenses": [
+        {
+          "name": "The Apache License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "http://jspecify.org/",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/jspecify/jspecify/1.0.0/jspecify-1.0.0-sources.jar",
+      "upstreamTexts": [
+        "texts/java-jspecify-1.0.0/SOURCE-COPYRIGHT.txt"
+      ]
+    },
+    {
+      "coordinate": "org.opentest4j:opentest4j:1.3.0",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "48e2df636cab6563ced64dcdff8abb2355627cb236ef0bf37598682ddf742f1b",
+      "licenses": [
+        {
+          "name": "The Apache License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://github.com/ota4j-team/opentest4j",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0-sources.jar",
+      "upstreamTexts": [
+        "texts/java-opentest4j-1.3.0/META-INF-LICENSE.txt"
+      ]
+    },
+    {
+      "coordinate": "org.postgresql:postgresql:42.7.11",
+      "scope": "runtime",
+      "packaged": true,
+      "sha256": "1981b31d3993c58702783c1cddf10a34e48c1f413d70ff1cb6def0a143484647",
+      "licenses": [
+        {
+          "name": "BSD-2-Clause",
+          "url": "https://jdbc.postgresql.org/about/license.html"
+        }
+      ],
+      "projectUrl": "https://jdbc.postgresql.org",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/postgresql/postgresql/42.7.11/postgresql-42.7.11-sources.jar",
+      "upstreamTexts": [
+        "texts/java-postgresql-42.7.11/META-INF-LICENSE.txt",
+        "texts/java-postgresql-42.7.11/META-INF-licenses-com.ongres.scram-scram-client-3.2-META-INF-LICENSE.txt",
+        "texts/java-postgresql-42.7.11/META-INF-licenses-com.ongres.scram-scram-common-3.2-META-INF-LICENSE.txt",
+        "texts/java-postgresql-42.7.11/META-INF-licenses-com.ongres.stringprep-saslprep-2.2-META-INF-LICENSE.txt",
+        "texts/java-postgresql-42.7.11/META-INF-licenses-com.ongres.stringprep-stringprep-2.2-META-INF-LICENSE.txt"
+      ]
+    },
+    {
+      "coordinate": "org.slf4j:jul-to-slf4j:2.0.18",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "cbb7d1aaaa9e871eb1a06594abd911bf97027152976edf1edc315be75239204e",
+      "licenses": [
+        {
+          "name": "MIT",
+          "url": "https://opensource.org/license/mit"
+        }
+      ],
+      "projectUrl": "http://www.slf4j.org",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/slf4j/jul-to-slf4j/2.0.18/jul-to-slf4j-2.0.18-sources.jar",
+      "upstreamTexts": [
+        "texts/java-jul-to-slf4j-2.0.18/META-INF-LICENSE.txt"
+      ]
+    },
+    {
+      "coordinate": "org.slf4j:slf4j-api:2.0.18",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "44508fd1576500688c790b190acdd16fec4f8c79a3e0b900afd70503cf055f55",
+      "licenses": [
+        {
+          "name": "MIT",
+          "url": "https://opensource.org/license/mit"
+        }
+      ],
+      "projectUrl": "http://www.slf4j.org",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-api/2.0.18/slf4j-api-2.0.18-sources.jar",
+      "upstreamTexts": [
+        "texts/java-slf4j-api-2.0.18/META-INF-LICENSE.txt"
+      ]
+    },
+    {
+      "coordinate": "org.springframework.boot:spring-boot-autoconfigure:3.5.16",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "0198331231e9bf872a135741d59c6d1f9e9007ff207a1ca910179c550bb12bfc",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0"
+        }
+      ],
+      "projectUrl": "https://spring.io/projects/spring-boot",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-autoconfigure/3.5.16/spring-boot-autoconfigure-3.5.16-sources.jar",
+      "upstreamTexts": [
+        "texts/java-spring-boot-autoconfigure-3.5.16/META-INF-LICENSE.txt",
+        "texts/java-spring-boot-autoconfigure-3.5.16/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "org.springframework.boot:spring-boot-starter-jdbc:3.5.16",
+      "scope": "compile",
+      "packaged": false,
+      "sha256": "04bd742f970fb6048a1c33a859e19f468fb7fa00787d6ddcf820f9ee1fbee41d",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0"
+        }
+      ],
+      "projectUrl": "https://spring.io/projects/spring-boot",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter-jdbc/3.5.16/spring-boot-starter-jdbc-3.5.16-sources.jar",
+      "upstreamTexts": [
+        "texts/java-spring-boot-starter-jdbc-3.5.16/META-INF-LICENSE.txt",
+        "texts/java-spring-boot-starter-jdbc-3.5.16/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "org.springframework.boot:spring-boot-starter-json:3.5.16",
+      "scope": "compile",
+      "packaged": false,
+      "sha256": "be8340bdd87d5e76bfec5b3b256bb923c841464793e5a8e2f7e8ced37e6eb434",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0"
+        }
+      ],
+      "projectUrl": "https://spring.io/projects/spring-boot",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter-json/3.5.16/spring-boot-starter-json-3.5.16-sources.jar",
+      "upstreamTexts": [
+        "texts/java-spring-boot-starter-json-3.5.16/META-INF-LICENSE.txt",
+        "texts/java-spring-boot-starter-json-3.5.16/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "org.springframework.boot:spring-boot-starter-logging:3.5.16",
+      "scope": "compile",
+      "packaged": false,
+      "sha256": "f761d56f6693a47e6cccca8e9202c716ab954ccdf7440e1fccc0cb50c661eeb8",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0"
+        }
+      ],
+      "projectUrl": "https://spring.io/projects/spring-boot",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter-logging/3.5.16/spring-boot-starter-logging-3.5.16-sources.jar",
+      "upstreamTexts": [
+        "texts/java-spring-boot-starter-logging-3.5.16/META-INF-LICENSE.txt",
+        "texts/java-spring-boot-starter-logging-3.5.16/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "org.springframework.boot:spring-boot-starter-thymeleaf:3.5.16",
+      "scope": "compile",
+      "packaged": false,
+      "sha256": "c40a91720d5b21ca1f0495c5b13fadc74e6f9d53bd55d89b1b87ec306175dbe6",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0"
+        }
+      ],
+      "projectUrl": "https://spring.io/projects/spring-boot",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter-thymeleaf/3.5.16/spring-boot-starter-thymeleaf-3.5.16-sources.jar",
+      "upstreamTexts": [
+        "texts/java-spring-boot-starter-thymeleaf-3.5.16/META-INF-LICENSE.txt",
+        "texts/java-spring-boot-starter-thymeleaf-3.5.16/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "org.springframework.boot:spring-boot-starter-tomcat:3.5.16",
+      "scope": "compile",
+      "packaged": false,
+      "sha256": "c3bc33205b0a46faab33dcdf743958e845ee94e1f7961bbe0e0f8ce881db747b",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0"
+        }
+      ],
+      "projectUrl": "https://spring.io/projects/spring-boot",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter-tomcat/3.5.16/spring-boot-starter-tomcat-3.5.16-sources.jar",
+      "upstreamTexts": [
+        "texts/java-spring-boot-starter-tomcat-3.5.16/META-INF-LICENSE.txt",
+        "texts/java-spring-boot-starter-tomcat-3.5.16/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "org.springframework.boot:spring-boot-starter-validation:3.5.16",
+      "scope": "compile",
+      "packaged": false,
+      "sha256": "62e810a8fd4d540daed0217a653cac97f52c876f3ee82fd947a9ad7fdd811661",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0"
+        }
+      ],
+      "projectUrl": "https://spring.io/projects/spring-boot",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter-validation/3.5.16/spring-boot-starter-validation-3.5.16-sources.jar",
+      "upstreamTexts": [
+        "texts/java-spring-boot-starter-validation-3.5.16/META-INF-LICENSE.txt",
+        "texts/java-spring-boot-starter-validation-3.5.16/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "org.springframework.boot:spring-boot-starter-web:3.5.16",
+      "scope": "compile",
+      "packaged": false,
+      "sha256": "3272f145a6edd94896c60fba7d2a05b525c78f8efd0172e7bffb6c3b9857762e",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0"
+        }
+      ],
+      "projectUrl": "https://spring.io/projects/spring-boot",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter-web/3.5.16/spring-boot-starter-web-3.5.16-sources.jar",
+      "upstreamTexts": [
+        "texts/java-spring-boot-starter-web-3.5.16/META-INF-LICENSE.txt",
+        "texts/java-spring-boot-starter-web-3.5.16/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "org.springframework.boot:spring-boot-starter:3.5.16",
+      "scope": "compile",
+      "packaged": false,
+      "sha256": "649da4576c83a4f814222dcff067cd774eeeb1119e790390eaeab8e9955d0d44",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0"
+        }
+      ],
+      "projectUrl": "https://spring.io/projects/spring-boot",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter/3.5.16/spring-boot-starter-3.5.16-sources.jar",
+      "upstreamTexts": [
+        "texts/java-spring-boot-starter-3.5.16/META-INF-LICENSE.txt",
+        "texts/java-spring-boot-starter-3.5.16/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "org.springframework.boot:spring-boot:3.5.16",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "2d5b16632402b840b0425ed52610071890bf8cb24c6c49af343bbde574123265",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0"
+        }
+      ],
+      "projectUrl": "https://spring.io/projects/spring-boot",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot/3.5.16/spring-boot-3.5.16-sources.jar",
+      "upstreamTexts": [
+        "texts/java-spring-boot-3.5.16/META-INF-LICENSE.txt",
+        "texts/java-spring-boot-3.5.16/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "org.springframework:spring-aop:6.2.19",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "a11b93539d80b02caf76171db2da96df39abebbfef49a2fadd6dda0779f2e20b",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0"
+        }
+      ],
+      "projectUrl": "https://github.com/spring-projects/spring-framework",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/springframework/spring-aop/6.2.19/spring-aop-6.2.19-sources.jar",
+      "upstreamTexts": [
+        "texts/java-spring-aop-6.2.19/META-INF-license.txt",
+        "texts/java-spring-aop-6.2.19/META-INF-notice.txt"
+      ]
+    },
+    {
+      "coordinate": "org.springframework:spring-beans:6.2.19",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "846dc8f30a639a36eb551ee99a30469be4d11bd285ca9daf164d98321571b404",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0"
+        }
+      ],
+      "projectUrl": "https://github.com/spring-projects/spring-framework",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/springframework/spring-beans/6.2.19/spring-beans-6.2.19-sources.jar",
+      "upstreamTexts": [
+        "texts/java-spring-beans-6.2.19/META-INF-license.txt",
+        "texts/java-spring-beans-6.2.19/META-INF-notice.txt"
+      ]
+    },
+    {
+      "coordinate": "org.springframework:spring-context:6.2.19",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "ead4b645f94a7f665f00093eaafde634e97b34524294de653b51e43e0b3fc4a4",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0"
+        }
+      ],
+      "projectUrl": "https://github.com/spring-projects/spring-framework",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/springframework/spring-context/6.2.19/spring-context-6.2.19-sources.jar",
+      "upstreamTexts": [
+        "texts/java-spring-context-6.2.19/META-INF-license.txt",
+        "texts/java-spring-context-6.2.19/META-INF-notice.txt"
+      ]
+    },
+    {
+      "coordinate": "org.springframework:spring-core:6.2.19",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "52146689e71a911c92bac26677d73c692512a739893a57710cc233591756bff6",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0"
+        }
+      ],
+      "projectUrl": "https://github.com/spring-projects/spring-framework",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/springframework/spring-core/6.2.19/spring-core-6.2.19-sources.jar",
+      "upstreamTexts": [
+        "texts/java-spring-core-6.2.19/META-INF-license.txt",
+        "texts/java-spring-core-6.2.19/META-INF-notice.txt"
+      ]
+    },
+    {
+      "coordinate": "org.springframework:spring-expression:6.2.19",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "d710a44417d890353895b341a722d7d08199e2b7da52f0a11c0e92571e1d6e19",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0"
+        }
+      ],
+      "projectUrl": "https://github.com/spring-projects/spring-framework",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/springframework/spring-expression/6.2.19/spring-expression-6.2.19-sources.jar",
+      "upstreamTexts": [
+        "texts/java-spring-expression-6.2.19/META-INF-license.txt",
+        "texts/java-spring-expression-6.2.19/META-INF-notice.txt"
+      ]
+    },
+    {
+      "coordinate": "org.springframework:spring-jcl:6.2.19",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "9994478bcea1423b8892d4eb0db942c94da0090167c3c684050c1eaef04491d0",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0"
+        }
+      ],
+      "projectUrl": "https://github.com/spring-projects/spring-framework",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/springframework/spring-jcl/6.2.19/spring-jcl-6.2.19-sources.jar",
+      "upstreamTexts": [
+        "texts/java-spring-jcl-6.2.19/META-INF-license.txt",
+        "texts/java-spring-jcl-6.2.19/META-INF-notice.txt"
+      ]
+    },
+    {
+      "coordinate": "org.springframework:spring-jdbc:6.2.19",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "c81fd8aca952aac243d9327af12596c2058012c9d3784f1313477a6d2cc56306",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0"
+        }
+      ],
+      "projectUrl": "https://github.com/spring-projects/spring-framework",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/springframework/spring-jdbc/6.2.19/spring-jdbc-6.2.19-sources.jar",
+      "upstreamTexts": [
+        "texts/java-spring-jdbc-6.2.19/META-INF-license.txt",
+        "texts/java-spring-jdbc-6.2.19/META-INF-notice.txt"
+      ]
+    },
+    {
+      "coordinate": "org.springframework:spring-tx:6.2.19",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "34a1b6f5d87ef4cca6849e1bc70a0f965eec6476737b3cae73ff2561a266ef73",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0"
+        }
+      ],
+      "projectUrl": "https://github.com/spring-projects/spring-framework",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/springframework/spring-tx/6.2.19/spring-tx-6.2.19-sources.jar",
+      "upstreamTexts": [
+        "texts/java-spring-tx-6.2.19/META-INF-license.txt",
+        "texts/java-spring-tx-6.2.19/META-INF-notice.txt"
+      ]
+    },
+    {
+      "coordinate": "org.springframework:spring-web:6.2.19",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "ca88e364ecebee61163e2260e8a20584138eca74e28a050d6a2ef6302bad2f2d",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0"
+        }
+      ],
+      "projectUrl": "https://github.com/spring-projects/spring-framework",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/springframework/spring-web/6.2.19/spring-web-6.2.19-sources.jar",
+      "upstreamTexts": [
+        "texts/java-spring-web-6.2.19/META-INF-license.txt",
+        "texts/java-spring-web-6.2.19/META-INF-notice.txt"
+      ]
+    },
+    {
+      "coordinate": "org.springframework:spring-webmvc:6.2.19",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "134f42320cedd31f54f683d2ca9936a4e015c011fb1882a31fa7213e2d8c7e94",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0"
+        }
+      ],
+      "projectUrl": "https://github.com/spring-projects/spring-framework",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/springframework/spring-webmvc/6.2.19/spring-webmvc-6.2.19-sources.jar",
+      "upstreamTexts": [
+        "texts/java-spring-webmvc-6.2.19/META-INF-license.txt",
+        "texts/java-spring-webmvc-6.2.19/META-INF-notice.txt"
+      ]
+    },
+    {
+      "coordinate": "org.thymeleaf:thymeleaf-spring6:3.1.5.RELEASE",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "fd5d306052d7aa6769a8ec77778d328e6f7c83af5ac074df38035bbb1e9cd72b",
+      "licenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "http://www.thymeleaf.org",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/thymeleaf/thymeleaf-spring6/3.1.5.RELEASE/thymeleaf-spring6-3.1.5.RELEASE-sources.jar",
+      "upstreamTexts": [
+        "texts/java-thymeleaf-spring6-3.1.5.RELEASE/META-INF-LICENSE.txt",
+        "texts/java-thymeleaf-spring6-3.1.5.RELEASE/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "org.thymeleaf:thymeleaf:3.1.5.RELEASE",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "4011795f8494dd69e764b7709443dd13d3068ba8ac37624f61d7084f4429cbe2",
+      "licenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "http://www.thymeleaf.org",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/thymeleaf/thymeleaf/3.1.5.RELEASE/thymeleaf-3.1.5.RELEASE-sources.jar",
+      "upstreamTexts": [
+        "texts/java-thymeleaf-3.1.5.RELEASE/SOURCE-COPYRIGHT.txt"
+      ]
+    },
+    {
+      "coordinate": "org.unbescape:unbescape:1.1.6.RELEASE",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "597cf87d5b1a4f385b9d1cec974b7b483abb3ee85fc5b3f8b62af8e4bec95c2c",
+      "licenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "http://www.unbescape.org",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/unbescape/unbescape/1.1.6.RELEASE/unbescape-1.1.6.RELEASE-sources.jar",
+      "upstreamTexts": [
+        "texts/java-unbescape-1.1.6.RELEASE/META-INF-LICENSE.txt",
+        "texts/java-unbescape-1.1.6.RELEASE/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "org.yaml:snakeyaml:2.4",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "ef779af5d29a9dde8cc70ce0341f5c6f7735e23edff9685ceaa9d35359b7bb7f",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://bitbucket.org/snakeyaml/snakeyaml",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/yaml/snakeyaml/2.4/snakeyaml-2.4-sources.jar",
+      "upstreamTexts": [
+        "texts/java-snakeyaml-2.4/SOURCE-COPYRIGHT.txt"
+      ]
+    }
+  ],
+  "npm": [
+    {
+      "name": "@babel/helper-string-parser",
+      "version": "7.29.7",
+      "license": "MIT",
+      "role": "production dependency tree",
+      "optional": false,
+      "integrity": "sha512-Pb5ijPrZ89GDH8223L4UP8i6QApWxs04RbPQJTeWDV0/keR2E36MeKnyr6LYmUUvqRRI+Iv87SuF1W6ErINzYw==",
+      "upstreamTexts": [
+        "texts/npm-@babel-helper-string-parser-7.29.7/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "@babel/helper-validator-identifier",
+      "version": "7.29.7",
+      "license": "MIT",
+      "role": "production dependency tree",
+      "optional": false,
+      "integrity": "sha512-qehxGkRj55h/ff8EMaJ+cYhyaKlHIxqYDn682wQD7RNp9UujOQsHog2uS0r2vzr4pW+sXf90NeeayjcNaX3fFg==",
+      "upstreamTexts": [
+        "texts/npm-@babel-helper-validator-identifier-7.29.7/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "@babel/parser",
+      "version": "7.29.9",
+      "license": "MIT",
+      "role": "production dependency tree",
+      "optional": false,
+      "integrity": "sha512-CjXrNHTnvqBVqHgdBysY3vk2T8tpJHb5/RMeHJBTyVa9xgugCB0CJTx/3oO8RV2QRQP391RWpB7D6hLjm8V9uA==",
+      "upstreamTexts": [
+        "texts/npm-@babel-parser-7.29.9/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "@babel/types",
+      "version": "7.29.8",
+      "license": "MIT",
+      "role": "production dependency tree",
+      "optional": false,
+      "integrity": "sha512-Vj1jF3cPfxg7OAfoI7QnVKLoILlm2JF9pnVHrX8qx7AHMiYWT+NDAA7jChlNgRS4WTLc/fD1lXLmPixluj+3Gg==",
+      "upstreamTexts": [
+        "texts/npm-@babel-types-7.29.8/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "@jridgewell/sourcemap-codec",
+      "version": "1.6.0",
+      "license": "MIT",
+      "role": "production dependency tree",
+      "optional": false,
+      "integrity": "sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw==",
+      "upstreamTexts": [
+        "texts/npm-@jridgewell-sourcemap-codec-1.6.0/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "@oxc-project/types",
+      "version": "0.151.0",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": false,
+      "integrity": "sha512-J1yXrIlNDZVzE3ada310xeAw7nH8yCAyLPuUIsjKatFPmfn5bS1oW+cM+QsGOtVWd5nhSpbwZWx/rue+r5Z+PA==",
+      "upstreamTexts": [
+        "texts/npm-@oxc-project-types-0.151.0/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "@playwright/test",
+      "version": "1.63.0",
+      "license": "Apache-2.0",
+      "role": "build/test",
+      "optional": false,
+      "integrity": "sha512-oxMK4vllB9RK5NQ2l1pq1IfOf2AvnEuj/vYGDj0H2nMtmtZpKtCwt/l00GEO6xjGfpBNAvjovvYdCm50dRQkpQ==",
+      "upstreamTexts": [
+        "texts/npm-@playwright-test-1.63.0/LICENSE.txt",
+        "texts/npm-@playwright-test-1.63.0/NOTICE.txt"
+      ]
+    },
+    {
+      "name": "@rolldown/binding-android-arm-eabi",
+      "version": "1.2.11",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": true,
+      "integrity": "sha512-A5kXfGKvKWWZE0TtPrfsvT+q4Y5d1QG8gGUzpYjGydM+fARM9MuX90PrXYXe0XbsDVgyxxNzHo6giCj90bsFNw==",
+      "upstreamTexts": []
+    },
+    {
+      "name": "@rolldown/binding-android-arm64",
+      "version": "1.2.11",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": true,
+      "integrity": "sha512-z6cTycz+iJ4PVkuL4HHW4DfTfoeU/2nqYYuSOrTmH7yHK5Y0LCOnA03V4ZNxavyVaU1oOqUgIg2klN/s+USGOA==",
+      "upstreamTexts": []
+    },
+    {
+      "name": "@rolldown/binding-darwin-arm64",
+      "version": "1.2.11",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": true,
+      "integrity": "sha512-jShvqNtP6vDC6/A5JOAzbVV+DkgHqhl/ScVCJEbt+TUY6QYz7YnXcrg3sLtFBniro0f/Ld50ZwCWA6f7KYD1nQ==",
+      "upstreamTexts": []
+    },
+    {
+      "name": "@rolldown/binding-darwin-x64",
+      "version": "1.2.11",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": true,
+      "integrity": "sha512-f2i2xiNWq1Z1l2++q2fuhZRdLAT3aqxD6vRNm1RAxpUoBcdqNB3C0s1Bt+K+PbEx2F5F4gQp6hqKkphCY/xF9w==",
+      "upstreamTexts": []
+    },
+    {
+      "name": "@rolldown/binding-freebsd-x64",
+      "version": "1.2.11",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": true,
+      "integrity": "sha512-4Ir5FSOKIAMr4r0kExpt1s3bMgzJU3rA45AYOHtQpls0oNeqcYBKrWMlckrYH4KCfGLfkfn1tN1dmZPMVsdXow==",
+      "upstreamTexts": []
+    },
+    {
+      "name": "@rolldown/binding-linux-arm-gnueabihf",
+      "version": "1.2.11",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": true,
+      "integrity": "sha512-/gnRDM+39BROzAN/k1OZjDPnDMcZxB/0EUxKjONO5yVkNEvlsoMDrxGNKgZi/ttFriS2gwlDNzB65pvNbFOXIQ==",
+      "upstreamTexts": []
+    },
+    {
+      "name": "@rolldown/binding-linux-arm64-gnu",
+      "version": "1.2.11",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": true,
+      "integrity": "sha512-PFaK8HwvAHbaKbBcDNQihjMKYvFnA5hiENx/l5tphTDz1E0WFp32l0A7aq7lyUwGsRw/xSrNIy/gIK4thrSCrw==",
+      "upstreamTexts": []
+    },
+    {
+      "name": "@rolldown/binding-linux-arm64-musl",
+      "version": "1.2.11",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": true,
+      "integrity": "sha512-AskzJUIKRLPxkruR1wLKewGbOw+EYfU/9lOrBFj4AFrEA8hPpKFnODWNu2WLaNs0QNkEb9QIJufmVZZIL/bJlg==",
+      "upstreamTexts": []
+    },
+    {
+      "name": "@rolldown/binding-linux-ppc64-gnu",
+      "version": "1.2.11",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": true,
+      "integrity": "sha512-qlUGAheh2yh8afH7QBgx0PrRHN85hKnNd78x8MeMhXivuevgd8vgf6/CstOzmNKY/lLTHvNTrPy98cLnAugzJw==",
+      "upstreamTexts": []
+    },
+    {
+      "name": "@rolldown/binding-linux-s390x-gnu",
+      "version": "1.2.11",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": true,
+      "integrity": "sha512-secpEad+0vCbSfn8upFySkDskv+bGPk3THSDS9Y89yc4rb4kzqHp8Dmyd9BkQW4SnhNXBZCl/6CrO//hZahNJQ==",
+      "upstreamTexts": []
+    },
+    {
+      "name": "@rolldown/binding-linux-x64-gnu",
+      "version": "1.2.11",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": true,
+      "integrity": "sha512-mOVBT3dPpkWm8XBWPmU4bf+U6dYDLeMo/9ojUmis4N0L5uu10qra5vOyngZ7/PSdoE4G9KvRt4bloRxNjLas7A==",
+      "upstreamTexts": []
+    },
+    {
+      "name": "@rolldown/binding-linux-x64-musl",
+      "version": "1.2.11",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": true,
+      "integrity": "sha512-Is78i9A8Ui4SqcxUwFJ9uMmjDn58IbVTjFWYdQestFEgeuEmHMLGNriXnVJKkwG2YiZjw8cP0zCTyDMdDGtOOg==",
+      "upstreamTexts": []
+    },
+    {
+      "name": "@rolldown/binding-openharmony-arm64",
+      "version": "1.2.11",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": true,
+      "integrity": "sha512-dUCXneZ87INUMyQ0D+C0HrEBNUPNXHaPmU5GTjyKTJEiussw9Kaj5Ln8UztPe4epV/ffvgNBEadksdYhmW6xJA==",
+      "upstreamTexts": []
+    },
+    {
+      "name": "@rolldown/binding-win32-arm64-msvc",
+      "version": "1.2.11",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": true,
+      "integrity": "sha512-jByxb6qfd+bH1xUd0qnfFnb17i9sWBPY2tOavJ0l3tdr3OTu+Kvtm8cd/JV5nFt657b1VqGltxg9olOEfofXWw==",
+      "upstreamTexts": []
+    },
+    {
+      "name": "@rolldown/binding-win32-x64-msvc",
+      "version": "1.2.11",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": true,
+      "integrity": "sha512-/PzKqzAJ03i19oy2ItPvyvaVjOjBCNnfaJs8yvUdGBKmiESgnrJSQ2awd81QzFbbnAmu7YO9ZnJrDCb9VSJPRA==",
+      "upstreamTexts": []
+    },
+    {
+      "name": "@rolldown/pluginutils",
+      "version": "1.0.1",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": false,
+      "integrity": "sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==",
+      "upstreamTexts": [
+        "texts/npm-@rolldown-pluginutils-1.0.1/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "@types/node",
+      "version": "24.10.1",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": false,
+      "integrity": "sha512-GNWcUTRBgIRJD5zj+Tq0fKOJ5XZajIiBroOF0yvj2bSU1WvNdYS/dn9UxwsujGW4JX06dnHyjV2y9rRaybH0iQ==",
+      "upstreamTexts": [
+        "texts/npm-@types-node-24.10.1/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "@vitejs/plugin-vue",
+      "version": "6.0.9",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": false,
+      "integrity": "sha512-rD/MORlhaZMlXWW0rEn4FB4wMinWC0z/D7Ye160S5+Rs1mC8ZDAdcDp4SjKfUhG5t8q1ktcPVw4xuTkPRlzrSA==",
+      "upstreamTexts": [
+        "texts/npm-@vitejs-plugin-vue-6.0.9/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "@volar/language-core",
+      "version": "2.4.28",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": false,
+      "integrity": "sha512-w4qhIJ8ZSitgLAkVay6AbcnC7gP3glYM3fYwKV3srj8m494E3xtrCv6E+bWviiK/8hs6e6t1ij1s2Endql7vzQ==",
+      "upstreamTexts": [
+        "texts/npm-@volar-language-core-2.4.28/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "@volar/source-map",
+      "version": "2.4.28",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": false,
+      "integrity": "sha512-yX2BDBqJkRXfKw8my8VarTyjv48QwxdJtvRgUpNE5erCsgEUdI2DsLbpa+rOQVAJYshY99szEcRDmyHbF10ggQ==",
+      "upstreamTexts": [
+        "texts/npm-@volar-source-map-2.4.28/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "@volar/typescript",
+      "version": "2.4.28",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": false,
+      "integrity": "sha512-Ja6yvWrbis2QtN4ClAKreeUZPVYMARDYZl9LMEv1iQ1QdepB6wn0jTRxA9MftYmYa4DQ4k/DaSZpFPUfxl8giw==",
+      "upstreamTexts": [
+        "texts/npm-@volar-typescript-2.4.28/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "@vue/compiler-core",
+      "version": "3.5.43",
+      "license": "MIT",
+      "role": "production dependency tree",
+      "optional": false,
+      "integrity": "sha512-zdiLhnbe1QQqgDT8xZMpNmyqZ3qlI+/Q/FHQco57Kwl/b05HhCzN6eVGN9QU9rbga4CrS0H5SYY8VGHZCt/1Hg==",
+      "upstreamTexts": [
+        "texts/npm-@vue-compiler-core-3.5.43/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "@vue/compiler-dom",
+      "version": "3.5.43",
+      "license": "MIT",
+      "role": "production dependency tree",
+      "optional": false,
+      "integrity": "sha512-PEZoAk3NQmsn/ejMzSOCyTYqwGqczrWm70PuhBKjjv1+TCoQAaO/zOqNwjV+honlNstT5ILxtc+8r8UUfj+iEQ==",
+      "upstreamTexts": [
+        "texts/npm-@vue-compiler-dom-3.5.43/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "@vue/compiler-sfc",
+      "version": "3.5.43",
+      "license": "MIT",
+      "role": "production dependency tree",
+      "optional": false,
+      "integrity": "sha512-FCbrG3XNCRl+js3huuKx4IVHBLTvMkJhVepjbxSPu1gn4yWLaYtGNQdjJGZaMytXB6qb76qQDDmDSLy/vkmleQ==",
+      "upstreamTexts": [
+        "texts/npm-@vue-compiler-sfc-3.5.43/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "@vue/compiler-ssr",
+      "version": "3.5.43",
+      "license": "MIT",
+      "role": "production dependency tree",
+      "optional": false,
+      "integrity": "sha512-GF62orf7KiJX9RqrHNGrYBudsQGD0OhJ5nDs90O8UiDuS40+YMYomiXu6w6EuvtXuRDc3MSNis3EaaSKAVSWpg==",
+      "upstreamTexts": [
+        "texts/npm-@vue-compiler-ssr-3.5.43/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "@vue/language-core",
+      "version": "3.2.6",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": false,
+      "integrity": "sha512-xYYYX3/aVup576tP/23sEUpgiEnujrENaoNRbaozC1/MA9I6EGFQRJb4xrt/MmUCAGlxTKL2RmT8JLTPqagCkg==",
+      "upstreamTexts": [
+        "texts/npm-@vue-language-core-3.2.6/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "@vue/reactivity",
+      "version": "3.5.43",
+      "license": "MIT",
+      "role": "production dependency tree",
+      "optional": false,
+      "integrity": "sha512-G/c9GyOZNI2jVaaS6OX1EF1SSFSv7H0ERqNTl4+DTFMlZmB5eVAB53aLQNam/7NL2NPtaDD7RdVrzf8uJzMuOA==",
+      "upstreamTexts": [
+        "texts/npm-@vue-reactivity-3.5.43/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "@vue/runtime-core",
+      "version": "3.5.43",
+      "license": "MIT",
+      "role": "production dependency tree",
+      "optional": false,
+      "integrity": "sha512-hU6U6VnVhBGQDpvlnnDlIB8ZGJBiOcgk2lh/0InltHiz3D8oSkluvuvY+do1G2H3+udeKFsmaBlgVYP7gXQzEw==",
+      "upstreamTexts": [
+        "texts/npm-@vue-runtime-core-3.5.43/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "@vue/runtime-dom",
+      "version": "3.5.43",
+      "license": "MIT",
+      "role": "production dependency tree",
+      "optional": false,
+      "integrity": "sha512-Bb2Jc0YjjJdMt1SJmb9b2L/IWd3I8lIT9x9eS/xvvP9CiVgna0ffua74xKRmt4/uSJ+0r4iN8ex1jrqkhQGWQw==",
+      "upstreamTexts": [
+        "texts/npm-@vue-runtime-dom-3.5.43/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "@vue/server-renderer",
+      "version": "3.5.43",
+      "license": "MIT",
+      "role": "production dependency tree",
+      "optional": false,
+      "integrity": "sha512-l2Ygjv9NehV94PSBxNWsAHC0j/eIIKbn92mBuWXAPGLnn6HfJ6MH5ubsd+Nk0YoZ5FRuxWI1P2VSoh+dbPQhCQ==",
+      "upstreamTexts": [
+        "texts/npm-@vue-server-renderer-3.5.43/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "@vue/shared",
+      "version": "3.5.43",
+      "license": "MIT",
+      "role": "production dependency tree",
+      "optional": false,
+      "integrity": "sha512-uksS7YGMR5NZyr4JNq0Rp+QyLns0ueaz20KwzIPW9R0LH1Vnt4E+XUM29PNseEbf1www2gOuhuDi5AKOIXag9Q==",
+      "upstreamTexts": [
+        "texts/npm-@vue-shared-3.5.43/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "alien-signals",
+      "version": "3.2.1",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": false,
+      "integrity": "sha512-I8FjmltrfnDFoZedi5CG8DghVYNhzb/Ijluz7tCSJH0xpd0484Kowhbb1XDYOxfJpU1p5wnM2X54dA+IfGyD1g==",
+      "upstreamTexts": [
+        "texts/npm-alien-signals-3.2.1/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "csstype",
+      "version": "3.2.3",
+      "license": "MIT",
+      "role": "production dependency tree",
+      "optional": false,
+      "integrity": "sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==",
+      "upstreamTexts": [
+        "texts/npm-csstype-3.2.3/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "detect-libc",
+      "version": "2.1.2",
+      "license": "Apache-2.0",
+      "role": "build/test",
+      "optional": false,
+      "integrity": "sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==",
+      "upstreamTexts": [
+        "texts/npm-detect-libc-2.1.2/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "entities",
+      "version": "7.0.1",
+      "license": "BSD-2-Clause",
+      "role": "production dependency tree",
+      "optional": false,
+      "integrity": "sha512-TWrgLOFUQTH994YUyl1yT4uyavY5nNB5muff+RtWaqNVCAK408b5ZnnbNAUEWLTCpum9w6arT70i1XdQ4UeOPA==",
+      "upstreamTexts": [
+        "texts/npm-entities-7.0.1/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "estree-walker",
+      "version": "2.0.2",
+      "license": "MIT",
+      "role": "production dependency tree",
+      "optional": false,
+      "integrity": "sha512-Rfkk/Mp/DL7JVje3u18FxFujQlTNR2q6QfMSMB7AvCBx91NGj/ba3kCfza0f6dVDbw7YlRf/nDrn7pQrCCyQ/w==",
+      "upstreamTexts": [
+        "texts/npm-estree-walker-2.0.2/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "fdir",
+      "version": "6.5.0",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": false,
+      "integrity": "sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg==",
+      "upstreamTexts": [
+        "texts/npm-fdir-6.5.0/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "fsevents",
+      "version": "2.3.3",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": true,
+      "integrity": "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==",
+      "upstreamTexts": []
+    },
+    {
+      "name": "lightningcss",
+      "version": "1.33.0",
+      "license": "MPL-2.0",
+      "role": "build/test",
+      "optional": false,
+      "integrity": "sha512-WkUDrojuJs0xkgGf2udWxa3yGBRxPtxUkB79i6aCZLRgc7PM8fZe9TosfPDcvEpQZbuFASnHYmRLBLUbmLOIIA==",
+      "upstreamTexts": [
+        "texts/npm-lightningcss-1.33.0/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "lightningcss-android-arm64",
+      "version": "1.33.0",
+      "license": "MPL-2.0",
+      "role": "build/test",
+      "optional": true,
+      "integrity": "sha512-gEpRTalKdosp4Bb8qWtc2iOgE5SeIHlpS1up9bFq2wAyYhl1UdTObYiHe98zEM9SQvSoqQZ1IQD0JNpg3Ml5pg==",
+      "upstreamTexts": []
+    },
+    {
+      "name": "lightningcss-darwin-arm64",
+      "version": "1.33.0",
+      "license": "MPL-2.0",
+      "role": "build/test",
+      "optional": true,
+      "integrity": "sha512-Sciaz8eenNTKn9b3t7+xr0ipTp9YxKQY4npwQ3mrRuL0BAVHBLyZxofhaKBAVtzmtRZ/zTyo0/to4B1uWG/Djg==",
+      "upstreamTexts": []
+    },
+    {
+      "name": "lightningcss-darwin-x64",
+      "version": "1.33.0",
+      "license": "MPL-2.0",
+      "role": "build/test",
+      "optional": true,
+      "integrity": "sha512-Z5UPAxzrjlWNNyGy6i65cJzzvgJ5D3T6wMvs+gWpY9d7qRhANrxqAp6LhxIgZhWEw18RfJTGcRxjuLIBr+m8XQ==",
+      "upstreamTexts": []
+    },
+    {
+      "name": "lightningcss-freebsd-x64",
+      "version": "1.33.0",
+      "license": "MPL-2.0",
+      "role": "build/test",
+      "optional": true,
+      "integrity": "sha512-QQM/Ti/hQajJwCY+RiWuCZ9sdtI/XQk7nDK5vC8kkdwixezOlDgvDx7+RT+QjK6FcFT4MpsuoBnHIo/O3StRRg==",
+      "upstreamTexts": []
+    },
+    {
+      "name": "lightningcss-linux-arm-gnueabihf",
+      "version": "1.33.0",
+      "license": "MPL-2.0",
+      "role": "build/test",
+      "optional": true,
+      "integrity": "sha512-N7FVBe6iS24MlM6R/4RBTxGhQheZGs7tiQ9U32UtF75NzP5Q7xWPRqLBCKxlRQRk3rY1jCIPLzx7WzOhuUIRLQ==",
+      "upstreamTexts": []
+    },
+    {
+      "name": "lightningcss-linux-arm64-gnu",
+      "version": "1.33.0",
+      "license": "MPL-2.0",
+      "role": "build/test",
+      "optional": true,
+      "integrity": "sha512-j2v/itmy4HlNxlc6voKXYgBqNi0Ng2LShg4z7GufpEgs05P+2suBVyi9I6YHq5uoVFx9ETin3eCEhLVyXGQnKg==",
+      "upstreamTexts": []
+    },
+    {
+      "name": "lightningcss-linux-arm64-musl",
+      "version": "1.33.0",
+      "license": "MPL-2.0",
+      "role": "build/test",
+      "optional": true,
+      "integrity": "sha512-yiO5ROMuYQgXbC60yjZU5CYSFZGKXL0HFATXt9mHJn1+zW55oCtMI9NfcVhYLMFDL7gV7oBPon/EmMMGg2OvtQ==",
+      "upstreamTexts": []
+    },
+    {
+      "name": "lightningcss-linux-x64-gnu",
+      "version": "1.33.0",
+      "license": "MPL-2.0",
+      "role": "build/test",
+      "optional": true,
+      "integrity": "sha512-ar+Ju7LmcN0Jo4FpL4hpFybwNG9/3A/Br5KW2n2jyODg3MEZXaDYADdemoNS+BDNfMgKvylJLj4S5tyRActuAg==",
+      "upstreamTexts": []
+    },
+    {
+      "name": "lightningcss-linux-x64-musl",
+      "version": "1.33.0",
+      "license": "MPL-2.0",
+      "role": "build/test",
+      "optional": true,
+      "integrity": "sha512-RYiYbkokw0trfKqqzfF55lginwEPrD3OJDfTuJzFs1MK6iFnDenaz1fqLLtX4ITG3OktJQXOeTaw1awrBAlZPw==",
+      "upstreamTexts": []
+    },
+    {
+      "name": "lightningcss-win32-arm64-msvc",
+      "version": "1.33.0",
+      "license": "MPL-2.0",
+      "role": "build/test",
+      "optional": true,
+      "integrity": "sha512-1K+MPfLSFVpphzpdbfkhlWk6wBrTObBzS2T6db10PNOZgR9GoVsAWzwNyuhUYYbTp23j+4RrncfujZ4uAzXvwA==",
+      "upstreamTexts": []
+    },
+    {
+      "name": "lightningcss-win32-x64-msvc",
+      "version": "1.33.0",
+      "license": "MPL-2.0",
+      "role": "build/test",
+      "optional": true,
+      "integrity": "sha512-OlEICDx/Xl0FqSp4bry8zFnCvGpig3Gl4gCquvYwHuqJKEC1+n9NgDniFvqHGmMv1ZkqDJrDqKKSykTDX+ehuA==",
+      "upstreamTexts": [
+        "texts/npm-lightningcss-win32-x64-msvc-1.33.0/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "magic-string",
+      "version": "0.30.21",
+      "license": "MIT",
+      "role": "production dependency tree",
+      "optional": false,
+      "integrity": "sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==",
+      "upstreamTexts": [
+        "texts/npm-magic-string-0.30.21/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "muggle-string",
+      "version": "0.4.1",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": false,
+      "integrity": "sha512-VNTrAak/KhO2i8dqqnqnAHOa3cYBwXEZe9h+D5h/1ZqFSTEFHdM65lR7RoIqq3tBBYavsOXV84NoHXZ0AkPyqQ==",
+      "upstreamTexts": [
+        "texts/npm-muggle-string-0.4.1/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "nanoid",
+      "version": "3.3.19",
+      "license": "MIT",
+      "role": "production dependency tree",
+      "optional": false,
+      "integrity": "sha512-Y2tUNy4ouw6tq5oDSKeQYGOyhkUBhNOcGV/02KC+6kd9eDGqdZd++mjMiIDilrBYvjEnCYvVtsuHCuP+okSfug==",
+      "upstreamTexts": [
+        "texts/npm-nanoid-3.3.19/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "path-browserify",
+      "version": "1.0.1",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": false,
+      "integrity": "sha512-b7uo2UCUOYZcnF/3ID0lulOJi/bafxa1xPe7ZPsammBSpjSWQkjNxlt635YGS2MiR9GjvuXCtz2emr3jbsz98g==",
+      "upstreamTexts": [
+        "texts/npm-path-browserify-1.0.1/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "picocolors",
+      "version": "1.1.1",
+      "license": "ISC",
+      "role": "production dependency tree",
+      "optional": false,
+      "integrity": "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==",
+      "upstreamTexts": [
+        "texts/npm-picocolors-1.1.1/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "picomatch",
+      "version": "4.0.7",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": false,
+      "integrity": "sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==",
+      "upstreamTexts": [
+        "texts/npm-picomatch-4.0.7/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "playwright",
+      "version": "1.63.0",
+      "license": "Apache-2.0",
+      "role": "build/test",
+      "optional": false,
+      "integrity": "sha512-+7ziBLidS4NaNCdt57SUDT+wYmmd5fmiQejUic/kb+YsYSCPyOOE9sebzMjNmQrsnNpDJqd4WHvV/8lfKfUDUg==",
+      "upstreamTexts": [
+        "texts/npm-playwright-1.63.0/LICENSE.txt",
+        "texts/npm-playwright-1.63.0/NOTICE.txt"
+      ]
+    },
+    {
+      "name": "playwright-core",
+      "version": "1.63.0",
+      "license": "Apache-2.0",
+      "role": "build/test",
+      "optional": false,
+      "integrity": "sha512-rYCsBF/M5HjUch52bbtVONEFjv6Xu8sm8h72dNlR5bzIE1fvC/bxgspzkjSfU+MweEMmPM8KJebG6nnyxo5mCg==",
+      "upstreamTexts": [
+        "texts/npm-playwright-core-1.63.0/LICENSE.txt",
+        "texts/npm-playwright-core-1.63.0/NOTICE.txt"
+      ]
+    },
+    {
+      "name": "postcss",
+      "version": "8.5.28",
+      "license": "MIT",
+      "role": "production dependency tree",
+      "optional": false,
+      "integrity": "sha512-RRuzqDtt5Y9h3quz5hWhK+TPnsmVs6WwSU6LkJMeY4HstUEDuYTG8UJSdawMRzmzAtV+KEoG8N3Qg2qLy5vM/A==",
+      "upstreamTexts": [
+        "texts/npm-postcss-8.5.28/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "rolldown",
+      "version": "1.2.11",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": false,
+      "integrity": "sha512-qpSwIyz0jHQq5qXBTNxFmE6664rJ7O+4TvPFOiOaBSrz8IOHc1koKKSqTM2H6u1UG1+TveuC6vaDHKXFOvb1Kw==",
+      "upstreamTexts": [
+        "texts/npm-rolldown-1.2.11/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "source-map-js",
+      "version": "1.2.1",
+      "license": "BSD-3-Clause",
+      "role": "production dependency tree",
+      "optional": false,
+      "integrity": "sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==",
+      "upstreamTexts": [
+        "texts/npm-source-map-js-1.2.1/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "tinyglobby",
+      "version": "0.2.17",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": false,
+      "integrity": "sha512-wXR/dYpcqKmfWpEdZjiKJOwCNFndD0DMnrW/cYjVGttEkBfVgcLFHoNrlj47mjOVic9yyNu65alsgF4NQyTa2g==",
+      "upstreamTexts": [
+        "texts/npm-tinyglobby-0.2.17/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "typescript",
+      "version": "5.9.3",
+      "license": "Apache-2.0",
+      "role": "production dependency tree",
+      "optional": false,
+      "integrity": "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==",
+      "upstreamTexts": [
+        "texts/npm-typescript-5.9.3/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "undici-types",
+      "version": "7.16.0",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": false,
+      "integrity": "sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw==",
+      "upstreamTexts": [
+        "texts/npm-undici-types-7.16.0/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "vite",
+      "version": "8.3.1",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": false,
+      "integrity": "sha512-/bvH9E9tmCXRGp2uXY3WbOldqpTwFkbha/8ANaEQ6VkxhH60KyqLwgZq6lG2y+4uT55x9+9eUHMpQ7uGnOCKjA==",
+      "upstreamTexts": [
+        "texts/npm-vite-8.3.1/LICENSE.md.txt"
+      ]
+    },
+    {
+      "name": "vscode-uri",
+      "version": "3.2.0",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": false,
+      "integrity": "sha512-m2gXo3bn0G1kT9InzMf07fTbqMbGtyckj3bH5ktLO+1Ssv+yiATZ4dhwaQv9UZWxJh6E9IFGnQyjgWVDWVBDrg==",
+      "upstreamTexts": [
+        "texts/npm-vscode-uri-3.2.0/LICENSE.md.txt"
+      ]
+    },
+    {
+      "name": "vue",
+      "version": "3.5.43",
+      "license": "MIT",
+      "role": "production dependency tree",
+      "optional": false,
+      "integrity": "sha512-o5qZoksdnjIKvW1srZ3ab7pcDNYAerBjRe54D0LBLfRdCYFrSgBHVXokMas35czQc0//lmx4/tuY4ZNQ+Rf2Ng==",
+      "upstreamTexts": [
+        "texts/npm-vue-3.5.43/LICENSE.txt"
+      ]
+    },
+    {
+      "name": "vue-tsc",
+      "version": "3.2.6",
+      "license": "MIT",
+      "role": "build/test",
+      "optional": false,
+      "integrity": "sha512-gYW/kWI0XrwGzd0PKc7tVB/qpdeAkIZLNZb10/InizkQjHjnT8weZ/vBarZoj4kHKbUTZT/bAVgoOr8x4NsQ/Q==",
+      "upstreamTexts": [
+        "texts/npm-vue-tsc-3.2.6/LICENSE.txt"
+      ]
+    }
+  ],
+  "unresolvedDeclarations": []
+}

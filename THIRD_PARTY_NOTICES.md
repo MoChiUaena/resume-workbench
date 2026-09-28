@@ -31,7 +31,11 @@
 | TypeScript | 5.9.3 | Apache-2.0 |
 | Maven Wrapper | 3.3.4 | Apache-2.0（脚本保留声明） |
 
-Chromium 由 Playwright 官方安装器准备，保留浏览器分发物中的许可证和 third-party notices；它不进入源码仓库。fonttools、Pillow、pypdf 与 Poppler 只用于开发准备或 QA，不是应用运行依赖。完整传递依赖声明及发布物审计在阶段 D 处理。
+Chromium 由 Playwright 官方安装器准备，保留浏览器分发物中的许可证和 third-party notices；它不进入源码仓库。fonttools、Pillow、pypdf 与 Poppler 只用于开发准备或 QA，不是应用运行依赖。
+
+`0.1.0` 的[完整依赖清单](docs/dependency-licenses.md)覆盖 61 个已解析 Maven 运行期依赖（53 个实际分发 JAR）和 75 个 npm 锁定包。POM 父级许可、npm SPDX 声明、依赖 SHA-256 / integrity、上游 LICENSE / NOTICE 与可获取的源码版权头保存在应用 JAR 的 `META-INF/third-party/`；`verify-distribution.py` 检查实际分发 JAR 与清单的完整性。未安装的平台可选 npm 包记录锁定声明，不作为运行期分发物。
+
+项目 MIT 不替代第三方许可证。Logback 的 EPL-2.0 / LGPL-2.1-only 双许可及 Jakarta 的 EPL / GPL + Classpath Exception 声明完整保留；库的官方源码归档位置列在清单中。Adobe XMP 按上游 POM 的 BSD-3-Clause 声明分发，并附 [Adobe SDK 的上游 BSD 许可](https://github.com/adobe/XMP-Toolkit-SDK/blob/main/LICENSE)。JDK、基础系统、Chromium、Playwright 自身分发条款保留在镜像原有的 legal / copyright / license 目录，不将它们改为本项目 MIT。
 
 ## 原创合成素材
 

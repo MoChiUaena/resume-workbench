@@ -6,6 +6,10 @@
 
 编辑页和深色模式的实际截图：[纸张文档风格](docs/workbench-editor.png) · [深色模式](docs/workbench-dark.png)。
 
+![19 秒实际操作演示](docs/demo.gif)
+
+演示使用合成奶龙简历，展示选简历、编辑、样式与间距、PDF 和完整备份。[最新版本与部署配置](https://github.com/MoChiUaena/resume-workbench/releases/tag/v0.1.0)。
+
 ## 现在可以做什么
 
 - 在“我的简历”列表选择、新建、重命名、复制和删除简历；从一份基础简历复制 Java 岗和 AI 岗版本。
@@ -25,9 +29,9 @@
 
 ## Docker 启动
 
-只需要 Docker Desktop / Docker Compose，无需在宿主机安装 Node、JDK 或 Maven。发布镜像由版本标签触发 CI，全部测试通过后推送到 GHCR；候选版本为 `0.1.0-rc.1`。预构建镜像的可用性以对应 Release 和 Actions 结果为准。
+只需要 Docker Desktop / Docker Compose，无需在宿主机安装 Node、JDK 或 Maven。当前版本为 `0.1.0`，包含完整排版控制和 schema 3；镜像由版本标签触发 CI，全部检查通过后推送到 GHCR。
 
-拿到版本对应的 `compose.yml` 和 `.env.example` 后，放入一个新目录：
+从 Release 下载 `resume-workbench-config.zip`，解压后有版本对应的 `compose.yml` 和 `.env.example`。在这个新目录运行：
 
 ```powershell
 Copy-Item .env.example .env
@@ -127,7 +131,7 @@ Compose 的 `.env` 保存部署设置，应与下载的备份分别保留。服�
 
 当前源码的结构化文档采用 `schemaVersion: 3`，分离 `content` 与 `layout`；新增样式位于 `layout.presentation`。读取 schema 2 简历时按原统一边距填充新设置，不批量改写已保存的数据。文件只通过 UUID 引用，不在正文中保存宿主机路径。移除当前照片不会删除历史文件；删除整份简历会删除它的历史记录，但仍保留图片文件。本阶段没有附件垃圾回收。
 
-新源码可恢复 schema 2 / 3 备份；新备份使用 schema 3，旧应用会明确拒绝，避免悄悄丢失样式。已发布的 `0.1.0-rc.1` 仍对应此前 schema 2 的版本，这一轮排版控制见当前功能分支。
+`0.1.0` 可恢复 schema 2 / 3 备份；新备份使用 schema 3，旧应用会明确拒绝，避免悄悄丢失样式。旧的 `0.1.0-rc.1` 使用 schema 2。升级前备份并保留 .env 和两个数据卷；读取旧文档不会批量改写记录，保存修改时才写入新文档。不能用旧应用恢复新备份。
 
 内存中的短期渲染快照保留 30 分钟、最多 64 个；它与 PostgreSQL 中可长期恢复的版本快照不同。浏览器只记住所选简历 ID，不用 localStorage 保存正文。
 
@@ -175,3 +179,5 @@ JDK 21 / Spring Boot 3.5.16 / PostgreSQL 16.10 / Flyway / Playwright Java 1.63.0
 - 黑体和宋体均本地嵌入，修复共享字形的 Unicode 反向映射；不承诺所有 ATS 系统兼容。
 
 字体、来源散列与许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。原创代码和脚本绘制的合成素材采用 MIT；用户提供的示例证件照不在此许可范围内。版本发布流程见 [发布说明](docs/releasing.md)。
+
+进一步阅读：[架构与设计](docs/architecture.md) · [依赖许可证清单](docs/dependency-licenses.md) · [参与开发](CONTRIBUTING.md) · [更新记录](CHANGELOG.md)。

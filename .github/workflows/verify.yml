@@ -52,7 +52,9 @@ jobs:
         working-directory: frontend
         run: npm ci --no-audit --no-fund && npm run build
       - name: Test backend with PostgreSQL
-        run: chmod +x mvnw && ./mvnw -B -ntp test
+        run: chmod +x mvnw && ./mvnw -B -ntp package
+      - name: Verify packaged dependencies and notices
+        run: python3 scripts/verify-distribution.py
       - name: Prepare browser and PDF QA
         run: |
           cd frontend
@@ -110,8 +112,31 @@ jobs:
             output/e2e-results.json
             output/*verification*.json
             output/stage-b-network.json
+            src/main/resources/META-INF/third-party/inventory.json
             output/pdf/
             frontend/test-results/
+      - name: Verify upgrade from the published schema 2 candidate
+        run: |
+          for side in source target; do
+            docker compose -p resume-ci-$side -f .tools/ci/$side/compose.yml --env-file .tools/ci/$side/.env down
+          done
+          mkdir -p .tools/ci/upgrade
+          cp compose.yml .tools/ci/upgrade/compose.yml
+          printf 'RESUME_PORT=18769\n' > .tools/ci/upgrade/.env
+          docker pull ghcr.io/mochiuaena/resume-workbench:0.1.0-rc.1
+          RESUME_APP_IMAGE=ghcr.io/mochiuaena/resume-workbench:0.1.0-rc.1 docker compose -p resume-ci-upgrade -f .tools/ci/upgrade/compose.yml --env-file .tools/ci/upgrade/.env up -d --wait --wait-timeout 120
+          python scripts/verify-upgrade.py before --isolated
+          RESUME_APP_IMAGE=resume-workbench:ci docker compose -p resume-ci-upgrade -f .tools/ci/upgrade/compose.yml --env-file .tools/ci/upgrade/.env up -d --wait --wait-timeout 120
+          python scripts/verify-upgrade.py after --isolated
+      - name: Upload upgrade evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: upgrade-evidence
+          retention-days: 14
+          path: |
+            output/upgrade-verification.json
+            output/pdf/release-upgraded.pdf
       - name: Log in to container registry for tagged release
         if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
@@ -131,7 +156,7 @@ jobs:
       - name: Stop test services
         if: always()
         run: |
-          for side in source target; do
+          for side in source target upgrade; do
             if [ -f .tools/ci/$side/compose.yml ]; then
               docker compose -p resume-ci-$side -f .tools/ci/$side/compose.yml --env-file .tools/ci/$side/.env down
             fi
