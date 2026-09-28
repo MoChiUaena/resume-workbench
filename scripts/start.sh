@@ -10,4 +10,4 @@ docker compose -f compose.dev.yml up -d --wait
 (cd frontend && npm ci && npm run build)
 ./mvnw -B package
 ./mvnw -B exec:java -Dexec.mainClass=com.microsoft.playwright.CLI '-Dexec.args=install chromium'
-exec java -jar target/resume-workbench-0.1.0-SNAPSHOT.jar
+exec java -jar target/resume-workbench.jar

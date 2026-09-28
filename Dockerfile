@@ -26,7 +26,7 @@ ENV SERVER_ADDRESS=0.0.0.0
 ENV RESUME_DATA_DIR=/app/data
 WORKDIR /app
 RUN mkdir -p /app/data && chown pwuser:pwuser /app/data
-COPY --from=backend --chown=pwuser:pwuser /build/target/resume-workbench-0.1.0-SNAPSHOT.jar /app/app.jar
+COPY --from=backend --chown=pwuser:pwuser /build/target/resume-workbench.jar /app/app.jar
 LABEL org.opencontainers.image.source="https://github.com/MoChiUaena/resume-workbench"
 USER pwuser
 EXPOSE 18765
