@@ -46,3 +46,7 @@ Chromium 由 Playwright 官方安装器准备，保留浏览器分发物中的�
 ## WebP 解码
 
 静态 WebP 使用 TwelveMonkeys ImageIO 3.15.2，按上游 BSD 三条款许可证分发。包含 imageio-webp、imageio-core、imageio-metadata、common-lang、common-io 和 common-image；完整上游条款和各 JAR 散列随 `META-INF/third-party/` 分发，来源见依赖许可证清单。项目没有修改这些依赖，也不需要额外的原生 WebP 库。
+
+## 可选文字模型接入
+
+开发版使用 Spring AI 1.1.8 的兼容文字接口适配器，按上游 Apache-2.0 条款分发，用于 DashScope、DeepSeek、GLM 与用户配置的兼容服务。各新增 Java 依赖的上游条款、来源和 SHA-256 记录在 `META-INF/third-party/inventory.json`，随应用分发。项目不分发模型权重，也不包含用户 API Key。

@@ -70,4 +70,18 @@ class ResumeServiceTest {
         String html=new RichText().render("**重点** <img src=x onerror=alert(1)> [link](javascript:alert(1))");
         assertThat(html).contains("<strong>重点</strong>","&lt;img").doesNotContain("<img","<a");
     }
+    @Test void reviewedParagraphCreatesOneSafetyVersionAndLostAcknowledgementCanRetry(){
+        var original=service.create("润色确认测试",ResumeDocument.sample("one"));var section=original.document().content().sections().getFirst();var entry=section.entries().getFirst();String before=entry.bullets().getFirst();UUID token=UUID.randomUUID();int count=service.versions(original.id()).size();
+        var applied=service.applyParagraph(original.id(),1,section.id(),entry.id(),0,before,"测试新的表达",token);
+        assertThat(applied.revision()).isEqualTo(2);assertThat(service.versions(original.id())).hasSize(count+1);
+        var safety=service.versions(original.id()).stream().filter(v->v.label().startsWith("AI 应用前")).findFirst().orElseThrow();assertThat(service.version(original.id(),safety.id()).document()).isEqualTo(original.document());
+        assertThat(service.applyParagraph(original.id(),1,section.id(),entry.id(),0,before,"测试新的表达",token)).isEqualTo(applied);assertThat(service.versions(original.id())).hasSize(count+1);
+        assertThat(applied.document().layout()).isEqualTo(original.document().layout());assertThat(applied.document().content().phone()).isEqualTo(original.document().content().phone());
+    }
+    @Test void staleOrMismatchedParagraphDoesNotCreateVersionOrOverwriteAnotherEdit(){
+        var original=service.create("旧建议检查",ResumeDocument.sample("one"));var section=original.document().content().sections().getFirst();var entry=section.entries().getFirst();int count=service.versions(original.id()).size();
+        assertThatThrownBy(()->service.applyParagraph(original.id(),1,section.id(),entry.id(),0,"不匹配的原文","新文字",UUID.randomUUID())).isInstanceOf(ApiException.class);assertThat(service.versions(original.id())).hasSize(count);assertThat(service.get(original.id())).isEqualTo(original);
+        var changed=service.save(original.id(),new ResumeService.Save("另一窗口修改",original.document(),1,UUID.randomUUID()));
+        assertThatThrownBy(()->service.applyParagraph(original.id(),1,section.id(),entry.id(),0,entry.bullets().getFirst(),"新文字",UUID.randomUUID())).isInstanceOfSatisfying(ApiException.class,e->assertThat(e.code).isEqualTo("REVISION_CONFLICT"));assertThat(service.get(original.id())).isEqualTo(changed);assertThat(service.versions(original.id())).hasSize(count);
+    }
 }

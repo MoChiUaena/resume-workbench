@@ -1,6 +1,6 @@
 # 依赖许可证清单
 
-解析结果：67 个 Maven 运行期依赖（其中 59 个实际 JAR 随应用分发）、75 个 npm 锁定包，未识别声明为 0。
+解析结果：92 个 Maven 运行期依赖（其中 84 个实际 JAR 随应用分发）、75 个 npm 锁定包，未识别声明为 0。
 
 依据已解析 POM（含父 POM）和 npm lockfile 的上游声明。原始 JAR 的 LICENSE / NOTICE 保留在各依赖内，并提取随应用分发；npm 已安装包的许可证文本同样附带。完整清单、SHA-256 / integrity 和文本位于应用 JAR 的 `META-INF/third-party/`。
 
@@ -20,10 +20,15 @@
 | com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.21.4 | The Apache Software License, Version 2.0 |
 | com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.21.4 | The Apache Software License, Version 2.0 |
 | com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.21.4 | The Apache Software License, Version 2.0 |
+| com.fasterxml.jackson.module:jackson-module-jsonSchema:2.21.4 | The Apache Software License, Version 2.0 |
 | com.fasterxml.jackson.module:jackson-module-parameter-names:2.21.4 | The Apache Software License, Version 2.0 |
 | com.fasterxml:classmate:1.7.3 | Apache License, Version 2.0 |
+| com.github.victools:jsonschema-generator:4.38.0 | The Apache License, Version 2.0 |
+| com.github.victools:jsonschema-module-jackson:4.38.0 | The Apache License, Version 2.0 |
+| com.github.victools:jsonschema-module-swagger-2:4.38.0 | The Apache License, Version 2.0 |
 | com.google.code.gson:gson:2.13.2 | Apache-2.0 |
 | com.google.errorprone:error_prone_annotations:2.41.0 | Apache 2.0 |
+| com.knuddels:jtokkit:1.1.0 | MIT License |
 | com.microsoft.playwright:driver-bundle:1.63.0 | Apache License, Version 2.0 |
 | com.microsoft.playwright:driver:1.63.0 | Apache License, Version 2.0 |
 | com.microsoft.playwright:playwright:1.63.0 | Apache License, Version 2.0 |
@@ -34,10 +39,18 @@
 | com.twelvemonkeys.imageio:imageio-metadata:3.15.2 | The BSD License |
 | com.twelvemonkeys.imageio:imageio-webp:3.15.2 | The BSD License |
 | com.zaxxer:HikariCP:6.3.3 | The Apache Software License, Version 2.0 |
+| io.micrometer:context-propagation:1.1.4 | The Apache Software License, Version 2.0 |
 | io.micrometer:micrometer-commons:1.15.12 | The Apache Software License, Version 2.0 |
+| io.micrometer:micrometer-core:1.15.12 | The Apache Software License, Version 2.0 |
 | io.micrometer:micrometer-observation:1.15.12 | The Apache Software License, Version 2.0 |
+| io.projectreactor:reactor-core:3.7.19 | Apache License, Version 2.0 |
+| io.swagger.core.v3:swagger-annotations-jakarta:2.2.38 | Apache License 2.0 |
 | jakarta.annotation:jakarta.annotation-api:2.1.1 | EPL 2.0 / GPL2 w/ CPE |
 | jakarta.validation:jakarta.validation-api:3.0.2 | Apache License 2.0 |
+| javax.validation:validation-api:1.1.0.Final | The Apache Software License, Version 2.0 |
+| org.antlr:ST4:4.3.4 | The BSD License |
+| org.antlr:antlr-runtime:3.5.3 | BSD licence |
+| org.antlr:antlr4-runtime:4.13.1 | BSD-3-Clause |
 | org.apache.logging.log4j:log4j-api:2.24.3 | Apache-2.0 |
 | org.apache.logging.log4j:log4j-to-slf4j:2.24.3 | Apache-2.0 |
 | org.apache.tomcat.embed:tomcat-embed-core:10.1.55 | Apache License, Version 2.0 |
@@ -46,13 +59,21 @@
 | org.attoparser:attoparser:2.0.7.RELEASE | The Apache Software License, Version 2.0 |
 | org.flywaydb:flyway-core:11.7.2 | Apache License, Version 2.0 |
 | org.flywaydb:flyway-database-postgresql:11.7.2 | Apache License, Version 2.0 |
+| org.hdrhistogram:HdrHistogram:2.2.2 | Public Domain, per Creative Commons CC0 / BSD-2-Clause |
 | org.hibernate.validator:hibernate-validator:8.0.3.Final | Apache License 2.0 |
 | org.jboss.logging:jboss-logging:3.6.3.Final | Apache License 2.0 |
 | org.jspecify:jspecify:1.0.0 | The Apache License, Version 2.0 |
+| org.latencyutils:LatencyUtils:2.0.3 | Public Domain, per Creative Commons CC0 |
 | org.opentest4j:opentest4j:1.3.0 | The Apache License, Version 2.0 |
 | org.postgresql:postgresql:42.7.11 | BSD-2-Clause |
+| org.reactivestreams:reactive-streams:1.0.4 | MIT-0 |
 | org.slf4j:jul-to-slf4j:2.0.18 | MIT |
 | org.slf4j:slf4j-api:2.0.18 | MIT |
+| org.springframework.ai:spring-ai-commons:1.1.8 | Apache 2.0 |
+| org.springframework.ai:spring-ai-model:1.1.8 | Apache 2.0 |
+| org.springframework.ai:spring-ai-openai:1.1.8 | Apache 2.0 |
+| org.springframework.ai:spring-ai-retry:1.1.8 | Apache 2.0 |
+| org.springframework.ai:spring-ai-template-st:1.1.8 | Apache 2.0 |
 | org.springframework.boot:spring-boot-autoconfigure:3.5.16 | Apache License, Version 2.0 |
 | org.springframework.boot:spring-boot-starter-jdbc:3.5.16 | Apache License, Version 2.0 |
 | org.springframework.boot:spring-boot-starter-json:3.5.16 | Apache License, Version 2.0 |
@@ -63,15 +84,19 @@
 | org.springframework.boot:spring-boot-starter-web:3.5.16 | Apache License, Version 2.0 |
 | org.springframework.boot:spring-boot-starter:3.5.16 | Apache License, Version 2.0 |
 | org.springframework.boot:spring-boot:3.5.16 | Apache License, Version 2.0 |
+| org.springframework.retry:spring-retry:2.0.13 | Apache 2.0 |
 | org.springframework:spring-aop:6.2.19 | Apache License, Version 2.0 |
 | org.springframework:spring-beans:6.2.19 | Apache License, Version 2.0 |
+| org.springframework:spring-context-support:6.2.19 | Apache License, Version 2.0 |
 | org.springframework:spring-context:6.2.19 | Apache License, Version 2.0 |
 | org.springframework:spring-core:6.2.19 | Apache License, Version 2.0 |
 | org.springframework:spring-expression:6.2.19 | Apache License, Version 2.0 |
 | org.springframework:spring-jcl:6.2.19 | Apache License, Version 2.0 |
 | org.springframework:spring-jdbc:6.2.19 | Apache License, Version 2.0 |
+| org.springframework:spring-messaging:6.2.19 | Apache License, Version 2.0 |
 | org.springframework:spring-tx:6.2.19 | Apache License, Version 2.0 |
 | org.springframework:spring-web:6.2.19 | Apache License, Version 2.0 |
+| org.springframework:spring-webflux:6.2.19 | Apache License, Version 2.0 |
 | org.springframework:spring-webmvc:6.2.19 | Apache License, Version 2.0 |
 | org.thymeleaf:thymeleaf-spring6:3.1.5.RELEASE | The Apache Software License, Version 2.0 |
 | org.thymeleaf:thymeleaf:3.1.5.RELEASE | The Apache Software License, Version 2.0 |

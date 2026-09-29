@@ -67,6 +67,36 @@ public class ResumeService {
     public Resume duplicate(UUID id, long revision, String title) {
         var original=load(id,true); requireRevision(original,revision); return create(title,original.document());
     }
+    public static String paragraph(ResumeDocument document,String sectionId,String entryId,int index) {
+        var section=document.content().sections().stream().filter(s->s.id().equals(sectionId)).findFirst()
+            .orElseThrow(()->new ApiException("AI_SOURCE_CHANGED","原模块已改变，请重新选择要润色的文字。",409));
+        var entry=section.entries().stream().filter(e->e.id().equals(entryId)).findFirst()
+            .orElseThrow(()->new ApiException("AI_SOURCE_CHANGED","原条目已改变，请重新选择要润色的文字。",409));
+        if(index<0||index>=entry.bullets().size())throw new ApiException("AI_SOURCE_CHANGED","原段落已改变，请重新选择文字。",409);
+        return entry.bullets().get(index);
+    }
+    /** Apply one reviewed paragraph and its safety snapshot in the same transaction. */
+    public Resume applyParagraph(UUID id,long revision,String sectionId,String entryId,int index,String original,String replacement,UUID mutationId) {
+        var existing=load(id,true);
+        if(mutationId.equals(existing.lastMutationId()))return existing;
+        requireRevision(existing,revision);
+        if(!paragraph(existing.document(),sectionId,entryId,index).equals(original))throw new ApiException("AI_SOURCE_CHANGED","原段落已改变，请重新生成建议。",409);
+        if(replacement==null||replacement.isBlank()||replacement.length()>800||replacement.equals(original))throw new ApiException("AI_NO_CHANGE","建议未产生可应用的变化。",422);
+        var content=existing.document().content();var sections=new ArrayList<ResumeDocument.Section>();
+        for(var section:content.sections()){
+            if(!section.id().equals(sectionId)){sections.add(section);continue;}
+            var entries=new ArrayList<ResumeDocument.Entry>();
+            for(var entry:section.entries()){
+                if(!entry.id().equals(entryId)){entries.add(entry);continue;}
+                var bullets=new ArrayList<>(entry.bullets());bullets.set(index,replacement);
+                entries.add(new ResumeDocument.Entry(entry.id(),entry.title(),entry.meta(),entry.bulleted(),List.copyOf(bullets)));
+            }
+            sections.add(new ResumeDocument.Section(section.id(),section.type(),section.title(),section.visible(),section.pageBreakBefore(),List.copyOf(entries)));
+        }
+        var changed=new ResumeDocument(ResumeDocument.SCHEMA_VERSION,new ResumeDocument.Content(content.name(),content.headline(),content.email(),content.phone(),content.location(),List.copyOf(sections)),existing.document().layout());
+        snapshot(existing,"AI 应用前自动保留 · r"+existing.revision());
+        return save(id,new Save(existing.title(),changed,revision,mutationId));
+    }
     public void delete(UUID id, long revision) {
         var existing=load(id,true); requireRevision(existing,revision);
         jdbc.update("DELETE FROM resumes WHERE id=?",id);

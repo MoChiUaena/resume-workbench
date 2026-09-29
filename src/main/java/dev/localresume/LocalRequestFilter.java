@@ -31,7 +31,9 @@ public class LocalRequestFilter extends OncePerRequestFilter {
         res.setHeader("X-Frame-Options", "SAMEORIGIN");
         res.setHeader("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; connect-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'self'");
         if (req.getRequestURI().startsWith("/api/")) res.setHeader("Cache-Control", "no-store");
-        try (WorkspaceGate.Lease lease = mutation && !req.getRequestURI().startsWith("/api/backups") ? gate.mutation() : null) {
+        // Provider calls only read a source snapshot. Do not hold the workspace lock during network I/O.
+        boolean providerCall=req.getRequestURI().equals("/api/ai/suggestions")||req.getRequestURI().matches("/api/models/profiles/[0-9a-f-]{36}/test");
+        try (WorkspaceGate.Lease lease = mutation && !providerCall && !req.getRequestURI().startsWith("/api/backups") ? gate.mutation() : null) {
             chain.doFilter(req, res);
         } catch (ApiException e) {
             if (res.isCommitted()) throw e;

@@ -80,6 +80,9 @@ jobs:
           printf 'RESUME_APP_IMAGE=resume-workbench:ci\nRESUME_PORT=18769\n' > .tools/ci/target/.env
           docker compose -p resume-ci-source -f .tools/ci/source/compose.yml --env-file .tools/ci/source/.env up -d --wait --wait-timeout 120
           docker compose -p resume-ci-target -f .tools/ci/target/compose.yml --env-file .tools/ci/target/.env up -d --wait --wait-timeout 120
+      - name: Start isolated model protocol fixture
+        run: |
+          docker run -d --name resume-model-fixture --network container:resume-ci-source-app-1 --mount type=bind,source="$PWD/scripts/qa-model-server.mjs",target=/qa-model-server.mjs,readonly --entrypoint /ms-playwright-driver/node resume-workbench:ci /qa-model-server.mjs
       - name: Cut application egress and verify it is blocked
         run: |
           for app in resume-ci-source-app-1 resume-ci-target-app-1; do
@@ -94,19 +97,24 @@ jobs:
           python scripts/verify-backup.py --isolated
           python scripts/verify-automatic-backups.py --isolated
           python scripts/verify-webp.py --isolated
+          python scripts/verify-model-settings.py --isolated
           python scripts/verify-pdfs.py --stage-c
           python scripts/verify-layout-pdfs.py
           python scripts/verify-template-pdfs.py
           python scripts/verify-redacted-pdfs.py
       - name: Recreate containers without deleting volumes
         run: |
+          docker stop resume-model-fixture
+          docker rm resume-model-fixture
           for side in source target; do
             docker compose -p resume-ci-$side -f .tools/ci/$side/compose.yml --env-file .tools/ci/$side/.env down
             docker compose -p resume-ci-$side -f .tools/ci/$side/compose.yml --env-file .tools/ci/$side/.env up -d --wait --wait-timeout 120
           done
+          docker run -d --name resume-model-fixture --network container:resume-ci-source-app-1 --mount type=bind,source="$PWD/scripts/qa-model-server.mjs",target=/qa-model-server.mjs,readonly --entrypoint /ms-playwright-driver/node resume-workbench:ci /qa-model-server.mjs
           python scripts/verify-backup.py --isolated --check-persistence
           python scripts/verify-automatic-backups.py --isolated --check-persistence
           python scripts/verify-webp.py --isolated --check-persistence
+          python scripts/verify-model-settings.py --isolated --check-persistence
       - name: Upload verification evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -189,6 +197,8 @@ jobs:
       - name: Stop test services
         if: always()
         run: |
+          docker stop resume-model-fixture || true
+          docker rm resume-model-fixture || true
           for side in source target upgrade upgrade-three upgrade-four upgrade-five; do
             if [ -f .tools/ci/$side/compose.yml ]; then
               docker compose -p resume-ci-$side -f .tools/ci/$side/compose.yml --env-file .tools/ci/$side/.env down
