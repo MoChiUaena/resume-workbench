@@ -59,6 +59,8 @@ PreviewService 将文档序列化后重新读取，形成不可变的渲染输�
 
 导出先核验当前修订并创建持久版本，再渲染固定文档。后续编辑不会混入该 PDF。ExportService 并发为 1，设定浏览器启动、导航和测量超时；仅允许请求这份模板、指定本地字体、脚本和所引用的图片，不接收任意 URL。PDF 与审计元数据存入 data/exports。
 
+脱敏导出使用 Redaction 对固定修订创建临时投影，图片隐藏时移除投影中的 UUID，原始引用不变。它与普通导出共用 PreviewService / ExportService；预览摘要在最终请求中再次核验，原稿变化或选项与预览不一致时拒绝。历史快照保存原稿，PDF 保存投影结果；导出设置不进入文档 schema，完整备份仍包含原始信息。说明见 redacted-export.md。
+
 ## 备份与恢复的事务边界
 
 普通写入持有共享锁，备份 / 导入持有排他锁。备份在 PostgreSQL 可重复读事务中读取当前记录和历史，继续持锁直到必要附件与 PDF 打包完成。它使用应用级一致快照，不拷贝正在写入的数据库文件。
@@ -73,6 +75,6 @@ LocalRequestFilter 校验本机 Host、同源 Origin、Sec-Fetch-Site 和写入�
 
 运行期核心功能不调用模型、云存储、字体 CDN 或在线 PDF 服务。安装镜像 / 依赖需联网，已在切断 app 默认外网路由的容器中验证运行流程。将来接 AI 时仍需单独设计发送字段、服务商展示和用户确认，不能静默把整份简历发到云端。
 
-选择 PostgreSQL 是为了事务、修订并发和迁移的清晰边界；代价是多一个容器。首版不并行维护 SQLite、S3、多租户或消息队列。两个模板与有限参数使测量、分页和回归测试的范围可控。
+选择 PostgreSQL 是为了事务、修订并发和迁移的清晰边界；代价是多一个容器。首版不并行维护 SQLite、S3、多租户或消息队列。四个模板与有限参数使测量、分页和回归测试的范围可控。
 
 可在面试中结合 ResumeService、ImageService、PreviewService、ExportService、BackupService 和相应测试，解释上述边界；测试记录见 stage-c-verification.md 与 layout-verification.md。

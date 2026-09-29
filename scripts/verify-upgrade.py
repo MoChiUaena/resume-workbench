@@ -1,4 +1,4 @@
-"""Upgrade schema 2/3 to the current release using retained, disposable volumes."""
+"""Upgrade schema 2/3/4 to the current release using retained, disposable volumes."""
 import argparse
 import hashlib
 import importlib.util
@@ -15,7 +15,7 @@ def before(base, source_schema=2, future_backup=None):
     assert qa.call(base,'/api/resumes')==[], 'Old instance must be empty and isolated'
     resume=qa.call(base,'/api/resumes',{'title':'版本升级 · 奶龙合成简历','sample':'one'})
     assert resume['document']['schemaVersion']==source_schema, 'Must start with the actual old schema'
-    if source_schema==3:
+    if source_schema in [3,4]:
         resume['document']['layout']['template']='banner'
         resume['document']['layout']['font']='serif'
         resume['document']['layout']['presentation'].update(accentColor='#7c3aed',marginTopMm=20,contactStyle='icons')
@@ -61,13 +61,18 @@ def after(base):
     exported=qa.call(base,'/api/resumes/'+imported['id']+'/export',{'expectedRevision':imported['revision']})
     (ROOT/'output/pdf').mkdir(exist_ok=True)
     (ROOT/f'output/pdf/release-upgraded-schema-{source_schema}.pdf').write_bytes(qa.call(base,'/api/exports/'+exported['id']+'/pdf',raw=True))
+    options={name:True for name in ['name','phone','email','location','photo','logo','matchingText']}
+    projected=qa.call(base,'/api/resumes/'+imported['id']+'/export/preview',{'expectedRevision':imported['revision'],'redaction':options})
+    redacted=qa.call(base,'/api/resumes/'+imported['id']+'/export',{'expectedRevision':imported['revision'],'redaction':options,'previewDigest':projected['digest']})
+    (ROOT/f'output/pdf/release-upgraded-redacted-schema-{source_schema}.pdf').write_bytes(qa.call(base,'/api/exports/'+redacted['id']+'/pdf',raw=True))
+    assert qa.call(base,'/api/resumes/'+imported['id'])==imported
     assert qa.call(base,'/api/resumes/'+old['id'])==current
-    report={'upgrade':f'schema {source_schema} -> 4','sameVolumes':True,'oldContentRevisionDatesPreserved':True,'oldImagesVersionsPdfPreserved':True,'oldBackupRestored':True,'newTemplatesEditableAndExportable':True,'oldAppRejectedFutureBackup':data['futureBackupRejected']}
+    report={'upgrade':f'schema {source_schema} -> 4','sameVolumes':True,'oldContentRevisionDatesPreserved':True,'oldImagesVersionsPdfPreserved':True,'oldBackupRestored':True,'newTemplatesEditableAndExportable':True,'redactedExportLeavesSourceUnchanged':True,'oldAppRejectedFutureBackup':data['futureBackupRejected']}
     (ROOT/f'output/upgrade-verification-schema-{source_schema}.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf8')
     print(json.dumps(report,ensure_ascii=False,indent=2))
 
 if __name__=='__main__':
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('step',choices=['before','after']);parser.add_argument('--base',default='http://127.0.0.1:18769');parser.add_argument('--isolated',action='store_true');parser.add_argument('--source-schema',type=int,choices=[2,3],default=2);parser.add_argument('--future-backup',type=Path);args=parser.parse_args()
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('step',choices=['before','after']);parser.add_argument('--base',default='http://127.0.0.1:18769');parser.add_argument('--isolated',action='store_true');parser.add_argument('--source-schema',type=int,choices=[2,3,4],default=2);parser.add_argument('--future-backup',type=Path);args=parser.parse_args()
     target=urlparse(args.base);assert args.isolated and target.hostname in ['127.0.0.1','localhost'] and target.port and target.port!=18765
     STATE=ROOT/f'output/upgrade-before-schema-{args.source_schema}.json'
     if args.step=='before':before(args.base.rstrip('/'),args.source_schema,args.future_backup)

@@ -97,6 +97,9 @@ def run(source, target):
     resume['document']['layout']['photo'] = original
     resume = save(source, resume)
     call(source, '/api/resumes/' + resume['id'] + '/export', {'expectedRevision': resume['revision']})
+    options = {name: True for name in ['name', 'phone', 'email', 'location', 'photo', 'logo', 'matchingText']}
+    projected = call(source, '/api/resumes/' + resume['id'] + '/export/preview', {'expectedRevision': resume['revision'], 'redaction': options})
+    redacted = call(source, '/api/resumes/' + resume['id'] + '/export', {'expectedRevision': resume['revision'], 'redaction': options, 'previewDigest': projected['digest']})
     meta, content = archive(source)
     OUT.mkdir(exist_ok=True)
     (OUT / 'stage-c-fresh-instance.zip').write_bytes(content)
@@ -109,6 +112,13 @@ def run(source, target):
     assert imported['revision'] == resume['revision']
     _, recovered = archive(target)
     assert canonical_zip(content) == canonical_zip(recovered), 'Structure, originals, PNGs, history or PDF changed'
+    with zipfile.ZipFile(io.BytesIO(recovered)) as recovered_archive:
+        recovered_workspace = json.loads(recovered_archive.read('workspace.json'))
+        recovered_redacted = next(item for item in recovered_workspace['exports'] if item['sha256'] == redacted['sha256'])
+    redacted_pdf = call(target, '/api/exports/' + recovered_redacted['id'] + '/pdf', raw=True)
+    assert hashlib.sha256(redacted_pdf).hexdigest() == redacted['sha256']
+    (OUT / 'pdf').mkdir(exist_ok=True)
+    (OUT / 'pdf/redacted-restored.pdf').write_bytes(redacted_pdf)
     versions = call(target, '/api/resumes/' + imported_id + '/versions')
     historical = next(v for v in versions if v['label'] == '历史 EXIF 照片')
     imported = call(target, f'/api/resumes/{imported_id}/versions/{historical["id"]}/restore',
@@ -129,7 +139,7 @@ def run(source, target):
         'sourceId': resume['id'], 'targetId': imported_id,
         'sourceDigest': digest(resume), 'targetDigest': digest(imported),
         'structureAndAllFileHashesMatch': True, 'historicalExifPhotoRestored': True,
-        'restoredRecordEditable': True, 'pdfSha256': exported['sha256']}
+        'restoredRecordEditable': True, 'redactedPdfHashPreserved': True, 'redactedPdfSha256': redacted['sha256'], 'pdfSha256': exported['sha256']}
     (OUT / 'stage-c-backup-verification.json').write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
     print(json.dumps(result, ensure_ascii=False, indent=2))
 

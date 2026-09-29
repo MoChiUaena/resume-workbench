@@ -95,6 +95,7 @@ jobs:
           python scripts/verify-pdfs.py --stage-c
           python scripts/verify-layout-pdfs.py
           python scripts/verify-template-pdfs.py
+          python scripts/verify-redacted-pdfs.py
       - name: Recreate containers without deleting volumes
         run: |
           for side in source target; do
@@ -138,6 +139,15 @@ jobs:
           python scripts/verify-upgrade.py before --isolated --source-schema 3 --future-backup output/stage-c-ui-backup.zip
           RESUME_APP_IMAGE=resume-workbench:ci docker compose -p resume-ci-upgrade-three -f .tools/ci/upgrade-three/compose.yml --env-file .tools/ci/upgrade-three/.env up -d --wait --wait-timeout 120
           python scripts/verify-upgrade.py after --isolated --source-schema 3
+          docker compose -p resume-ci-upgrade-three -f .tools/ci/upgrade-three/compose.yml --env-file .tools/ci/upgrade-three/.env down
+          mkdir -p .tools/ci/upgrade-four
+          cp compose.yml .tools/ci/upgrade-four/compose.yml
+          printf 'RESUME_PORT=18769\n' > .tools/ci/upgrade-four/.env
+          docker pull ghcr.io/mochiuaena/resume-workbench:0.3.0
+          RESUME_APP_IMAGE=ghcr.io/mochiuaena/resume-workbench:0.3.0 docker compose -p resume-ci-upgrade-four -f .tools/ci/upgrade-four/compose.yml --env-file .tools/ci/upgrade-four/.env up -d --wait --wait-timeout 120
+          python scripts/verify-upgrade.py before --isolated --source-schema 4
+          RESUME_APP_IMAGE=resume-workbench:ci docker compose -p resume-ci-upgrade-four -f .tools/ci/upgrade-four/compose.yml --env-file .tools/ci/upgrade-four/.env up -d --wait --wait-timeout 120
+          python scripts/verify-upgrade.py after --isolated --source-schema 4
       - name: Upload upgrade evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -166,7 +176,7 @@ jobs:
       - name: Stop test services
         if: always()
         run: |
-          for side in source target upgrade upgrade-three; do
+          for side in source target upgrade upgrade-three upgrade-four; do
             if [ -f .tools/ci/$side/compose.yml ]; then
               docker compose -p resume-ci-$side -f .tools/ci/$side/compose.yml --env-file .tools/ci/$side/.env down
             fi

@@ -25,6 +25,10 @@ public class ResumeService {
         return jdbc.query("SELECT id,title,revision,updated_at FROM resumes ORDER BY updated_at DESC,id",(rs,n)->new Summary(rs.getObject(1,UUID.class),rs.getString(2),rs.getLong(3),rs.getTimestamp(4).toInstant()));
     }
     public Resume get(UUID id) { return load(id,false); }
+    @Transactional(readOnly=true)
+    public Resume savedRevision(UUID id,long revision) {
+        var current=load(id,false);requireRevision(current,revision);return current;
+    }
     private Resume load(UUID id, boolean lock) {
         var found=jdbc.query("SELECT * FROM resumes WHERE id=?"+(lock ? " FOR UPDATE" : ""),(rs,n)->read(rs),id);
         if(found.isEmpty()) throw new ApiException("RESUME_NOT_FOUND","这份简历不存在或已被删除。",404);

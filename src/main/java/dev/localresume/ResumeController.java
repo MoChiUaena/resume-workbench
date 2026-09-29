@@ -15,6 +15,8 @@ public class ResumeController {
                          @Min(1) long expectedRevision,@NotNull UUID mutationId) {}
     public record NamedRevision(@Min(1) long expectedRevision,@NotBlank @Size(max=120) String title) {}
     public record Revision(@Min(1) long expectedRevision) {}
+    public record ExportRequest(@Min(1) long expectedRevision, @Valid Redaction.Options redaction,
+                                @Pattern(regexp="[0-9a-f]{64}") String previewDigest) {}
     private final ResumeService resumes;
     private final ImageService images;
     private final PreviewService previews;
@@ -55,12 +57,22 @@ public class ResumeController {
     @PostMapping("/{id}/versions/{versionId}/restore") public Object restore(@PathVariable UUID id,@PathVariable UUID versionId,@Valid @RequestBody Revision input) {
         return resumes.restore(id,versionId,input.expectedRevision());
     }
-    @PostMapping("/{id}/export") public Object export(@PathVariable UUID id,@Valid @RequestBody Revision input) {
-        // Load then checkpoint with the same revision. A racing edit yields 409 before rendering.
-        var resume=resumes.get(id);
-        var checkpoint=resumes.exportCheckpoint(id,input.expectedRevision());
-        if(resume.revision()!=checkpoint.sourceRevision()) throw new ApiException("REVISION_CONFLICT","内容已更新，请重新导出。",409);
-        var preview=previews.create(resume.document());
+    @PostMapping("/{id}/export/preview") public Object exportPreview(@PathVariable UUID id,@Valid @RequestBody ExportRequest input) {
+        if(input.redaction()==null) throw new ApiException("REDACTION_OPTIONS_REQUIRED","请选择脱敏范围后预览。",422);
+        var resume=resumes.savedRevision(id,input.expectedRevision());
+        var preview=previews.create(Redaction.apply(resume.document(),input.redaction()));
+        return Map.of("id",preview.id(),"digest",preview.digest(),"url","/render/"+preview.id(),"revision",resume.revision());
+    }
+    @PostMapping("/{id}/export") public Object export(@PathVariable UUID id,@Valid @RequestBody ExportRequest input) {
+        var resume=resumes.savedRevision(id,input.expectedRevision());
+        if(input.redaction()!=null&&input.previewDigest()==null)
+            throw new ApiException("EXPORT_PREVIEW_REQUIRED","请先检查脱敏预览，再导出 PDF。",422);
+        var preview=previews.create(input.redaction()==null?resume.document():Redaction.apply(resume.document(),input.redaction()));
+        if(input.redaction()!=null&&!preview.digest().equals(input.previewDigest()))
+            throw new ApiException("EXPORT_PREVIEW_CHANGED","脱敏选项已改变，请更新预览后再导出。",422);
+        // Pin the same source revision after projection. A racing edit yields 409 before rendering.
+        var checkpoint=input.redaction()==null?resumes.exportCheckpoint(id,input.expectedRevision()):
+            resumes.checkpoint(id,input.expectedRevision(),"脱敏 PDF 原稿 · r"+input.expectedRevision());
         return exports.generate(preview,id.toString(),checkpoint.id().toString(),resume.revision());
     }
 }
