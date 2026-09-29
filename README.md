@@ -8,14 +8,14 @@
 
 ![26 秒实际操作演示](docs/demo.gif)
 
-演示使用合成奶龙简历，展示选简历、编辑、撤销、样式与间距、版本对比、PDF 和完整备份。[最新版本与部署配置](https://github.com/MoChiUaena/resume-workbench/releases/tag/v0.2.0)。
+演示使用合成奶龙简历，展示选简历、编辑、撤销、样式与间距、版本对比、PDF 和完整备份。[最新版本与部署配置](https://github.com/MoChiUaena/resume-workbench/releases/tag/v0.3.0)。
 
 ## 现在可以做什么
 
 - 在“我的简历”列表选择、新建、重命名、复制和删除简历；从一份基础简历复制 Java 岗和 AI 岗版本。
 - 编辑基本信息、教育、工作 / 实习、项目、技能和自定义模块；添加条目、排序、隐藏、按模块另起一页。
 - 正文支持段落、项目列表和 `**加粗**`。输入 HTML 会作为文字显示，不接受任意 HTML/CSS。
-- 编辑页左侧选模块、中间填写内容、右侧实时预览。界面可选蓝白工具或纸张文档风格，并能独立切换深色模式；选择保存在本机浏览器。PDF 模板仍可独立选择经典单栏或并列页眉。
+- 编辑页左侧选模块、中间填写内容、右侧实时预览。界面可选蓝白工具或纸张文档风格，并能独立切换深色模式；选择保存在本机浏览器。PDF 版式可独立选择四种简历模板。
 - 两张图片可以独立替换、隐藏、移除、调整尺寸、旋转和裁剪。
 - 新建示例使用“奶龙”作为姓名和你提供的证件照原图；保留一张独立的虚构学校 Logo。已有简历的内容不会被模板更新覆盖。
 - “版式设置”分为模板、文字、样式、间距：黑体 / 宋体、字号比例与预设、中文 / English 信息标签、八种主题色与自定义色、文字对齐、图标 / 文字标签 / 纯内容、模块标题样式。
@@ -25,13 +25,14 @@
 - 顶部“撤销 / 重做”覆盖正文、简历名称、模块、图片与排版，连续输入合并为一步，撤销后的内容仍会自动保存。支持 Ctrl / ⌘ Z、Ctrl Y 和 Ctrl / ⌘ Shift Z；最近 100 步仅保留在当前编辑页面，刷新或重新打开简历会清空，长期保存请使用版本快照。
 - 在“历史版本”点击“对比”，查看旧版与当前编辑内容的文字、模块、照片 / 校徽及版式变化，可筛选后恢复；查看不会保存或覆盖草稿。恢复后的结果也能撤销，数据库修订号继续递增。
 - 中文 A4 预览与 PDF 共用模板、字体、图片和分页脚本，PDF 保留可选择、可搜索的文字。
+- 四种简历模板：经典单栏、并列页眉、横栏名片、侧栏标题。横栏名片将联系方式独立横排，侧栏标题将模块标题放在左侧、正文放在右侧；切换保留正文、图片和文字 / 样式 / 间距设置。网站 A/B 风格仍独立于简历模板。
 - “备份与恢复”下载包含正文、版式、历史版本、原图、标准化图片和相关 PDF 的 ZIP；可以在全新实例恢复，再继续修改。导入会新增记录，保留现有简历。
 
 阶段 C 的部署、备份和离线闭环已在独立容器中验证。首版为单人本地使用，没有账号、AI、云存储或公开分享功能。`compose.yml` 运行 app / db 两个服务；`compose.dev.yml` 只供源码开发时启动数据库。
 
 ## Docker 启动
 
-只需要 Docker Desktop / Docker Compose，无需在宿主机安装 Node、JDK 或 Maven。当前版本为 `0.2.0`，新增撤销 / 重做与历史版本对比，文档仍为 schema 3；镜像由版本标签触发 CI，全部检查通过后推送到 GHCR。
+只需要 Docker Desktop / Docker Compose，无需在宿主机安装 Node、JDK 或 Maven。当前版本为 `0.3.0`，包含四种模板、撤销 / 重做与历史版本对比，文档使用 schema 4；镜像由版本标签触发 CI，全部检查通过后推送到 GHCR。
 
 从 Release 下载 `resume-workbench-config.zip`，解压后有版本对应的 `compose.yml` 和 `.env.example`。在这个新目录运行：
 
@@ -131,9 +132,9 @@ Linux/macOS 提供 `scripts/start.sh`，需要 Docker、JDK 21、Node 和 Chromi
 
 Compose 的 `.env` 保存部署设置，应与下载的备份分别保留。服务器密码和主机目录不进入 ZIP；界面风格 / 深色偏好仍保存在本机浏览器。自定义 `-p` 项目名时卷名前缀也会变化。
 
-当前源码的结构化文档采用 `schemaVersion: 3`，分离 `content` 与 `layout`；新增样式位于 `layout.presentation`。读取 schema 2 简历时按原统一边距填充新设置，不批量改写已保存的数据。文件只通过 UUID 引用，不在正文中保存宿主机路径。移除当前照片不会删除历史文件；删除整份简历会删除它的历史记录，但仍保留图片文件。本阶段没有附件垃圾回收。
+当前源码的结构化文档采用 `schemaVersion: 4`，分离 `content` 与 `layout`；版式样式位于 `layout.presentation`。schema 4 扩展模板标识，数据库结构不变。读取 schema 2 时按原统一边距补齐设置，读取 schema 3 时保留已有设置；不批量改写已保存的数据。文件只通过 UUID 引用，不在正文中保存宿主机路径。移除当前照片不会删除历史文件；删除整份简历会删除它的历史记录，但仍保留图片文件。本阶段没有附件垃圾回收。
 
-`0.2.0` 可恢复 schema 2 / 3 备份，与 `0.1.0` 使用相同文档和数据库结构。撤销记录属于当前页面，不进入备份；历史版本仍完整备份。旧的 `0.1.0-rc.1` 使用 schema 2，不能导入 schema 3 备份。升级前备份并保留 .env 和两个数据卷；读取旧文档不会批量改写记录，保存修改时才写入新文档。
+`0.3.0` 可恢复 schema 2 / 3 / 4 备份。新备份标识为 schema 4，旧应用会明确拒绝，避免丢失新模板。撤销记录属于当前页面，不进入备份；历史版本仍完整备份。升级前备份并保留 .env 和两个数据卷；读取旧文档只在内存转换，保存修改时才写入 schema 4。不能保证保存新模板后直接切回旧应用，可在独立旧实例恢复升级前备份。
 
 内存中的短期渲染快照保留 30 分钟、最多 64 个；它与 PostgreSQL 中可长期恢复的版本快照不同。浏览器只记住所选简历 ID，不用 localStorage 保存正文。
 
@@ -157,7 +158,7 @@ npm run build
 npm run test:e2e
 ```
 
-E2E 只删除测试自己创建的简历 ID，不清空工作区。备份界面测试仅在 `RESUME_TEST_ISOLATED=1` 的独立实例启用，避免复制真实用户的工作区。测试覆盖编辑、重开、排序隐藏、照片历史、复制删除、失败重试、保存中的继续输入、双窗口冲突、两个模板 PDF 和长内容分页。数据目录可能保留测试上传文件，尚未实现垃圾回收。
+E2E 只删除测试自己创建的简历 ID，不清空工作区。备份界面测试仅在 `RESUME_TEST_ISOLATED=1` 的独立实例启用，避免复制真实用户的工作区。测试覆盖编辑、重开、排序隐藏、照片历史、复制删除、失败重试、保存中的继续输入、双窗口冲突、四种模板 PDF 和长内容分页。数据目录可能保留测试上传文件，尚未实现垃圾回收。
 
 PDF QA 需要 Python `pypdf` 以及 Poppler 的 `pdftoppm`、`pdffonts`：
 
@@ -167,7 +168,7 @@ python scripts/verify-pdfs.py
 
 产物在 `output/pdf/stage-b-{classic|banner}-{one|two}.pdf`，报告在 `output/pdf-verification-stage-b.json`，E2E 报告在 `output/e2e-results.json`。逐字检查中文和标题顺序，不用 NFKC 归一化掩盖部首替换错误。`--stage-a` 只用于检查保留的阶段 A 旧样本。
 
-当前源码的验证包含 9 项前端逻辑测试、35 项 Java 测试、15 项浏览器测试，以及中文 PDF、全新实例恢复和排版边界检查。`scripts/verify-backup.py --isolated` 在两个空实例执行恢复检查；`scripts/verify-pdfs.py --stage-c` 检查两模板与恢复样本；`scripts/verify-layout-pdfs.py` 检查自定义样式、重置和七页边界样本。详情见 [排版控制验收](docs/layout-verification.md) 和 [撤销与版本对比验收](docs/history-verification.md)。
+当前源码的验证包含 9 项前端逻辑测试、37 项 Java 测试、18 项浏览器测试，以及中文 PDF、全新实例恢复和排版边界检查。`scripts/verify-backup.py --isolated` 在两个空实例执行恢复检查；`scripts/verify-pdfs.py --stage-c` 检查两模板与恢复样本；`scripts/verify-layout-pdfs.py` 检查自定义样式、重置和七页边界样本。新增模板检查见 [四模板验收](docs/templates-verification.md)。详情见 [排版控制验收](docs/layout-verification.md) 和 [撤销与版本对比验收](docs/history-verification.md)。
 
 详情见 [阶段 C 验收记录](docs/stage-c-verification.md)、[阶段 B 验收记录](docs/stage-b-verification.md) 和 [阶段 A 记录](docs/stage-a-verification.md)。GitHub Actions 自动运行这些检查并保存合成数据的报告；它们的远端结果需查看实际运行记录。
 

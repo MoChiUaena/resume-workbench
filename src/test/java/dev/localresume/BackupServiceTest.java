@@ -3,6 +3,8 @@ package dev.localresume;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Validator;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -62,25 +64,25 @@ class BackupServiceTest {
         assertThat(photoId).isNotEqualTo(doc.layout().photo().id());assertThat(storage.image(photoId)).isEqualTo(storage.image(doc.layout().photo().id()));assertThat(storage.original(photoId)).isEqualTo(storage.original(doc.layout().photo().id()));
         assertThat(recovered.document().layout().presentation()).isEqualTo(style);
     }
-    @Test void schemaTwoBackupsRestoreWithTheirOriginalAppearance()throws Exception {
+    @ParameterizedTest @ValueSource(ints={2,3}) void olderBackupsRestoreWithTheirOriginalAppearance(int sourceSchema)throws Exception {
         var doc=withImages();resumes.create("旧版本简历",doc);
         var created=backups.create();var files=new LinkedHashMap<String,byte[]>();
         try(var zip=new java.util.zip.ZipInputStream(Files.newInputStream(backups.download(created.id())))){
             java.util.zip.ZipEntry entry;while((entry=zip.getNextEntry())!=null)if(!entry.getName().equals("manifest.json"))files.put(entry.getName(),zip.readAllBytes());
         }
-        var workspace=(com.fasterxml.jackson.databind.node.ObjectNode)mapper.readTree(files.get("workspace.json"));workspace.put("schemaVersion",2);
+        var workspace=(com.fasterxml.jackson.databind.node.ObjectNode)mapper.readTree(files.get("workspace.json"));workspace.put("schemaVersion",sourceSchema);
         for(String group:List.of("resumes","versions"))for(var record:workspace.path(group)){
-            var document=(com.fasterxml.jackson.databind.node.ObjectNode)record.path("document");document.put("schemaVersion",2);
-            ((com.fasterxml.jackson.databind.node.ObjectNode)document.path("layout")).remove("presentation");
+            var document=(com.fasterxml.jackson.databind.node.ObjectNode)record.path("document");document.put("schemaVersion",sourceSchema);
+            if(sourceSchema==2)((com.fasterxml.jackson.databind.node.ObjectNode)document.path("layout")).remove("presentation");
         }
-        files.put("workspace.json",mapper.writeValueAsBytes(workspace));files.put("settings.json",mapper.writeValueAsBytes(new BackupData.Settings(2,5242880,24000000)));
+        files.put("workspace.json",mapper.writeValueAsBytes(workspace));files.put("settings.json",mapper.writeValueAsBytes(new BackupData.Settings(sourceSchema,5242880,24000000)));
         var entries=files.entrySet().stream().map(e->new BackupArchive.FileEntry(e.getKey(),e.getValue().length,ImageService.sha(e.getValue()))).toList();
-        files.put("manifest.json",mapper.writeValueAsBytes(new BackupArchive.Manifest(BackupArchive.FORMAT,1,2,Instant.now(),entries)));
+        files.put("manifest.json",mapper.writeValueAsBytes(new BackupArchive.Manifest(BackupArchive.FORMAT,1,sourceSchema,Instant.now(),entries)));
         var bytes=new ByteArrayOutputStream();try(var zip=new java.util.zip.ZipOutputStream(bytes)){
             for(var entry:files.entrySet()){zip.putNextEntry(new java.util.zip.ZipEntry(entry.getKey()));zip.write(entry.getValue());zip.closeEntry();}
         }
         var result=backups.restore(new ByteArrayInputStream(bytes.toByteArray()));var recovered=resumes.get(result.resumeIds().getFirst());
-        assertThat(recovered.document().schemaVersion()).isEqualTo(3);
+        assertThat(recovered.document().schemaVersion()).isEqualTo(4);
         assertThat(recovered.document().layout().presentation()).isEqualTo(ResumeDocument.Presentation.defaults(doc.layout().marginMm()));
     }
     @Test void corruptionFailsBeforeImportAndPreservesExistingRows()throws Exception{

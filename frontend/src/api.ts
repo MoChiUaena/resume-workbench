@@ -1,3 +1,4 @@
+import type {TemplateId} from './resumeTemplates';
 export type Slot = { id: string | null; visible: boolean; widthMm: number; heightMm: number; fit: 'cover' | 'contain'; quarterTurns: number; zoom: number; positionX: number; positionY: number };
 export type Asset = { id: string; format: string; bytes: number; sourceWidth: number; sourceHeight: number; width: number; height: number; exifOrientation: number };
 export type Draft = { schemaVersion: number; sample: 'one' | 'two'; name: string; headline: string; email: string; phone: string; location: string; swapImages: boolean; photo: Slot; logo: Slot };
@@ -5,8 +6,8 @@ export class ApiFailure extends Error { constructor(public code: string, message
 export type Entry = { id: string; title: string; meta: string; bulleted: boolean; bullets: string[] };
 export type Section = { id: string; type: 'education' | 'experience' | 'project' | 'skills' | 'custom'; title: string; visible: boolean; pageBreakBefore: boolean; entries: Entry[] };
 export type Presentation = { language:'zh'|'en'; accentColor:string; alignment:'left'|'center'|'justify'; contactStyle:'labels'|'icons'|'plain'; headingStyle:'template'|'line'|'bar'|'plain'; marginHorizontalMm:number; marginTopMm:number; marginBottomMm:number; entryGapMm:number; paragraphGapMm:number };
-export type ResumeLayout = { template:'classic'|'banner'; font:'sans'|'serif'; fontSize:number; lineHeight:number; sectionGapMm:number; marginMm:number; swapImages:boolean; photo:Slot; logo:Slot; presentation:Presentation };
-export type ResumeDocument = { schemaVersion: 3; content: { name: string; headline: string; email: string; phone: string; location: string; sections: Section[] }; layout: ResumeLayout };
+export type ResumeLayout = { template:TemplateId; font:'sans'|'serif'; fontSize:number; lineHeight:number; sectionGapMm:number; marginMm:number; swapImages:boolean; photo:Slot; logo:Slot; presentation:Presentation };
+export type ResumeDocument = { schemaVersion: 4; content: { name: string; headline: string; email: string; phone: string; location: string; sections: Section[] }; layout: ResumeLayout };
 export type Resume = { id: string; title: string; document: ResumeDocument; revision: number; lastMutationId: string | null; updatedAt: string };
 export type Summary = Omit<Resume, 'document' | 'lastMutationId'>;
 export type Version = { id: string; title: string; label: string; sourceRevision: number; createdAt: string };

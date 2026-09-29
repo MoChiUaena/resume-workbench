@@ -37,3 +37,18 @@ h2{font-size:calc(11.4pt * var(--font-scale,1));color:var(--accent,#244f63)}h2:a
 .headings-plain h2{border-left:0;padding-left:0}.headings-plain h2:after,.headings-plain h2:before{display:none}
 .alignment-center ul{padding-left:0}.alignment-center li{list-style-position:inside;padding-left:0}
 .alignment-center.headings-bar h2{border-left:0;padding-left:0}.alignment-center.headings-bar h2:before{display:block;content:'';flex:none;width:.7mm;height:1.05em;background:var(--accent,#244f63)}
+/* Contact-card header: contact details have a full-width row beneath the identity/images. */
+.template-card .resume-header{row-gap:2mm;grid-template-rows:auto auto auto;min-height:0}
+.template-card .identity{display:contents}
+.template-card .identity h1{grid-column:2;grid-row:1;align-self:end;margin:0}
+.template-card .headline{grid-column:2;grid-row:2;align-self:start;margin:0}
+.template-card .left-cell{grid-column:1;grid-row:1 / span 2}
+.template-card .right-cell{grid-column:3;grid-row:1 / span 2}
+.template-card .contacts{grid-column:1 / -1;grid-row:3;display:flex;flex-direction:row;flex-wrap:wrap;justify-content:space-between;gap:1mm 4mm;padding-top:2mm;border-top:.2mm solid color-mix(in srgb,var(--accent,#244f63) 16%,white)}
+.template-card .contact-line{max-width:100%;min-width:0}.template-card .contact-line>span:last-child{min-width:0;overflow-wrap:anywhere}
+.template-card.alignment-center .contacts{justify-content:center}
+/* Title rail: keep headings before entries in the DOM and use the same page measurement. */
+.template-rail .resume-section{display:grid;grid-template-columns:22mm minmax(0,1fr);column-gap:4mm;align-items:start}
+.template-rail h2{grid-column:1;display:block;min-width:0;overflow-wrap:anywhere;margin:0}
+.template-rail .entry{grid-column:2;min-width:0}
+.template-rail.headings-template h2{border:0;padding:0}.template-rail.headings-template h2:after,.template-rail.headings-template h2:before{display:none}

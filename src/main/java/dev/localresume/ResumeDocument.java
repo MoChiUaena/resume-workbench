@@ -4,11 +4,12 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.util.*;
 
-/** Schema 3 adds presentation settings; schema 2 is upgraded when read, without writing user records. */
-public record ResumeDocument(@Min(3) @Max(3) int schemaVersion,
+/** Schema 4 adds template identifiers; legacy documents are upgraded in memory without writing records. */
+public record ResumeDocument(@Min(4) @Max(4) int schemaVersion,
                              @NotNull @Valid Content content, @NotNull @Valid Layout layout) {
-    public static final int SCHEMA_VERSION = 3;
-    public ResumeDocument { if(schemaVersion==2) schemaVersion=SCHEMA_VERSION; }
+    public static final int SCHEMA_VERSION = 4;
+    public static boolean supportsSchema(int version) { return Set.of(2,3,SCHEMA_VERSION).contains(version); }
+    public ResumeDocument { if(schemaVersion==2||schemaVersion==3) schemaVersion=SCHEMA_VERSION; }
     public record Content(@NotBlank @Size(max=30) String name,
                           @NotNull @Size(max=70) String headline,
                           @NotNull @Size(max=100) String email,
@@ -22,7 +23,7 @@ public record ResumeDocument(@Min(3) @Max(3) int schemaVersion,
     public record Entry(@NotBlank @Size(max=50) String id,
                         @NotNull @Size(max=80) String title, @NotNull @Size(max=120) String meta,
                         boolean bulleted, @NotNull @Size(max=30) List<@NotNull @Size(max=800) String> bullets) {}
-    public record Layout(@NotNull @Pattern(regexp="classic|banner") String template,
+    public record Layout(@NotNull @Pattern(regexp="classic|banner|card|rail") String template,
                          @NotNull @Pattern(regexp="sans|serif") String font,
                          @DecimalMin("9.0") @DecimalMax("12.0") double fontSize,
                          @DecimalMin("1.2") @DecimalMax("2.0") double lineHeight,

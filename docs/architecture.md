@@ -15,9 +15,9 @@ flowchart LR
 
 ## 文档、版本与图片
 
-`ResumeDocument` 的 schema 3 分离 content 与 layout。正文采用结构化模块，有限 Markdown 只支持段落、列表和加粗；HTML 会转义。layout 包含两个模板、字体、字号、行距、两个图片槽位和 presentation 样式。不存在任意 HTML/CSS 注入或自由画布。
+`ResumeDocument` 的 schema 4 分离 content 与 layout。正文采用结构化模块，有限 Markdown 只支持段落、列表和加粗；HTML 会转义。layout 包含四个模板、字体、字号、行距、两个图片槽位和 presentation 样式。不存在任意 HTML/CSS 注入或自由画布。
 
-schema 2 文档读取时在内存补齐默认样式和原有边距，不批量更新数据库；只有用户保存修改时写入新文档。备份 manifest 同时标识文档 schema，旧应用明确拒绝 schema 3，避免悄悄丢失排版设置。
+schema 2 文档读取时在内存补齐默认样式和原有边距，schema 3 保留原有 presentation；两者只在内存升级到 schema 4，不批量更新数据库。只有用户保存修改时写入新文档。备份 manifest 同时标识文档 schema，旧应用明确拒绝 schema 4，避免丢失新模板。
 
 数据库中的 resumes 保存当前文档、修订和最后一次 mutation ID；resume_versions 保存可长期恢复的快照。resume_assets / version_assets 分别引用稳定附件 UUID。照片与 Logo 独立配置，替换或隐藏当前照片不删除历史版本仍需的原图。当前没有垃圾回收，删除整份简历后可能保留无引用文件。
 

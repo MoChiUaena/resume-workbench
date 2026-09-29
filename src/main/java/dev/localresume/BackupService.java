@@ -123,7 +123,7 @@ public class BackupService {
         }
     }
     private void validate(BackupData backup,BackupArchive.Staged staged) throws IOException {
-        if(backup==null || !Set.of(2,ResumeDocument.SCHEMA_VERSION).contains(backup.schemaVersion()) || backup.resumes()==null || backup.versions()==null || backup.attachments()==null || backup.exports()==null
+        if(backup==null || !ResumeDocument.supportsSchema(backup.schemaVersion()) || backup.resumes()==null || backup.versions()==null || backup.attachments()==null || backup.exports()==null
             || backup.resumes().size()>2000 || backup.versions().size()>10000) throw BackupArchive.invalid("工作区数据无效或数量超限。");
         var resumeIds=new HashSet<UUID>();var versionIds=new HashSet<UUID>();var assetIds=new HashSet<String>();
         var versionOwners=new HashMap<UUID,BackupData.SavedVersion>();
