@@ -9,7 +9,13 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/api/backups")
 public class BackupController {
     private final BackupService backups;
-    public BackupController(BackupService backups) { this.backups=backups; }
+    private final AutomaticBackups automatic;
+    public BackupController(BackupService backups,AutomaticBackups automatic) { this.backups=backups;this.automatic=automatic; }
+    @GetMapping public Object history(@RequestParam(defaultValue="0") int page){return backups.history(page);}
+    @GetMapping("/automatic") public Object automatic(){return automatic.status();}
+    @PutMapping("/automatic") public Object configure(@jakarta.validation.Valid @RequestBody AutomaticBackups.Policy policy){return automatic.configure(policy);}
+    @PostMapping("/automatic/check") public Object checkNow(){return automatic.checkNow();}
+    @PostMapping("/{id}/restore") public Object restoreSaved(@PathVariable String id){return backups.restoreSaved(id);}
     @PostMapping public Object create() { return backups.create(); }
     @GetMapping("/{id}/download") public ResponseEntity<FileSystemResource> download(@PathVariable String id) {
         return ResponseEntity.ok().contentType(MediaType.parseMediaType("application/zip"))

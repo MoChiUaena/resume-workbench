@@ -34,7 +34,7 @@ def before(base, source_schema=2, future_backup=None):
             assert error.code==422 and json.loads(error.read())['code']=='BACKUP_VERSION_UNSUPPORTED'
             rejected=True
         assert rejected and qa.call(base,'/api/resumes')==previous, 'Old app must reject future backup without changes'
-    data={'base':base,'sourceSchema':source_schema,'futureBackupRejected':rejected,'resume':resume,'assets':assets,'export':exported,'versions':qa.call(base,'/api/resumes/'+resume['id']+'/versions')}
+    data={'base':base,'sourceSchema':source_schema,'futureBackupRejected':rejected,'backupId':meta['id'],'resume':resume,'assets':assets,'export':exported,'versions':qa.call(base,'/api/resumes/'+resume['id']+'/versions')}
     STATE.write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding='utf8')
     print(f'Old schema {source_schema} resume, images, versions, PDF and complete backup prepared.')
 
@@ -42,6 +42,9 @@ def after(base):
     data=json.loads(STATE.read_text(encoding='utf8'));old=data['resume'];assert data['base']==base
     source_schema=data['sourceSchema']
     current=qa.call(base,'/api/resumes/'+old['id'])
+    history=qa.call(base,'/api/backups')['items']
+    assert any(item['backup']['id']==data['backupId'] and item['kind']=='legacy' for item in history), 'Pre-upgrade ZIP must remain available'
+    assert not qa.call(base,'/api/backups/automatic')['state']['enabled'], 'Upgrade must not enable background backups'
     assert current['revision']==old['revision'] and current['updatedAt']==old['updatedAt']
     assert current['document']['content']==old['document']['content']
     assert current['document']['schemaVersion']==4
@@ -67,7 +70,7 @@ def after(base):
     (ROOT/f'output/pdf/release-upgraded-redacted-schema-{source_schema}.pdf').write_bytes(qa.call(base,'/api/exports/'+redacted['id']+'/pdf',raw=True))
     assert qa.call(base,'/api/resumes/'+imported['id'])==imported
     assert qa.call(base,'/api/resumes/'+old['id'])==current
-    report={'upgrade':f'schema {source_schema} -> 4','sameVolumes':True,'oldContentRevisionDatesPreserved':True,'oldImagesVersionsPdfPreserved':True,'oldBackupRestored':True,'newTemplatesEditableAndExportable':True,'redactedExportLeavesSourceUnchanged':True,'oldAppRejectedFutureBackup':data['futureBackupRejected']}
+    report={'upgrade':f'schema {source_schema} -> 4','sameVolumes':True,'oldContentRevisionDatesPreserved':True,'oldImagesVersionsPdfPreserved':True,'oldBackupRestored':True,'oldBackupVisibleInHistory':True,'automaticBackupsRemainDisabled':True,'newTemplatesEditableAndExportable':True,'redactedExportLeavesSourceUnchanged':True,'oldAppRejectedFutureBackup':data['futureBackupRejected']}
     (ROOT/f'output/upgrade-verification-schema-{source_schema}.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf8')
     print(json.dumps(report,ensure_ascii=False,indent=2))
 

@@ -19,6 +19,7 @@ import java.util.*;
 public class BackupService {
     public record Created(String id, long bytes, int resumes, int versions, int attachments, int exports, Instant createdAt) {}
     public record Restored(int resumes, int versions, int attachments, int exports, List<UUID> resumeIds) {}
+    public record AutomaticResult(Created backup,String fingerprint,String outcome) {}
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
     private final Validator validator;
@@ -27,6 +28,7 @@ public class BackupService {
     private final TransactionTemplate tx;
     private final Path data;
     private final BackupArchive archive;
+    private final BackupCatalog catalog;
     public final long maxBytes;
     private final long maxUploadBytes;
     private final long maxPixels;
@@ -40,10 +42,16 @@ public class BackupService {
         this.tx=new TransactionTemplate(transactions); this.tx.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ); this.data=Path.of(data).toAbsolutePath().normalize();
         this.maxBytes=maxBytes; this.maxUploadBytes=maxUploadBytes; this.maxPixels=maxPixels;
         this.archive=new BackupArchive(mapper,maxBytes);
+        this.catalog=new BackupCatalog(this.data,mapper,maxBytes);
     }
-    public Created create() {
+    public Created create() { return create("manual",null).backup(); }
+    public AutomaticResult automatic(String previousFingerprint) { return create("automatic",previousFingerprint); }
+    private AutomaticResult create(String kind,String previousFingerprint) {
         try (var lease=gate.exclusive()) {
             BackupData snapshot=tx.execute(status->snapshot());
+            String fingerprint=ImageService.sha(mapper.writeValueAsBytes(snapshot));
+            if(kind.equals("automatic")&&fingerprint.equals(previousFingerprint))return new AutomaticResult(null,fingerprint,"unchanged");
+            if(kind.equals("automatic")&&previousFingerprint==null&&snapshot.resumes().isEmpty())return new AutomaticResult(null,fingerprint,"empty");
             String id=UUID.randomUUID().toString();
             Path directory=data.resolve("backups"); Files.createDirectories(directory);
             Path temp=directory.resolve(id+".tmp"), destination=directory.resolve(id+".zip");
@@ -61,9 +69,12 @@ public class BackupService {
                 files.put("exports/"+export.id()+".json",BackupArchive.Source.json(mapper.writeValueAsBytes(export)));
             }
             try {
-                archive.write(temp,files);
+                var manifest=archive.write(temp,files);
                 Files.move(temp,destination,StandardCopyOption.ATOMIC_MOVE);
-                return new Created(id,Files.size(destination),snapshot.resumes().size(),snapshot.versions().size(),snapshot.attachments().size(),snapshot.exports().size(),Instant.now());
+                var created=new Created(id,Files.size(destination),snapshot.resumes().size(),snapshot.versions().size(),snapshot.attachments().size(),snapshot.exports().size(),manifest.createdAt());
+                try{catalog.save(new BackupCatalog.Stored(1,kind,created,BackupCatalog.hash(destination),fingerprint));}
+                catch(IOException e){Files.deleteIfExists(destination);throw e;}
+                return new AutomaticResult(created,fingerprint,"created");
             } finally { Files.deleteIfExists(temp); }
         } catch(ApiException e) { throw e; }
         catch(Exception e) { throw new ApiException("BACKUP_FAILED","备份未完成，请检查本地文件完整性、磁盘空间和数据库状态后重试。",503); }
@@ -71,8 +82,14 @@ public class BackupService {
     public Path download(String id) {
         requireUuid(id);
         Path file=data.resolve("backups").resolve(id+".zip");
-        if(!Files.isRegularFile(file)) throw new ApiException("BACKUP_NOT_FOUND","备份文件不存在，请重新创建。",404);
+        if(!Files.isRegularFile(file,LinkOption.NOFOLLOW_LINKS)) throw new ApiException("BACKUP_NOT_FOUND","备份文件不存在，请重新创建。",404);
+        catalog.verify(file);
         return file;
+    }
+    public BackupCatalog.History history(int page) { try(var lease=gate.mutation()){return catalog.history(page);} }
+    public Restored restoreSaved(String id) {
+        try(var input=Files.newInputStream(download(id))){return restore(input);}
+        catch(IOException e){throw new ApiException("BACKUP_NOT_FOUND","本机备份无法读取，请选择其他备份。",404);}
     }
     private BackupData snapshot() {
         var resumes=jdbc.query("SELECT * FROM resumes ORDER BY id",(rs,n)->new BackupData.SavedResume(rs.getObject("id",UUID.class),rs.getString("title"),parse(rs.getString("document"),ResumeDocument.class),rs.getLong("revision"),rs.getTimestamp("created_at").toInstant(),rs.getTimestamp("updated_at").toInstant()));
@@ -105,6 +122,7 @@ public class BackupService {
                 }
             } catch(IOException e) { throw BackupArchive.invalid("导出文件读取失败，备份未完成。"); }
         }
+        exports.sort(Comparator.comparing(ExportService.Export::id));
         return new BackupData(ResumeDocument.SCHEMA_VERSION,List.copyOf(resumes),List.copyOf(versions),List.copyOf(assets),List.copyOf(exports));
     }
     private Path attachmentPath(ImageService.Asset asset,String filename) { requireUuid(asset.id()); return data.resolve("attachments").resolve(asset.id()).resolve(filename); }

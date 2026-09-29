@@ -24,6 +24,7 @@ spring:
         cachecontrol:
           no-cache: true
 resume:
+  auto-backup-poll-ms: ${RESUME_AUTO_BACKUP_POLL_MS:60000}
   data-dir: ${RESUME_DATA_DIR:./data}
   max-upload-bytes: ${RESUME_MAX_UPLOAD_BYTES:5242880}
   max-pixels: 24000000

@@ -92,6 +92,7 @@ jobs:
       - name: Restore in a fresh instance and check PDFs
         run: |
           python scripts/verify-backup.py --isolated
+          python scripts/verify-automatic-backups.py --isolated
           python scripts/verify-pdfs.py --stage-c
           python scripts/verify-layout-pdfs.py
           python scripts/verify-template-pdfs.py
@@ -103,6 +104,7 @@ jobs:
             docker compose -p resume-ci-$side -f .tools/ci/$side/compose.yml --env-file .tools/ci/$side/.env up -d --wait --wait-timeout 120
           done
           python scripts/verify-backup.py --isolated --check-persistence
+          python scripts/verify-automatic-backups.py --isolated --check-persistence
       - name: Upload verification evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -143,8 +145,8 @@ jobs:
           mkdir -p .tools/ci/upgrade-four
           cp compose.yml .tools/ci/upgrade-four/compose.yml
           printf 'RESUME_PORT=18769\n' > .tools/ci/upgrade-four/.env
-          docker pull ghcr.io/mochiuaena/resume-workbench:0.3.0
-          RESUME_APP_IMAGE=ghcr.io/mochiuaena/resume-workbench:0.3.0 docker compose -p resume-ci-upgrade-four -f .tools/ci/upgrade-four/compose.yml --env-file .tools/ci/upgrade-four/.env up -d --wait --wait-timeout 120
+          docker pull ghcr.io/mochiuaena/resume-workbench:0.4.0
+          RESUME_APP_IMAGE=ghcr.io/mochiuaena/resume-workbench:0.4.0 docker compose -p resume-ci-upgrade-four -f .tools/ci/upgrade-four/compose.yml --env-file .tools/ci/upgrade-four/.env up -d --wait --wait-timeout 120
           python scripts/verify-upgrade.py before --isolated --source-schema 4
           RESUME_APP_IMAGE=resume-workbench:ci docker compose -p resume-ci-upgrade-four -f .tools/ci/upgrade-four/compose.yml --env-file .tools/ci/upgrade-four/.env up -d --wait --wait-timeout 120
           python scripts/verify-upgrade.py after --isolated --source-schema 4
