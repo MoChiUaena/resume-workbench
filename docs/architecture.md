@@ -21,7 +21,7 @@ schema 2 文档读取时在内存补齐默认样式和原有边距，schema 3 �
 
 数据库中的 resumes 保存当前文档、修订和最后一次 mutation ID；resume_versions 保存可长期恢复的快照。resume_assets / version_assets 分别引用稳定附件 UUID。照片与 Logo 独立配置，替换或隐藏当前照片不删除历史版本仍需的原图。当前没有垃圾回收，删除整份简历后可能保留无引用文件。
 
-`AttachmentStorage` 是存储边界，目前只实现 LocalFileStorage。每个 UUID 文件夹保存原文件、标准化 PNG 和 metadata.json，记录内容格式、像素、EXIF 方向及两份 SHA-256。上传先验证内容格式和尺寸，再解码、校正方向；默认 5 MiB / 2400 万像素。SVG、HEIC、WebP 尚未声明支持。
+`AttachmentStorage` 是存储边界，目前只实现 LocalFileStorage。每个 UUID 文件夹保存原文件、标准化 PNG 和 metadata.json，记录内容格式、像素、EXIF 方向及两份 SHA-256。上传先验证内容格式和尺寸，再解码、校正方向；默认 5 MiB / 2400 万像素。JPEG、PNG 和静态 WebP 支持导入，WebP 由固定的纯 Java ImageIO 解码器处理；动态 WebP、SVG、HEIC 不支持。画布和码流尺寸在解码前分别检查，原图与方向信息保留。
 
 ## 自动保存与并发修改
 

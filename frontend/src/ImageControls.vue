@@ -18,9 +18,9 @@ async function select(event: Event) {
   <div class="card-title"><h3>{{ title }}</h3><label class="check"><input v-model="slot.visible" type="checkbox" :aria-label="'显示' + title">显示</label></div>
   <div class="upload-row">
    <div class="asset-thumb checker"><img v-if="slot.id" :src="'/api/assets/' + slot.id + '/image'" :alt="title"><span v-else>＋</span></div>
-   <div class="upload-description"><label class="upload-button">{{ busy ? '正在导入…' : slot.id ? '替换图片' : '导入图片' }}<input type="file" accept="image/jpeg,image/png" :aria-label="'上传' + title" :disabled="busy" @change="select"></label>
+   <div class="upload-description"><label class="upload-button">{{ busy ? '正在导入…' : slot.id ? '替换图片' : '导入图片' }}<input type="file" accept="image/jpeg,image/png,image/webp,.webp" :aria-label="'上传' + title" :disabled="busy" @change="select"></label>
     <p v-if="asset">{{ asset.format }} · {{ (asset.bytes / 1024).toFixed(1) }} KiB<br>{{ asset.width }} × {{ asset.height }} px<span v-if="asset.exifOrientation !== 1"> · 已校正方向</span></p>
-    <p v-else>JPEG / PNG · ≤ {{ maxBytes / 1048576 }} MiB</p>
+    <p v-else>JPEG / PNG / 静态 WebP · ≤ {{ maxBytes / 1048576 }} MiB</p>
    </div>
    <button v-if="slot.id" class="text-button" :aria-label="'移除' + title" @click="emit('removed')">移除</button>
   </div>
