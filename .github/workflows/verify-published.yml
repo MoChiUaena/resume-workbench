@@ -7,7 +7,7 @@ on:
     inputs:
       image:
         description: Published version to verify anonymously
-        default: ghcr.io/mochiuaena/resume-workbench:0.3.0
+        default: ghcr.io/mochiuaena/resume-workbench:0.4.0
         required: true
 permissions:
   contents: read
@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
-      RESUME_APP_IMAGE: ${{ inputs.image || 'ghcr.io/mochiuaena/resume-workbench:0.3.0' }}
+      RESUME_APP_IMAGE: ${{ inputs.image || 'ghcr.io/mochiuaena/resume-workbench:0.4.0' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Pull the published image without registry credentials
@@ -46,6 +46,12 @@ jobs:
           assert len(reader.pages) == 2
           assert '全新实例恢复后继续编辑' in reader.pages[0].extract_text()
           assert '奶龙' in reader.pages[0].extract_text()
+          redacted = PdfReader('output/pdf/redacted-restored.pdf')
+          assert len(redacted.pages) == 2
+          redacted_text = '\n'.join(page.extract_text() for page in redacted.pages)
+          assert '候选人' in redacted_text and '奶龙' not in redacted_text
+          assert 'nailong@example.invalid' not in redacted_text
+          assert all(len(page.images) == 0 for page in redacted.pages)
           print('Published image: editable restoration and two-page Chinese PDF passed.')
           PY
       - name: Upload published-image evidence
@@ -57,6 +63,7 @@ jobs:
           path: |
             output/stage-c-backup-verification.json
             output/pdf/restored-new-instance.pdf
+            output/pdf/redacted-restored.pdf
       - name: Stop disposable workspaces
         if: always()
         run: |

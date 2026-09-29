@@ -60,5 +60,5 @@
     if(!Array.from(root.children).every(s=>s.querySelector('.page-content').getBoundingClientRect().bottom < bottomLimit(s))) throw new Error('OVERFLOW');
     window.__resumePages=root.children.length; window.__resumeReady=true;
   } catch (e) { window.__resumeError=String(e); document.querySelector('#layout-error').hidden=false; }
-  window.parent.postMessage({type:'resume-layout',pages:root.children.length,error:window.__resumeError || null},window.location.origin);
+  window.parent.postMessage({type:'resume-layout',path:location.pathname,pages:root.children.length,error:window.__resumeError || null},window.location.origin);
 })();

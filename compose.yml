@@ -1,7 +1,7 @@
 name: resume-workbench
 services:
   app:
-    image: ${RESUME_APP_IMAGE:-ghcr.io/mochiuaena/resume-workbench:0.3.0}
+    image: ${RESUME_APP_IMAGE:-ghcr.io/mochiuaena/resume-workbench:0.4.0}
     build: .
     environment:
       SERVER_ADDRESS: 0.0.0.0

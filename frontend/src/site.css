@@ -211,7 +211,7 @@
 .appearance-controls select{min-width:110px}
 .rw-editor-top{padding:0 10px;gap:5px}
 .rw-editor-top input{width:150px}
-.rw-revision,.rw-editor-top>button:nth-last-child(2){display:none}
+.rw-revision,.rw-save-version{display:none}
 .rw-editor-grid{grid-template-columns:1fr}
 .rw-module-nav{height:auto;overflow:visible}
 .rw-module-heading{display:none}
