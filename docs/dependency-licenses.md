@@ -1,6 +1,6 @@
 # 依赖许可证清单
 
-解析结果：61 个 Maven 运行期依赖（其中 53 个实际 JAR 随应用分发）、75 个 npm 锁定包，未识别声明为 0。
+解析结果：67 个 Maven 运行期依赖（其中 59 个实际 JAR 随应用分发）、75 个 npm 锁定包，未识别声明为 0。
 
 依据已解析 POM（含父 POM）和 npm lockfile 的上游声明。原始 JAR 的 LICENSE / NOTICE 保留在各依赖内，并提取随应用分发；npm 已安装包的许可证文本同样附带。完整清单、SHA-256 / integrity 和文本位于应用 JAR 的 `META-INF/third-party/`。
 
@@ -27,6 +27,12 @@
 | com.microsoft.playwright:driver-bundle:1.63.0 | Apache License, Version 2.0 |
 | com.microsoft.playwright:driver:1.63.0 | Apache License, Version 2.0 |
 | com.microsoft.playwright:playwright:1.63.0 | Apache License, Version 2.0 |
+| com.twelvemonkeys.common:common-image:3.15.2 | The BSD License |
+| com.twelvemonkeys.common:common-io:3.15.2 | The BSD License |
+| com.twelvemonkeys.common:common-lang:3.15.2 | The BSD License |
+| com.twelvemonkeys.imageio:imageio-core:3.15.2 | The BSD License |
+| com.twelvemonkeys.imageio:imageio-metadata:3.15.2 | The BSD License |
+| com.twelvemonkeys.imageio:imageio-webp:3.15.2 | The BSD License |
 | com.zaxxer:HikariCP:6.3.3 | The Apache Software License, Version 2.0 |
 | io.micrometer:micrometer-commons:1.15.12 | The Apache Software License, Version 2.0 |
 | io.micrometer:micrometer-observation:1.15.12 | The Apache Software License, Version 2.0 |

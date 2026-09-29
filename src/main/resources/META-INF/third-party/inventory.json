@@ -1,6 +1,6 @@
 {
   "inventoryVersion": 1,
-  "applicationVersion": "0.5.0",
+  "applicationVersion": "0.6.0",
   "scope": "Resolved Maven runtime JARs and entire npm lockfile; OS/JDK/browser retain their own notices in the image.",
   "java": [
     {
@@ -312,6 +312,108 @@
       "sourceArchive": "https://repo.maven.apache.org/maven2/com/microsoft/playwright/playwright/1.63.0/playwright-1.63.0-sources.jar",
       "upstreamTexts": [
         "texts/java-playwright-1.63.0/SOURCE-COPYRIGHT.txt"
+      ]
+    },
+    {
+      "coordinate": "com.twelvemonkeys.common:common-image:3.15.2",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "2f293a4d247ead6588b0f70336412494723e77df2d814549fbdb08fd7619eec3",
+      "licenses": [
+        {
+          "name": "The BSD License",
+          "url": "https://github.com/haraldk/TwelveMonkeys#license"
+        }
+      ],
+      "projectUrl": "https://github.com/haraldk/TwelveMonkeys",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/com/twelvemonkeys/common/common-image/3.15.2/common-image-3.15.2-sources.jar",
+      "upstreamTexts": [
+        "texts/java-common-image-3.15.2/SOURCE-COPYRIGHT.txt"
+      ]
+    },
+    {
+      "coordinate": "com.twelvemonkeys.common:common-io:3.15.2",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "9e23601e28682f5c0947b4c34f373889315263e653975c9265e22e492d4d5e67",
+      "licenses": [
+        {
+          "name": "The BSD License",
+          "url": "https://github.com/haraldk/TwelveMonkeys#license"
+        }
+      ],
+      "projectUrl": "https://github.com/haraldk/TwelveMonkeys",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/com/twelvemonkeys/common/common-io/3.15.2/common-io-3.15.2-sources.jar",
+      "upstreamTexts": [
+        "texts/java-common-io-3.15.2/SOURCE-COPYRIGHT.txt"
+      ]
+    },
+    {
+      "coordinate": "com.twelvemonkeys.common:common-lang:3.15.2",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "06bc0995d2f1fe89ecbf2834701095833fb506c79be6f9cf27ee5b09528f578d",
+      "licenses": [
+        {
+          "name": "The BSD License",
+          "url": "https://github.com/haraldk/TwelveMonkeys#license"
+        }
+      ],
+      "projectUrl": "https://github.com/haraldk/TwelveMonkeys",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/com/twelvemonkeys/common/common-lang/3.15.2/common-lang-3.15.2-sources.jar",
+      "upstreamTexts": [
+        "texts/java-common-lang-3.15.2/SOURCE-COPYRIGHT.txt"
+      ]
+    },
+    {
+      "coordinate": "com.twelvemonkeys.imageio:imageio-core:3.15.2",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "7f753d7305e11e715d837957f56f4b2c2cd9ad6973d4fb80aec6ce220c196912",
+      "licenses": [
+        {
+          "name": "The BSD License",
+          "url": "https://github.com/haraldk/TwelveMonkeys#license"
+        }
+      ],
+      "projectUrl": "https://github.com/haraldk/TwelveMonkeys/tree/master/imageio",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/com/twelvemonkeys/imageio/imageio-core/3.15.2/imageio-core-3.15.2-sources.jar",
+      "upstreamTexts": [
+        "texts/java-imageio-core-3.15.2/SOURCE-COPYRIGHT.txt"
+      ]
+    },
+    {
+      "coordinate": "com.twelvemonkeys.imageio:imageio-metadata:3.15.2",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "8bfac259ab0175b7680dbdbdb908f4525d7f628730913d5f95b53850c2149dbc",
+      "licenses": [
+        {
+          "name": "The BSD License",
+          "url": "https://github.com/haraldk/TwelveMonkeys#license"
+        }
+      ],
+      "projectUrl": "https://github.com/haraldk/TwelveMonkeys/tree/master/imageio",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/com/twelvemonkeys/imageio/imageio-metadata/3.15.2/imageio-metadata-3.15.2-sources.jar",
+      "upstreamTexts": [
+        "texts/java-imageio-metadata-3.15.2/SOURCE-COPYRIGHT.txt"
+      ]
+    },
+    {
+      "coordinate": "com.twelvemonkeys.imageio:imageio-webp:3.15.2",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "179bb7d577e11e6e4f6fd83d27e8dad8de8f08cb9b9a8f2dd4d7a25181c39ec8",
+      "licenses": [
+        {
+          "name": "The BSD License",
+          "url": "https://github.com/haraldk/TwelveMonkeys#license"
+        }
+      ],
+      "projectUrl": "https://github.com/haraldk/TwelveMonkeys/tree/master/imageio",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/com/twelvemonkeys/imageio/imageio-webp/3.15.2/imageio-webp-3.15.2-sources.jar",
+      "upstreamTexts": [
+        "texts/java-imageio-webp-3.15.2/SOURCE-COPYRIGHT.txt"
       ]
     },
     {

@@ -42,3 +42,7 @@ Chromium 由 Playwright 官方安装器准备，保留浏览器分发物中的�
 `scripts/generate-fixtures.py` 生成虚构学校校徽和用于 JPEG / EXIF 测试的卡通图片。这些脚本绘制的素材采用本仓库 MIT 许可证。字体本身继续使用 OFL，不因用于合成图片而改用 MIT。
 
 新建简历示例使用 `src/main/resources/static/samples/nailong-portrait.png`，它是用户在本轮提供的图片的原样副本，不是脚本生成的素材。原图为 690 × 930 像素、648,656 字节；SHA-256 为 `759776674d2f4ef8f30ec1e3223f9e456b3871cc02518cea328eff266a926e2f`。本仓库的 MIT 许可证不对该图片授予额外权利。
+
+## WebP 解码
+
+静态 WebP 使用 TwelveMonkeys ImageIO 3.15.2，按上游 BSD 三条款许可证分发。包含 imageio-webp、imageio-core、imageio-metadata、common-lang、common-io 和 common-image；完整上游条款和各 JAR 散列随 `META-INF/third-party/` 分发，来源见依赖许可证清单。项目没有修改这些依赖，也不需要额外的原生 WebP 库。

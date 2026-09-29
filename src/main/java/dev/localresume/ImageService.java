@@ -31,33 +31,36 @@ public class ImageService {
         if (bytes.length >= 8 && bytes[0] == (byte)137 && bytes[1] == 80 && bytes[2] == 78 && bytes[3] == 71
             && bytes[4] == 13 && bytes[5] == 10 && bytes[6] == 26 && bytes[7] == 10) format = "PNG";
         else if (bytes.length >= 3 && bytes[0] == (byte)255 && bytes[1] == (byte)216 && bytes[2] == (byte)255) format = "JPEG";
-        else throw new ApiException("UNSUPPORTED_FORMAT", "仅支持 JPEG 和 PNG；请先将 HEIC、WebP 或 SVG 转换格式。", 415);
+        else if (WebpHeader.matches(bytes)) format = "WEBP";
+        else throw new ApiException("UNSUPPORTED_FORMAT", "支持 JPEG、PNG 和静态 WebP；请先将 HEIC 或 SVG 转换格式。", 415);
         int sourceWidth, sourceHeight, orientation = 1;
         BufferedImage decoded;
         try (var input = ImageIO.createImageInputStream(new ByteArrayInputStream(bytes))) {
+            var webp = format.equals("WEBP") ? WebpHeader.read(bytes, maxPixels) : null;
             var readers = ImageIO.getImageReaders(input);
             if (!readers.hasNext()) throw new IOException("No decoder");
             var reader = readers.next();
             try {
                 reader.setInput(input);
                 sourceWidth = reader.getWidth(0); sourceHeight = reader.getHeight(0);
-                if (sourceWidth <= 0 || sourceHeight <= 0 || sourceWidth > 12000 || sourceHeight > 12000
-                    || (long) sourceWidth * sourceHeight > maxPixels)
-                    throw new ApiException("PIXEL_LIMIT", "图片像素超限，请缩小至 2400 万像素以内，且单边不超过 12000 像素。", 413);
+                WebpHeader.checkPixels(sourceWidth, sourceHeight, maxPixels);
+                if (webp != null && (webp.width() != sourceWidth || webp.height() != sourceHeight))
+                    throw new IOException("WebP reader dimensions do not match container");
                 decoded = reader.read(0);
-                if (decoded == null) throw new IOException("No pixels");
+                if (decoded == null || decoded.getWidth() != sourceWidth || decoded.getHeight() != sourceHeight)
+                    throw new IOException("Invalid decoded dimensions");
             } finally { reader.dispose(); }
-            if (format.equals("JPEG")) {
+            if (format.equals("JPEG") || format.equals("WEBP")) {
                 var metadata = ImageMetadataReader.readMetadata(new ByteArrayInputStream(bytes));
                 var exif = metadata.getFirstDirectoryOfType(ExifIFD0Directory.class);
                 if (exif != null && exif.containsTag(ExifIFD0Directory.TAG_ORIENTATION))
                     orientation = exif.getInt(ExifIFD0Directory.TAG_ORIENTATION);
             }
         } catch (ApiException e) { throw e; }
-        catch (Exception e) { throw new ApiException("CORRUPT_IMAGE", "无法解码图片，文件可能已损坏，请重新保存为 JPEG 或 PNG。", 422); }
+        catch (Exception e) { throw new ApiException("CORRUPT_IMAGE", "无法解码图片，文件可能已损坏，请重新保存为 JPEG、PNG 或静态 WebP。", 422); }
         BufferedImage normalized = orient(decoded, orientation);
         byte[] png;
-        try (var out = new ByteArrayOutputStream()) { ImageIO.write(normalized, "png", out); png = out.toByteArray(); }
+        try (var out = new ByteArrayOutputStream()) { if (!ImageIO.write(normalized, "png", out)) throw new IOException("No PNG encoder"); png = out.toByteArray(); }
         catch (IOException e) { throw new ApiException("IMAGE_PROCESSING_FAILED", "图片处理失败，请换一张图片重试。", 422); }
         var asset = new Asset(UUID.randomUUID().toString(), format, bytes.length, sourceWidth, sourceHeight,
             normalized.getWidth(), normalized.getHeight(), orientation, sha(bytes), sha(png));

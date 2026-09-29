@@ -105,6 +105,52 @@ class BackupServiceTest {
         assertThat(recovered.document().schemaVersion()).isEqualTo(4);
         assertThat(recovered.document().layout().presentation()).isEqualTo(ResumeDocument.Presentation.defaults(doc.layout().marginMm()));
     }
+    @Test void webpBackupKeepsOriginalsTransparencyHistoryAndAutomaticFingerprint()throws Exception {
+        var photo=images.importImage(Files.readAllBytes(Path.of("fixtures/portrait-exif-6.webp")));
+        var logo=images.importImage(Files.readAllBytes(Path.of("fixtures/university-logo-lossless.webp")));
+        var sample=ResumeDocument.sample("two");var l=sample.layout();
+        var doc=new ResumeDocument(4,sample.content(),new ResumeDocument.Layout(l.template(),l.font(),l.fontSize(),l.lineHeight(),l.sectionGapMm(),l.marginMm(),false,
+            new ResumeDraft.ImageSlot(photo.id(),true,26,34,"cover",1,1.15,45,55),new ResumeDraft.ImageSlot(logo.id(),true,26,26,"contain",0,1,50,50),l.presentation()));
+        var original=resumes.create("WebP 完整备份",doc);resumes.checkpoint(original.id(),original.revision(),"WebP 基线");
+        var automatic=backups.automatic(null);assertThat(automatic.outcome()).isEqualTo("created");
+        assertThat(backups.automatic(automatic.fingerprint()).outcome()).isEqualTo("unchanged");
+        var restored=backups.restoreSaved(automatic.backup().id());var recovered=resumes.get(restored.resumeIds().getFirst());
+        assertThat(resumes.get(original.id())).isEqualTo(original);assertThat(resumes.list()).hasSize(2);
+        assertThat(recovered.document().content()).isEqualTo(doc.content());
+        assertThat(recovered.document().layout().photo().quarterTurns()).isEqualTo(1);
+        assertThat(resumes.versions(recovered.id())).anyMatch(v->v.label().equals("WebP 基线"));
+        for(var pair:List.of(Map.entry(photo.id(),recovered.document().layout().photo().id()),Map.entry(logo.id(),recovered.document().layout().logo().id()))) {
+            assertThat(pair.getValue()).isNotEqualTo(pair.getKey());
+            assertThat(storage.metadata(pair.getValue()).format()).isEqualTo("WEBP");
+            assertThat(storage.original(pair.getValue())).isEqualTo(storage.original(pair.getKey()));
+            assertThat(storage.image(pair.getValue())).isEqualTo(storage.image(pair.getKey()));
+        }
+        assertThat(storage.metadata(recovered.document().layout().photo().id()).exifOrientation()).isEqualTo(6);
+    }
+    @Test void aRehashedAnimatedWebpArchiveCannotBypassTheStaticImageRule()throws Exception {
+        var photo=images.importImage(Files.readAllBytes(Path.of("fixtures/portrait-lossy.webp")));
+        var sample=ResumeDocument.sample("one");var l=sample.layout();
+        var doc=new ResumeDocument(4,sample.content(),new ResumeDocument.Layout(l.template(),l.font(),l.fontSize(),l.lineHeight(),l.sectionGapMm(),l.marginMm(),false,
+            new ResumeDraft.ImageSlot(photo.id(),true,26,34,"cover",0,1,50,50),new ResumeDraft.ImageSlot(null,false,26,26,"contain",0,1,50,50),l.presentation()));
+        var original=resumes.create("动画拒绝检查",doc);var created=backups.create();var files=new LinkedHashMap<String,byte[]>();
+        try(var zip=new java.util.zip.ZipInputStream(Files.newInputStream(backups.download(created.id())))) {
+            java.util.zip.ZipEntry entry;while((entry=zip.getNextEntry())!=null)if(!entry.getName().equals("manifest.json"))files.put(entry.getName(),zip.readAllBytes());
+        }
+        byte[] animated=Files.readAllBytes(Path.of("fixtures/animated.webp"));
+        var workspace=(com.fasterxml.jackson.databind.node.ObjectNode)mapper.readTree(files.get("workspace.json"));
+        var asset=(com.fasterxml.jackson.databind.node.ObjectNode)workspace.path("attachments").get(0);
+        asset.put("bytes",animated.length);asset.put("sourceWidth",16);asset.put("sourceHeight",16);asset.put("sha256",ImageService.sha(animated));
+        files.put("workspace.json",mapper.writeValueAsBytes(workspace));files.put("attachments/"+photo.id()+"/metadata.json",mapper.writeValueAsBytes(asset));
+        files.put("attachments/"+photo.id()+"/original.webp",animated);
+        var entries=files.entrySet().stream().map(e->new BackupArchive.FileEntry(e.getKey(),e.getValue().length,ImageService.sha(e.getValue()))).toList();
+        files.put("manifest.json",mapper.writeValueAsBytes(new BackupArchive.Manifest(BackupArchive.FORMAT,1,4,Instant.now(),entries)));
+        var bytes=new ByteArrayOutputStream();try(var zip=new java.util.zip.ZipOutputStream(bytes)) {
+            for(var entry:files.entrySet()){zip.putNextEntry(new java.util.zip.ZipEntry(entry.getKey()));zip.write(entry.getValue());zip.closeEntry();}
+        }
+        assertThatThrownBy(()->backups.restore(new ByteArrayInputStream(bytes.toByteArray()))).isInstanceOfSatisfying(ApiException.class,e->assertThat(e.code).isEqualTo("BACKUP_INVALID"));
+        assertThat(resumes.get(original.id())).isEqualTo(original);assertThat(resumes.list()).hasSize(1);
+        assertThat(storage.original(photo.id())).isEqualTo(Files.readAllBytes(Path.of("fixtures/portrait-lossy.webp")));
+    }
     @Test void corruptionFailsBeforeImportAndPreservesExistingRows()throws Exception{
         resumes.create("唯一简历",withImages());var created=backups.create();byte[] bytes=Files.readAllBytes(backups.download(created.id()));bytes[bytes.length/2]^=1;
         assertThatThrownBy(()->backups.restore(new ByteArrayInputStream(bytes))).isInstanceOf(ApiException.class);

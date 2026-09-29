@@ -9,6 +9,8 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.*;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 import static org.assertj.core.api.Assertions.*;
 
@@ -74,6 +76,68 @@ class ImageServiceTest {
     @Test void doesNotAllowPathTraversal() {
         var storage = new LocalFileStorage(temp.toString(), new ObjectMapper());
         assertCode("ASSET_NOT_FOUND", () -> storage.image("../../secret"));
+    }
+    @Test void losslessWebpKeepsTransparentLogoPixelsAndOriginalBytes() throws Exception {
+        byte[] bytes = fixture("university-logo-lossless.webp");
+        var imageService = service();
+        var source = imageService.importImage(fixture("university-logo.png"));
+        var asset = imageService.importImage(bytes);
+        var storage = new LocalFileStorage(temp.toString(), new ObjectMapper());
+        assertThat(bytes.length).isLessThan(1000000);
+        assertThat(asset.format()).isEqualTo("WEBP");
+        assertThat(asset.width()).isEqualTo(512);
+        assertThat(asset.normalizedSha256()).isEqualTo(source.normalizedSha256());
+        assertThat(storage.original(asset.id())).isEqualTo(bytes);
+        assertThat(storage.image(asset.id())).isEqualTo(storage.image(source.id()));
+    }
+    @Test void lossyWebpKeepsAlphaAndImportsPortrait() throws Exception {
+        var logo = service().importImage(fixture("university-logo-lossy.webp"));
+        var normalized = ImageIO.read(temp.resolve("attachments/" + logo.id() + "/image.png").toFile());
+        assertThat(normalized.getRGB(0, 0) >>> 24).isZero();
+        assertThat(normalized.getRGB(256, 232) >>> 24).isEqualTo(255);
+        var photo = service().importImage(fixture("portrait-lossy.webp"));
+        assertThat(photo.format()).isEqualTo("WEBP");
+        assertThat(photo.width()).isEqualTo(360); assertThat(photo.height()).isEqualTo(480);
+    }
+    @Test void appliesWebpExifOrientationWithoutChangingOriginal() throws Exception {
+        byte[] bytes = fixture("portrait-exif-6.webp");
+        var asset = service().importImage(bytes);
+        assertThat(asset.sourceWidth()).isEqualTo(480); assertThat(asset.sourceHeight()).isEqualTo(360);
+        assertThat(asset.exifOrientation()).isEqualTo(6);
+        assertThat(asset.width()).isEqualTo(360); assertThat(asset.height()).isEqualTo(480);
+        var image = ImageIO.read(temp.resolve("attachments/" + asset.id() + "/image.png").toFile());
+        var red = new java.awt.Color(image.getRGB(30, 30));
+        assertThat(red.getRed()).isGreaterThan(red.getGreen() + 80);
+        assertThat(new LocalFileStorage(temp.toString(), new ObjectMapper()).original(asset.id())).isEqualTo(bytes);
+    }
+    @Test void explainsAnimatedAndCorruptWebpAndRejectsTruncatedOrOverflowChunks() throws Exception {
+        assertCode("ANIMATED_WEBP_UNSUPPORTED", () -> service().importImage(fixture("animated.webp")));
+        assertCode("CORRUPT_IMAGE", () -> service().importImage(fixture("corrupt.webp")));
+        byte[] oversizedChunk = fixture("portrait-lossy.webp");
+        ByteBuffer.wrap(oversizedChunk).order(ByteOrder.LITTLE_ENDIAN).putInt(16, -1);
+        assertCode("CORRUPT_IMAGE", () -> service().importImage(oversizedChunk));
+        byte[] corruptPayload = fixture("portrait-lossy.webp");
+        Arrays.fill(corruptPayload, 20, corruptPayload.length, (byte) 0);
+        assertCode("CORRUPT_IMAGE", () -> service().importImage(corruptPayload));
+    }
+    @Test void webpLimitsApplyBeforeBitstreamDecodeAndAtExactByteLimit() throws Exception {
+        byte[] original = fixture("university-logo-lossless.webp");
+        var bounded = new ImageService(new LocalFileStorage(temp.toString(), new ObjectMapper()), original.length, 24000000);
+        assertThat(bounded.importImage(original).bytes()).isEqualTo(original.length);
+        assertCode("FILE_TOO_LARGE", () -> bounded.importImage(Arrays.copyOf(original, original.length + 1)));
+        var pixels = new ImageService(new LocalFileStorage(temp.toString(), new ObjectMapper()), 5242880, 100);
+        assertCode("PIXEL_LIMIT", () -> pixels.importImage(original));
+        byte[] header = new byte[26];
+        ByteBuffer buffer = ByteBuffer.wrap(header).order(ByteOrder.LITTLE_ENDIAN);
+        buffer.put("RIFF".getBytes(java.nio.charset.StandardCharsets.US_ASCII)).putInt(18)
+            .put("WEBPVP8L".getBytes(java.nio.charset.StandardCharsets.US_ASCII)).putInt(5).put((byte) 0x2f).putInt(12000);
+        assertCode("PIXEL_LIMIT", () -> service().importImage(header));
+    }
+    @Test void refusesMismatchedCanvasAndBitstreamInsteadOfAllocatingFromEither() throws Exception {
+        byte[] bytes = fixture("university-logo-lossy.webp");
+        assertThat(new String(bytes, 12, 4, java.nio.charset.StandardCharsets.US_ASCII)).isEqualTo("VP8X");
+        bytes[24] = 1; bytes[25] = 0; bytes[26] = 0;
+        assertCode("CORRUPT_IMAGE", () -> service().importImage(bytes));
     }
     private void assertCode(String code, org.assertj.core.api.ThrowableAssert.ThrowingCallable call) {
         assertThatThrownBy(call).isInstanceOfSatisfying(ApiException.class, e -> {

@@ -59,7 +59,7 @@ jobs:
         run: |
           cd frontend
           npx playwright install --with-deps chromium
-          python -m pip install pypdf==6.10.0
+          python -m pip install pypdf==6.10.0 pillow==12.3.0
           sudo apt-get update -qq
           sudo apt-get install -y poppler-utils
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
@@ -93,6 +93,7 @@ jobs:
         run: |
           python scripts/verify-backup.py --isolated
           python scripts/verify-automatic-backups.py --isolated
+          python scripts/verify-webp.py --isolated
           python scripts/verify-pdfs.py --stage-c
           python scripts/verify-layout-pdfs.py
           python scripts/verify-template-pdfs.py
@@ -105,6 +106,7 @@ jobs:
           done
           python scripts/verify-backup.py --isolated --check-persistence
           python scripts/verify-automatic-backups.py --isolated --check-persistence
+          python scripts/verify-webp.py --isolated --check-persistence
       - name: Upload verification evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -150,6 +152,15 @@ jobs:
           python scripts/verify-upgrade.py before --isolated --source-schema 4
           RESUME_APP_IMAGE=resume-workbench:ci docker compose -p resume-ci-upgrade-four -f .tools/ci/upgrade-four/compose.yml --env-file .tools/ci/upgrade-four/.env up -d --wait --wait-timeout 120
           python scripts/verify-upgrade.py after --isolated --source-schema 4
+          docker compose -p resume-ci-upgrade-four -f .tools/ci/upgrade-four/compose.yml --env-file .tools/ci/upgrade-four/.env down
+          mkdir -p .tools/ci/upgrade-five
+          cp compose.yml .tools/ci/upgrade-five/compose.yml
+          printf 'RESUME_PORT=18769\n' > .tools/ci/upgrade-five/.env
+          docker pull ghcr.io/mochiuaena/resume-workbench:0.5.0
+          RESUME_APP_IMAGE=ghcr.io/mochiuaena/resume-workbench:0.5.0 docker compose -p resume-ci-upgrade-five -f .tools/ci/upgrade-five/compose.yml --env-file .tools/ci/upgrade-five/.env up -d --wait --wait-timeout 120
+          python scripts/verify-upgrade.py before --isolated --source-schema 4 --source-version 0.5.0 --automatic-enabled --unsupported-webp-backup output/webp-cross-instance.zip
+          RESUME_APP_IMAGE=resume-workbench:ci docker compose -p resume-ci-upgrade-five -f .tools/ci/upgrade-five/compose.yml --env-file .tools/ci/upgrade-five/.env up -d --wait --wait-timeout 120
+          python scripts/verify-upgrade.py after --isolated --source-schema 4 --source-version 0.5.0
       - name: Upload upgrade evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -178,7 +189,7 @@ jobs:
       - name: Stop test services
         if: always()
         run: |
-          for side in source target upgrade upgrade-three upgrade-four; do
+          for side in source target upgrade upgrade-three upgrade-four upgrade-five; do
             if [ -f .tools/ci/$side/compose.yml ]; then
               docker compose -p resume-ci-$side -f .tools/ci/$side/compose.yml --env-file .tools/ci/$side/.env down
             fi

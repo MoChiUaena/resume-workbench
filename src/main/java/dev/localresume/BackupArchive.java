@@ -119,7 +119,7 @@ public final class BackupArchive {
     }
     static void validatePath(String name) {
         boolean allowed = name != null && (name.equals("workspace.json") || name.equals("settings.json")
-            || name.matches("attachments/" + UUID_PATTERN + "/(?:image\\.png|metadata\\.json|original\\.(?:jpeg|png))")
+            || name.matches("attachments/" + UUID_PATTERN + "/(?:image\\.png|metadata\\.json|original\\.(?:jpeg|png|webp))")
             || name.matches("exports/" + UUID_PATTERN + "\\.(?:pdf|json)"));
         if (!allowed) throw invalid("备份包含不允许的文件路径。");
     }
