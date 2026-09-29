@@ -1,4 +1,5 @@
 import type { Entry, ResumeDocument, Section, Slot } from './api';
+import {templateName} from './resumeTemplates.ts';
 
 export type DiffCategory = 'content' | 'images' | 'layout';
 export type Change = { field: string; before: string; after: string };
@@ -73,7 +74,7 @@ export function compareDrafts(before: DraftState, after: DraftState): DiffGroup[
     groups.push(group);
   }
   const layout: DiffGroup = { id: 'layout', title: '文字、样式与间距', category: 'layout', changes: [] };
-  change(layout, '模板', a.template, b.template, v => v === 'classic' ? '经典单栏' : '并列页眉');
+  change(layout, '模板', a.template, b.template, v => templateName(String(v)));
   change(layout, '字体', a.font, b.font, v => v === 'sans' ? '黑体' : '宋体');
   change(layout, '字号', a.fontSize, b.fontSize, v => `${v} pt`);
   change(layout, '正文行距', a.lineHeight, b.lineHeight);

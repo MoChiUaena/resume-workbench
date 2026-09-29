@@ -100,7 +100,7 @@ public final class BackupArchive {
                 }
                 zip.closeEntry();
             }
-            if (manifest == null || !FORMAT.equals(manifest.format()) || manifest.formatVersion() != VERSION || !Set.of(2,ResumeDocument.SCHEMA_VERSION).contains(manifest.documentSchemaVersion()))
+            if (manifest == null || !FORMAT.equals(manifest.format()) || manifest.formatVersion() != VERSION || !ResumeDocument.supportsSchema(manifest.documentSchemaVersion()))
                 throw new ApiException("BACKUP_VERSION_UNSUPPORTED", "备份格式或版本不受支持，请使用匹配的应用版本。", 422);
             if (manifest.files() == null || manifest.files().size() != actual.size()) throw invalid("备份清单与文件数量不一致。");
             var unique = new HashSet<String>();

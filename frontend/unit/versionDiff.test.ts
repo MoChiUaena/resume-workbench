@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { compareDrafts, type DraftState } from '../src/versionDiff.ts';
 const slot = { id: null, visible: true, widthMm: 26, heightMm: 34, fit: 'cover' as const, quarterTurns: 0, zoom: 1, positionX: 50, positionY: 50 };
-const baseline: DraftState = { title: '合成简历', document: { schemaVersion: 3,
+const baseline: DraftState = { title: '合成简历', document: { schemaVersion: 4,
   content: { name: '奶龙', headline: 'Java', phone: '', email: '', location: '', sections: [
     { id: 'a', type: 'project', title: '项目经历', visible: true, pageBreakBefore: false, entries: [
       { id: 'one', title: '项目一', meta: '2026', bulleted: true, bullets: ['原始正文'] },
@@ -41,6 +41,7 @@ test('image replacement, crop changes, zero spacing and layout values are indepe
   const next = structuredClone(baseline); next.document.layout.photo.id = 'photo-id';
   next.document.layout.logo.quarterTurns = 1; next.document.layout.logo.visible = false;
   next.document.layout.sectionGapMm = 0; next.document.layout.font = 'serif'; next.document.layout.presentation.marginTopMm = 22;
+  next.document.layout.template = 'rail';
   const groups = compareDrafts(baseline, next);
   assert.deepEqual(groups.map(g => g.category), ['images', 'images', 'layout']);
   assert.deepEqual(groups[0].image, { before: null, after: 'photo-id' });
@@ -48,4 +49,5 @@ test('image replacement, crop changes, zero spacing and layout values are indepe
   assert.ok(changes.some(c => c.field === '旋转' && c.after === '90°'));
   assert.ok(changes.some(c => c.field === '模块间距' && c.after === '0 mm'));
   assert.ok(changes.some(c => c.field === '字体' && c.after === '宋体'));
+  assert.ok(changes.some(c => c.field === '模板' && c.after === '侧栏标题'));
 });
