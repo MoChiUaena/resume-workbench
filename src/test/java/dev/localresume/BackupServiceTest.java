@@ -41,6 +41,26 @@ class BackupServiceTest {
         return new ResumeDocument(2,doc.content(),new ResumeDocument.Layout(l.template(),l.font(),l.fontSize(),l.lineHeight(),l.sectionGapMm(),l.marginMm(),false,
             new ResumeDraft.ImageSlot(photo.id(),true,26,34,"cover",0,1,50,50),new ResumeDraft.ImageSlot(logo.id(),true,26,26,"contain",0,1,50,50)));
     }
+    @Test void historyIncludesManualAutomaticAndLegacyArchivesAndRestoresWithoutChangingCurrentRows()throws Exception {
+        var original=resumes.create("历史索引 · 合成简历",withImages());
+        var manual=backups.create();var automatic=backups.automatic(null);assertThat(automatic.outcome()).isEqualTo("created");
+        var skipped=backups.automatic(automatic.fingerprint());assertThat(skipped.outcome()).isEqualTo("unchanged");
+        assertThat(backups.history(0).items()).extracting(BackupCatalog.Item::kind).containsExactlyInAnyOrder("manual","automatic");
+        assertThat(backups.history(0).items()).hasSize(2);assertThat(resumes.get(original.id())).isEqualTo(original);
+        Files.delete(data.resolve("backups/"+manual.id()+".json"));
+        assertThat(backups.history(0).items()).anyMatch(item->item.kind().equals("legacy")&&item.backup().id().equals(manual.id()));
+        var restored=backups.restoreSaved(automatic.backup().id());assertThat(restored.resumes()).isEqualTo(1);assertThat(resumes.get(original.id())).isEqualTo(original);
+        assertThat(resumes.get(restored.resumeIds().getFirst()).document().content()).isEqualTo(original.document().content());
+        assertThat(backups.automatic(automatic.fingerprint()).outcome()).isEqualTo("created");
+    }
+    @Test void damagedCatalogOrArchiveIsReportedAndPreservesOtherBackups()throws Exception {
+        resumes.create("校验 · 合成简历",withImages());var good=backups.create();var damaged=backups.create();
+        Path zip=backups.download(damaged.id());byte[] bytes=Files.readAllBytes(zip);bytes[bytes.length/2]^=1;Files.write(zip,bytes);
+        assertThatThrownBy(()->backups.download(damaged.id())).isInstanceOfSatisfying(ApiException.class,e->assertThat(e.code).isEqualTo("BACKUP_CORRUPT"));
+        Files.writeString(data.resolve("backups/"+damaged.id()+".json"),"broken");assertThat(backups.history(0).unreadable()).isEqualTo(1);
+        assertThat(backups.download(good.id())).isRegularFile();assertThat(Files.exists(zip)).isTrue();
+        assertThatThrownBy(()->backups.restoreSaved("../"+good.id())).isInstanceOf(ApiException.class);assertThat(resumes.list()).hasSize(1);
+    }
     @Test void completeBackupRestoresEditableDataVersionsOriginalsAndExportsWithoutOverwrite()throws Exception{
         var base=withImages();var layout=base.layout();
         var style=new ResumeDocument.Presentation("en","#c65c19","center","icons","bar",18,22,20,4,1.2);

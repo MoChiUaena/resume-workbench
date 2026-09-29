@@ -8,7 +8,7 @@
 
 ![26 秒实际操作演示](docs/demo.gif)
 
-演示使用合成奶龙简历，展示选简历、编辑、撤销、样式与间距、版本对比、PDF 和完整备份。[最新版本与部署配置](https://github.com/MoChiUaena/resume-workbench/releases/tag/v0.4.0)。
+演示使用合成奶龙简历，展示选简历、编辑、撤销、样式与间距、版本对比、PDF 和完整备份。[最新版本与部署配置](https://github.com/MoChiUaena/resume-workbench/releases/tag/v0.5.0)。
 
 ## 现在可以做什么
 
@@ -28,12 +28,13 @@
 - 四种简历模板：经典单栏、并列页眉、横栏名片、侧栏标题。横栏名片将联系方式独立横排，侧栏标题将模块标题放在左侧、正文放在右侧；切换保留正文、图片和文字 / 样式 / 间距设置。网站 A/B 风格仍独立于简历模板。
 - 顶部「脱敏 PDF」可独立隐藏姓名、电话、邮箱、位置、证件照和学校 Logo，正文可同步替换相同信息；检查预览后导出副本，原稿保持不变。其他学校、单位和链接仍需在预览中检查，完整备份仍保留原始信息。详见 [脱敏导出说明](docs/redacted-export.md)。
 - “备份与恢复”下载包含正文、版式、历史版本、原图、标准化图片和相关 PDF 的 ZIP；可以在全新实例恢复，再继续修改。导入会新增记录，保留现有简历。
+- 自动本地备份默认关闭，可选择每天 / 每周，数据有变化才生成副本；重启补做到期检查，失败保留最近成功的副本并重试。本机历史支持手动 / 自动 / 旧版 ZIP 的分页查看、下载和确认恢复，全部已有文件保留。详见 [自动备份与历史](docs/automatic-backups.md)。
 
 阶段 C 的部署、备份和离线闭环已在独立容器中验证。首版为单人本地使用，没有账号、AI、云存储或公开分享功能。`compose.yml` 运行 app / db 两个服务；`compose.dev.yml` 只供源码开发时启动数据库。
 
 ## Docker 启动
 
-只需要 Docker Desktop / Docker Compose，无需在宿主机安装 Node、JDK 或 Maven。当前版本为 `0.4.0`，包含脱敏 PDF、四种模板、撤销 / 重做与历史版本对比，文档仍使用 schema 4；镜像由版本标签触发 CI，全部检查通过后推送到 GHCR。
+只需要 Docker Desktop / Docker Compose，无需在宿主机安装 Node、JDK 或 Maven。当前版本为 `0.5.0`，包含自动备份与历史、脱敏 PDF、四种模板、撤销 / 重做与历史版本对比，文档仍使用 schema 4；镜像由版本标签触发 CI，全部检查通过后推送到 GHCR。
 
 从 Release 下载 `resume-workbench-config.zip`，解压后有版本对应的 `compose.yml` 和 `.env.example`。在这个新目录运行：
 
@@ -169,7 +170,7 @@ python scripts/verify-pdfs.py
 
 产物在 `output/pdf/stage-b-{classic|banner}-{one|two}.pdf`，报告在 `output/pdf-verification-stage-b.json`，E2E 报告在 `output/e2e-results.json`。逐字检查中文和标题顺序，不用 NFKC 归一化掩盖部首替换错误。`--stage-a` 只用于检查保留的阶段 A 旧样本。
 
-当前源码的验证包含 9 项前端逻辑测试、43 项 Java 测试、22 项浏览器测试，以及中文 PDF、全新实例恢复和排版边界检查。`scripts/verify-backup.py --isolated` 在两个空实例执行恢复检查；`scripts/verify-pdfs.py --stage-c` 检查两模板与恢复样本；`scripts/verify-layout-pdfs.py` 检查自定义样式、重置和七页边界样本。新增模板检查见 [四模板验收](docs/templates-verification.md)。运行恢复检查后，`scripts/verify-redacted-pdfs.py` 检查四模板脱敏、独立选择和恢复后的 PDF；详见 [脱敏导出验收](docs/redacted-verification.md)、[排版控制验收](docs/layout-verification.md) 和 [撤销与版本对比验收](docs/history-verification.md)。
+当前源码的验证包含 9 项前端逻辑测试、50 项 Java 测试、24 项浏览器测试，以及中文 PDF、全新实例恢复和排版边界检查。`scripts/verify-backup.py --isolated` 在两个空实例执行恢复检查；`scripts/verify-automatic-backups.py --isolated` 验证自动副本与实例策略；`scripts/verify-pdfs.py --stage-c` 检查两模板与恢复样本；`scripts/verify-layout-pdfs.py` 检查自定义样式、重置和七页边界样本。新增模板检查见 [四模板验收](docs/templates-verification.md)。运行恢复检查后，`scripts/verify-redacted-pdfs.py` 检查四模板脱敏、独立选择和恢复后的 PDF；详见 [自动备份验收](docs/automatic-backup-verification.md)、[脱敏导出验收](docs/redacted-verification.md)、[排版控制验收](docs/layout-verification.md) 和 [撤销与版本对比验收](docs/history-verification.md)。
 
 详情见 [阶段 C 验收记录](docs/stage-c-verification.md)、[阶段 B 验收记录](docs/stage-b-verification.md) 和 [阶段 A 记录](docs/stage-a-verification.md)。GitHub Actions 自动运行这些检查并保存合成数据的报告；它们的远端结果需查看实际运行记录。
 

@@ -7,7 +7,7 @@ on:
     inputs:
       image:
         description: Published version to verify anonymously
-        default: ghcr.io/mochiuaena/resume-workbench:0.4.0
+        default: ghcr.io/mochiuaena/resume-workbench:0.5.0
         required: true
 permissions:
   contents: read
@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
-      RESUME_APP_IMAGE: ${{ inputs.image || 'ghcr.io/mochiuaena/resume-workbench:0.4.0' }}
+      RESUME_APP_IMAGE: ${{ inputs.image || 'ghcr.io/mochiuaena/resume-workbench:0.5.0' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Pull the published image without registry credentials
@@ -39,6 +39,7 @@ jobs:
       - name: Verify editable backup restoration and searchable PDF
         run: |
           python3 scripts/verify-backup.py --isolated
+          python3 scripts/verify-automatic-backups.py --isolated
           python3 -m pip install pypdf==6.10.0
           python3 - <<'PY'
           from pypdf import PdfReader
@@ -62,6 +63,7 @@ jobs:
           retention-days: 14
           path: |
             output/stage-c-backup-verification.json
+            output/automatic-backup-verification.json
             output/pdf/restored-new-instance.pdf
             output/pdf/redacted-restored.pdf
       - name: Stop disposable workspaces
