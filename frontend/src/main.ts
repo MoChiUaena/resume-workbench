@@ -4,4 +4,5 @@ import './style.css';
 import './site.css';
 import './backup.css';
 import './history.css';
+import './models.css';
 createApp(App).mount('#app');

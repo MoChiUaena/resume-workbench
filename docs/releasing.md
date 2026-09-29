@@ -1,6 +1,8 @@
 # 验证与发布流程
 
-GitHub Actions 在 `main`、PR 和手动运行时检查 9 项前端逻辑测试与构建、58 项 Java 测试、可执行 JAR / 许可证清单、Docker 镜像、26 项浏览器测试、离线使用、全新实例备份恢复、中文 PDF 和容器重建持久化。自动备份检查覆盖调度、去重、历史恢复、跨实例策略边界和重建保留；脱敏检查覆盖四模板、图片字节移除、原稿保留、过期预览和下载重试。测试只在合成数据的独立 PostgreSQL schema / Compose 项目执行。
+GitHub Actions 在 `main`、PR 和手动运行时检查 10 项前端逻辑测试与构建、76 项 Java 测试、可执行 JAR / 许可证清单、Docker 镜像、30 项浏览器测试、离线使用、全新实例备份恢复、中文 PDF 和容器重建持久化。自动备份检查覆盖调度、去重、历史恢复、跨实例策略边界和重建保留；脱敏检查覆盖四模板、图片字节移除、原稿保留、过期预览和下载重试。测试只在合成数据的独立 PostgreSQL schema / Compose 项目执行。
+
+日常迭代通过功能分支、PR、CI 和合并同步 GitHub，变更集中记录在 CHANGELOG 的 Unreleased 区域。小功能完成后不自动创建版本标签或 Release，也不把 Compose 默认镜像改成尚未发布的版本。累积到较完整的里程碑，再统一确定版本、更新部署配置和发布镜像。
 
 推送 `v<版本>` 标签会运行同一套检查。全部通过后，将**刚测试的同一份镜像**推送到 `ghcr.io/mochiuaena/resume-workbench:<版本>`；失败不会发布。工作流使用仓库自带 `GITHUB_TOKEN` 的 packages 写入权限，不需要用户提供 Token。Action 与基础镜像均固定到 commit / digest。
 
