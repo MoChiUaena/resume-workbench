@@ -30,6 +30,7 @@ public class TextSuggestions {
     private final ModelGateway gateway;
     private final Clock clock;
     private final Map<UUID,Suggestion> suggestions=new ConcurrentHashMap<>();
+    private final Map<UUID,String> appliedTexts=new ConcurrentHashMap<>();
     private final Semaphore generation=new Semaphore(1);
     @org.springframework.beans.factory.annotation.Autowired
     public TextSuggestions(ResumeService resumes,ModelSettings settings,ModelGateway gateway){this(resumes,settings,gateway,Clock.systemUTC());}
@@ -48,19 +49,26 @@ public class TextSuggestions {
             var result=new Suggestion(UUID.randomUUID(),source.id(),source.revision(),input.sectionId(),input.entryId(),input.paragraph(),
                 original,selection.start(),selection.end(),selection.text(),replacement,profile.name(),profile.provider(),profile.model(),
                 profile.baseUrl()+"/chat/completions",clock.instant().plusSeconds(600),addsNumbers(selection.text(),replacement));
-            suggestions.entrySet().removeIf(entry->!entry.getValue().expiresAt().isAfter(clock.instant()));
-            if(suggestions.size()>=32){var oldest=suggestions.values().stream().min(Comparator.comparing(Suggestion::expiresAt)).orElseThrow();suggestions.remove(oldest.id());}
+            suggestions.entrySet().removeIf(entry->{boolean expired=!entry.getValue().expiresAt().isAfter(clock.instant());if(expired)appliedTexts.remove(entry.getKey());return expired;});
+            if(suggestions.size()>=32){var oldest=suggestions.values().stream().min(Comparator.comparing(Suggestion::expiresAt)).orElseThrow();suggestions.remove(oldest.id());appliedTexts.remove(oldest.id());}
             suggestions.put(result.id(),result);return result;
         }finally{generation.release();}
     }
-    public ResumeService.Resume apply(UUID id,UUID resumeId,long revision,boolean confirmed){
+    public ResumeService.Resume apply(UUID id,UUID resumeId,long revision,boolean confirmed){return apply(id,resumeId,revision,confirmed,null);}
+    public synchronized ResumeService.Resume apply(UUID id,UUID resumeId,long revision,boolean confirmed,String reviewedText){
         if(!confirmed)throw new ApiException("AI_APPLY_CONFIRMATION_REQUIRED","请核对事实和表达后，再确认应用建议。",422);
         var value=suggestions.get(id);
-        if(value==null||!value.expiresAt().isAfter(clock.instant())){suggestions.remove(id);throw new ApiException("AI_SUGGESTION_EXPIRED","建议已过期，请重新生成。",410);}
+        if(value==null||!value.expiresAt().isAfter(clock.instant())){suggestions.remove(id);appliedTexts.remove(id);throw new ApiException("AI_SUGGESTION_EXPIRED","建议已过期，请重新生成。",410);}
         if(!value.resumeId().equals(resumeId)||value.revision()!=revision)throw new ApiException("AI_SOURCE_CHANGED","建议不属于当前简历或修订，请重新生成。",409);
-        String updated=value.original().substring(0,value.selectionStart())+value.replacement()+value.original().substring(value.selectionEnd());
+        String chosen=reviewedText==null?value.replacement():reviewedText;
+        if(chosen==null||chosen.isBlank()||chosen.length()>800||chosen.codePoints().anyMatch(c->Character.isISOControl(c)&&c!='\t'))
+            throw new ApiException("AI_REVIEW_TEXT_INVALID","请保留单段、非空且不超过 800 字的建议文字。",422);
+        String updated=value.original().substring(0,value.selectionStart())+chosen+value.original().substring(value.selectionEnd());
         if(updated.length()>800)throw new ApiException("AI_RESULT_TOO_LONG","建议应用后将超过单段 800 字上限，请缩短选区或手动编辑。",422);
-        return resumes.applyParagraph(resumeId,revision,value.sectionId(),value.entryId(),value.paragraph(),value.original(),updated,id);
+        String previous=appliedTexts.putIfAbsent(id,chosen);
+        if(previous!=null&&!previous.equals(chosen))throw new ApiException("AI_APPLY_TEXT_CHANGED","这条建议已尝试应用另一份文字，请刷新简历后重新生成。",409);
+        try{return resumes.applyParagraph(resumeId,revision,value.sectionId(),value.entryId(),value.paragraph(),value.original(),updated,id);}
+        catch(RuntimeException failure){if(previous==null)appliedTexts.remove(id,chosen);throw failure;}
     }
     private static Selection selection(String source,Integer start,Integer end){
         if(start==null&&end==null){start=0;end=source.length();}

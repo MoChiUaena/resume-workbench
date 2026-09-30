@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {textDifference} from '../src/textDifference.ts';
-import {claimWarnings} from '../src/claimWarnings.ts';
+import {addedNumericClaims,claimWarnings} from '../src/claimWarnings.ts';
 
 const full=(parts:{text:string}[])=>parts.map(part=>part.text).join('');
 const edits=(parts:{text:string;changed:boolean}[])=>parts.filter(part=>part.changed).map(part=>part.text);
@@ -39,4 +39,10 @@ test('responsibility and outcome hints react to new claims, including repeated r
  assert.deepEqual(claimWarnings('负责测试，参与联调。','负责测试，负责联调。'),{roles:['负责'],outcomes:[]});
  assert.deepEqual(claimWarnings('负责测试并确保稳定。','负责测试并确保稳定。'),{roles:[],outcomes:[]});
  assert.deepEqual(claimWarnings('参与联调。','参与联调并记录问题。'),{roles:[],outcomes:[]});
+});
+
+test('numeric review hint follows the human-edited proposal rather than the first model reply',()=>{
+ assert.equal(addedNumericClaims('完成接口核对。','完成接口核对，提升 30%。'),true);
+ assert.equal(addedNumericClaims('完成接口核对。','完成接口核对。'),false);
+ assert.equal(addedNumericClaims('处理 30% 的请求。','处理 30% 的请求并记录结果。'),false);
 });

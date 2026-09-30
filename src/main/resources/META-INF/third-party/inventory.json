@@ -1,6 +1,6 @@
 {
   "inventoryVersion": 1,
-  "applicationVersion": "0.7.0",
+  "applicationVersion": "0.8.0-SNAPSHOT",
   "scope": "Resolved Maven runtime JARs and entire npm lockfile; OS/JDK/browser retain their own notices in the image.",
   "java": [
     {

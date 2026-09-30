@@ -94,4 +94,30 @@ class TextSuggestionsTest {
         assertThat(service.create(valid).selectedOriginal()).isEqualTo("参与");
         verify(gateway).rewrite(any(),eq("secret-canary"),eq("参与"));
     }
+    @Test void manuallyReviewedSelectionUsesExactlyOneLockedPayloadForRetries(){
+        var base=request(true);String paragraph=ResumeService.paragraph(source.document(),base.sectionId(),base.entryId(),0);
+        var input=new TextSuggestions.Request(source.id(),1,base.sectionId(),base.entryId(),0,3,16,models.defaultId(),models.revision(),true);
+        var suggestion=service.create(input);String reviewed="人工核对后的表达";
+        service.apply(suggestion.id(),source.id(),1,true,reviewed);
+        String expected=paragraph.substring(0,3)+reviewed+paragraph.substring(16);
+        verify(resumes).applyParagraph(eq(source.id()),eq(1L),eq(base.sectionId()),eq(base.entryId()),eq(0),eq(paragraph),eq(expected),eq(suggestion.id()));
+        service.apply(suggestion.id(),source.id(),1,true,reviewed);
+        verify(resumes,times(2)).applyParagraph(eq(source.id()),eq(1L),any(),any(),anyInt(),any(),eq(expected),eq(suggestion.id()));
+        assertThatThrownBy(()->service.apply(suggestion.id(),source.id(),1,true,"另一份文字"))
+            .isInstanceOfSatisfying(ApiException.class,e->assertThat(e.code).isEqualTo("AI_APPLY_TEXT_CHANGED"));
+        verify(gateway,times(1)).rewrite(any(),any(),any());
+        verifyNoMoreInteractions(gateway);
+    }
+    @Test void invalidOrFailedManualReviewDoesNotLockTheSuggestion(){
+        var suggestion=service.create(request(true));
+        for(String invalid:List.of(" ","两段\n文字","文".repeat(801)))
+            assertThatThrownBy(()->service.apply(suggestion.id(),source.id(),1,true,invalid))
+                .isInstanceOfSatisfying(ApiException.class,e->assertThat(e.code).isEqualTo("AI_REVIEW_TEXT_INVALID"));
+        verify(resumes,never()).applyParagraph(any(),anyLong(),any(),any(),anyInt(),any(),any(),any());
+        when(resumes.applyParagraph(any(),anyLong(),any(),any(),anyInt(),any(),any(),any()))
+            .thenThrow(new ApiException("REVISION_CONFLICT","测试中的回滚",409)).thenReturn(source);
+        assertThatThrownBy(()->service.apply(suggestion.id(),source.id(),1,true,"第一版校正"))
+            .isInstanceOfSatisfying(ApiException.class,e->assertThat(e.code).isEqualTo("REVISION_CONFLICT"));
+        assertThat(service.apply(suggestion.id(),source.id(),1,true,"第二版校正")).isEqualTo(source);
+    }
 }

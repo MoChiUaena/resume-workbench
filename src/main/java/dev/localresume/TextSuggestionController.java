@@ -8,9 +8,10 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/ai")
 public class TextSuggestionController {
-    public record Apply(@NotNull UUID resumeId,@Min(1) long expectedRevision,@AssertTrue boolean confirmApply) {}
+    public record Apply(@NotNull UUID resumeId,@Min(1) long expectedRevision,@AssertTrue boolean confirmApply,
+                        @Size(max=800) String reviewedText) {}
     private final TextSuggestions suggestions;
     public TextSuggestionController(TextSuggestions suggestions){this.suggestions=suggestions;}
     @PostMapping("/suggestions") public Object create(@Valid @RequestBody TextSuggestions.Request input){return suggestions.create(input);}
-    @PostMapping("/suggestions/{id}/apply") public Object apply(@PathVariable UUID id,@Valid @RequestBody Apply input){return suggestions.apply(id,input.resumeId(),input.expectedRevision(),input.confirmApply());}
+    @PostMapping("/suggestions/{id}/apply") public Object apply(@PathVariable UUID id,@Valid @RequestBody Apply input){return suggestions.apply(id,input.resumeId(),input.expectedRevision(),input.confirmApply(),input.reviewedText());}
 }
