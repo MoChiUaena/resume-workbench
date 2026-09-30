@@ -27,6 +27,36 @@ test('provider cards manage presets, keep credentials masked, switch default and
  page.once('dialog',dialog=>dialog.accept());await other.getByRole('button',{name:'删除',exact:true}).click();await expect(other).toHaveCount(0);await page.getByRole('button',{name:'我的简历',exact:true}).click();await expect(page.getByRole('heading',{name:/我的简历/})).toBeVisible();
 });
 
+test('review separates distant edits and flags new responsibility and outcome claims',async({page,request})=>{
+ await config(request);const source=await resume(request);
+ await page.goto('/?view=models');await page.getByLabel('界面风格').selectOption('b');await page.getByRole('switch',{name:'深色模式'}).click();
+ await page.route('**/api/ai/suggestions',async route=>{
+  const response=await route.fetch();const result=await response.json();
+  await route.fulfill({response,json:{...result,replacement:`【审核提示】${result.original} 主导联调，确保系统稳定。`}});
+ });
+ const dialog=await open(page,source.id);await dialog.getByLabel('确认发送选定段落').check();
+ await dialog.getByRole('button',{name:'生成润色建议'}).click();
+ await expect(dialog.getByTestId('ai-role-risk')).toContainText('主导');
+ await expect(dialog.getByTestId('ai-outcome-risk')).toContainText('确保');
+ await expect(dialog.getByTestId('ai-result-text').locator('mark')).toHaveCount(2);
+ const original=await dialog.getByTestId('ai-original-text').textContent();
+ const suggested=await dialog.getByTestId('ai-result-text').textContent();
+ expect(suggested).toBe(`【审核提示】${original} 主导联调，确保系统稳定。`);
+ await expect(dialog.getByRole('button',{name:'确认应用建议'})).toBeDisabled();
+ await fs.mkdir(path.join(root,'output'),{recursive:true});
+ await page.screenshot({path:path.join(root,'output/ai-review-risks-dark.png'),animations:'disabled'});
+ await page.setViewportSize({width:430,height:960});
+ await expect(dialog.getByTestId('ai-role-risk')).toBeVisible();
+ const bounds=await dialog.boundingBox();expect(bounds).not.toBeNull();
+ expect(bounds!.x).toBeGreaterThanOrEqual(0);
+ expect(bounds!.x+bounds!.width).toBeLessThanOrEqual(430);
+ expect(await dialog.evaluate(element=>element.scrollWidth<=element.clientWidth+1)).toBe(true);
+ await dialog.getByTestId('ai-outcome-risk').scrollIntoViewIfNeeded();
+ await page.screenshot({path:path.join(root,'output/ai-review-risks-mobile.png'),animations:'disabled'});
+ await dialog.getByRole('button',{name:'取消',exact:true}).click();
+ expect(await(await request.get('/api/resumes/'+source.id)).json()).toEqual(source);
+});
+
 test('only a confirmed selected paragraph is sent; apply is versioned and undoable without leaking contacts',async({page,request})=>{
  await config(request);const source=await resume(request);const initial=(await(await request.get(`/api/resumes/${source.id}/versions`)).json()).length;
  const dialog=await open(page,source.id);await dialog.getByLabel('要润色的段落').selectOption('0');await expect(dialog.getByRole('button',{name:'生成润色建议'})).toBeDisabled();const original=await dialog.getByTestId('ai-sent-text').textContent();expect(original).not.toContain('PRIVATE-');await dialog.getByLabel('确认发送选定段落').check();
