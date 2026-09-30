@@ -38,7 +38,7 @@ public class LocalRequestFilter extends OncePerRequestFilter {
         } catch (ApiException e) {
             if (res.isCommitted()) throw e;
             res.setStatus(e.status); res.setContentType("application/json;charset=UTF-8");
-            res.getWriter().write("{\"code\":\"WORKSPACE_BUSY\",\"message\":\"备份或恢复正在进行，本次修改尚未保存，请稍后重试。\"}");
+            res.getWriter().write("{\"code\":\"WORKSPACE_BUSY\",\"message\":\"备份、恢复或文件检查正在进行，本次操作尚未完成，请稍后重试。\"}");
         }
     }
 }

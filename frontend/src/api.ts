@@ -14,9 +14,9 @@ export type Version = { id: string; title: string; label: string; sourceRevision
 export type VersionDetail = Version & { document: ResumeDocument };
 export async function api<T>(url: string, body?: object | FormData, method?: string, signal?:AbortSignal): Promise<T> {
   let response: Response;
-  const timeout=AbortSignal.timeout(url.startsWith('/api/backups')?120000:url.startsWith('/api/ai/')||url.endsWith('/test')||url.endsWith('/export')?90000:15000);
+  const timeout=AbortSignal.timeout(url.startsWith('/api/backups')?120000:url.startsWith('/api/storage/')||url.startsWith('/api/ai/')||url.endsWith('/test')||url.endsWith('/export')?90000:15000);
   try { response = await fetch(url, { method: method || (body ? 'POST' : 'GET'), headers: body instanceof FormData ? { 'X-Local-Resume': '1' } : body ? { 'Content-Type': 'application/json', 'X-Local-Resume': '1' } : {}, body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined, signal:signal?AbortSignal.any([signal,timeout]):timeout }); }
-  catch { throw new ApiFailure('NETWORK_ERROR',url.startsWith('/api/ai/suggestions/')&&url.endsWith('/apply')?'应用结果尚未确认，请保持页面并用同一份文字重试。':url.startsWith('/api/models')||url.startsWith('/api/ai/')?'模型操作未完成，原文保留，请重试。':'无法连接本地服务，本次修改可能尚未保存。请保留页面并重试。'); }
+  catch { throw new ApiFailure('NETWORK_ERROR',url.startsWith('/api/storage/')?'空间检查未完成，请检查本地服务后重试。':url.startsWith('/api/ai/suggestions/')&&url.endsWith('/apply')?'应用结果尚未确认，请保持页面并用同一份文字重试。':url.startsWith('/api/models')||url.startsWith('/api/ai/')?'模型操作未完成，原文保留，请重试。':'无法连接本地服务，本次修改可能尚未保存。请保留页面并重试。'); }
   if (!response.ok) { const e = await response.json().catch(() => ({ code: 'NETWORK_ERROR', message: '无法连接本地服务，请检查服务是否正在运行。' })); throw new ApiFailure(e.code,e.message); }
   return response.json();
 }
