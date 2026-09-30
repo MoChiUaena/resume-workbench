@@ -6,7 +6,7 @@ GitHub Actions 在 `main`、PR 和手动运行时检查 12 项前端逻辑测试
 
 推送 `v<版本>` 标签会运行同一套检查。全部通过后，将**刚测试的同一份镜像**推送到 `ghcr.io/mochiuaena/resume-workbench:<版本>`；失败不会发布。工作流使用仓库自带 `GITHUB_TOKEN` 的 packages 写入权限，不需要用户提供 Token。Action 与基础镜像均固定到 commit / digest。
 
-首个候选版本为 `v0.1.0-rc.1`，正式首版为 `v0.1.0`，当前版本为 `v0.6.0`，容器平台为 Linux amd64。发布前更新 POM、前端 package / lockfile、依赖清单的 applicationVersion、Compose、.env.example、README 和 published-image 工作流默认版本。可执行文件固定为 target/resume-workbench.jar，避免每次发布修改启动路径。已发布版本不复用标签覆盖；需要修改时使用新版本。
+首个候选版本为 `v0.1.0-rc.1`，正式首版为 `v0.1.0`，当前版本为 `v0.7.0`，容器平台为 Linux amd64。发布前更新 POM、前端 package / lockfile、依赖清单的 applicationVersion、Compose、.env.example、README 和 published-image 工作流默认版本。可执行文件固定为 target/resume-workbench.jar，避免每次发布修改启动路径。已发布版本不复用标签覆盖；需要修改时使用新版本。
 
 发布前检查：
 
@@ -16,7 +16,7 @@ GitHub Actions 在 `main`、PR 和手动运行时检查 12 项前端逻辑测试
 4. 标签触发的验证与镜像推送成功后，确认 GHCR 包可以匿名拉取。首次发布的包可能默认为 private，需要在 GitHub Packages 设置中改为 public；工作流成功并不等于已验证公开拉取。
 5. 在新目录下载配置，使用已发布镜像启动两个服务，验证健康检查和 PDF。之后在 Release 记录实际镜像 digest 与 Actions 链接。
 
-通过 `Verify published image` 手动工作流指定该版本镜像，使用空 Docker 凭据匿名拉取，在两个全新目录启动并执行恢复、普通 / 脱敏 PDF。应从匹配的版本标签运行该工作流，避免用新版接口检查不支持该功能的旧镜像。升级回归须使用独立实例，分别运行 rc.1、v0.2.0、v0.4.0 与 v0.5.0 创建 schema 2 / 3 / 4 文档与备份，再以保留卷的方式换新版，核验正文 / 样式 / 修订 / 文件完整性和再次导出；另须确认 v0.2.0 拒绝新版 schema 4 备份。
+通过 `Verify published image` 手动工作流指定该版本镜像，使用空 Docker 凭据匿名拉取，在两个全新目录启动并执行恢复、普通 / 脱敏 PDF。应从匹配的版本标签运行该工作流，避免用新版接口检查不支持该功能的旧镜像。升级回归须使用独立实例，分别运行 rc.1、v0.2.0、v0.4.0、v0.5.0 与 v0.6.0 创建 schema 2 / 3 / 4 文档与备份，再以保留卷的方式换新版，核验正文 / 样式 / 修订 / 文件完整性和再次导出；另须确认 v0.2.0 拒绝新版 schema 4 备份。
 
 依赖更新时重新解析 runtime dependency:list、运行 generate-notices.py，检查所有许可声明并保留上游文本；运行 verify-distribution.py 逐个核对打包 JAR。字体、上游许可与用户提供的示例图片继续分别声明，不把第三方资源改为项目 MIT。
 

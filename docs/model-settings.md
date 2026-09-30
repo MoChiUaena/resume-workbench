@@ -1,6 +1,6 @@
 # 模型设置与段落润色
 
-这项功能已进入开发版，当前正式镜像仍为 0.6.0。开发版可从源码运行 `docker compose up -d --build --wait`；日常修改通过 PR 和 CI 合并，后续里程碑再统一发布。
+从 0.7.0 起，可在本机应用中按需启用模型设置与段落润色。Docker 安装方式见 README；从源码运行可用 `docker compose up -d --build --wait`。
 
 1. 在页面顶部打开「模型设置」，点击「添加模型」。
 2. 选择 DashScope、DeepSeek、GLM 或其他兼容服务，填写配置名称、Base URL、文字模型和 API Key。预设地址可以按服务商所在区域调整，模型名称以账号实际可用的模型为准。
