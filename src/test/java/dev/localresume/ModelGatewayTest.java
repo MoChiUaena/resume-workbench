@@ -35,5 +35,22 @@ class ModelGatewayTest {
         content="{\"text\":\""+"文".repeat(801)+"\"}";assertThatThrownBy(()->new ModelGateway(mapper).rewrite(profile(),"secret-test-key","原文")).isInstanceOfSatisfying(ApiException.class,e->assertThat(e.code).isEqualTo("MODEL_RESPONSE_INVALID"));
         content="x".repeat(70000);assertThatThrownBy(()->new ModelGateway(mapper).rewrite(profile(),"secret-test-key","原文")).isInstanceOf(ApiException.class);
     }
+    @Test void excessiveExpansionFromARealisticResumePromptIsRejectedWithoutRetry(){
+        String source="整理接口文档，与同组成员核对字段，记录并修复联调问题。";
+        content="{\"text\":\""+"主导前后端联调，确保系统稳定运行。".repeat(4)+"\"}";
+        assertThatThrownBy(()->new ModelGateway(mapper).rewrite(profile(),"secret-test-key",source))
+            .isInstanceOfSatisfying(ApiException.class,e->{assertThat(e.code).isEqualTo("MODEL_EXPANSION_REJECTED");assertThat(e.getMessage()).contains("原文保留");});
+        assertThat(calls.get()).isEqualTo(1);
+    }
+    @Test void overCompressedLongParagraphIsRejectedWhileConciseEditingStillWorks(){
+        String concise="我在课程练习里把接口文档整理了一下，后来和同组成员一块儿对字段；有联调问题就记下来、修好。";
+        content="{\"text\":\"在课程练习中整理接口文档，与同组成员核对字段；记录并修复联调问题。\"}";
+        assertThat(new ModelGateway(mapper).rewrite(profile(),"secret-test-key",concise)).contains("整理接口文档");
+        String longSource=concise.repeat(12);
+        assertThat(longSource.length()).isLessThan(800);
+        assertThatThrownBy(()->new ModelGateway(mapper).rewrite(profile(),"secret-test-key",longSource))
+            .isInstanceOfSatisfying(ApiException.class,e->{assertThat(e.code).isEqualTo("MODEL_OMISSION_RISK");assertThat(e.getMessage()).contains("原文保留");});
+        assertThat(calls.get()).isEqualTo(2);
+    }
     @Test void timeoutsDoNotRetryOrReturnInventedText(){delay=300;assertThatThrownBy(()->new ModelGateway(mapper,Duration.ofMillis(60)).rewrite(profile(),"secret-test-key","原文")).isInstanceOfSatisfying(ApiException.class,e->assertThat(e.code).isEqualTo("MODEL_CONNECTION_FAILED"));assertThat(calls.get()).isEqualTo(1);}
 }
