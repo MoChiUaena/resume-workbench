@@ -18,7 +18,7 @@
 
 示例简历使用奶龙素材，创建后可替换为自己的内容和图片。
 
-开发版新增可选的[模型设置与段落润色](docs/model-settings.md)，支持 DashScope、DeepSeek、GLM 等服务。当前正式镜像仍为 0.6.0，开发版可从源码构建运行。
+开发版新增可选的[模型设置与段落润色](docs/model-settings.md)，支持 DashScope、DeepSeek、GLM 等服务，并可先划选句段再润色。当前正式镜像仍为 0.6.0，开发版可从源码构建运行。
 
 ## 安装与启动
 

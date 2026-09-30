@@ -67,6 +67,61 @@ test('only a confirmed selected paragraph is sent; apply is versioned and undoab
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect.poll(async()=>(await(await request.get('/api/resumes/'+source.id)).json()).document).toEqual(source.document);
 });
 
+test('selected sentence is the only model input and only that range is applied',async({page,request})=>{
+ await config(request);let source=await resume(request);
+ const section=source.document.content.sections.find((item:any)=>item.type==='project');
+ const entry=section.entries[0];entry.bullets[0]+=' '+'在课程练习中整理接口文档，与同组成员核对字段，并记录联调问题。'.repeat(15);entry.bullets.push('对照段落保持不变。');
+ source=await(await request.put('/api/resumes/'+source.id,{headers,data:{title:source.title,document:source.document,expectedRevision:source.revision,mutationId:crypto.randomUUID()}})).json();
+ const first=source.document.content.sections.find((item:any)=>item.id===section.id).entries[0].bullets[0];
+ expect(first.length).toBeGreaterThan(500);expect(first.length).toBeLessThan(780);
+ const phrase='核对字段',start=first.indexOf(phrase,Math.floor(first.length/2)),end=start+phrase.length,selected=first.slice(start,end);
+ expect(start).toBeGreaterThan(0);
+ await page.goto(`/?view=editor&resume=${source.id}`);await expect(page.getByTestId('preview-status')).toContainText('预览已更新');
+ await page.getByTestId('nav-project').click();
+ const area=page.getByRole('textbox',{name:'条目正文'}).first();
+ await area.evaluate((node:HTMLTextAreaElement,range)=>{node.focus();node.setSelectionRange(range.start,range.end);},{start,end});
+ await page.getByRole('button',{name:'AI 段落润色',exact:true}).first().click();
+ const dialog=page.getByRole('dialog',{name:'AI 段落润色',exact:true});
+ const picker=dialog.getByLabel('选取要润色的句段');
+ await expect(picker).toBeFocused();
+ expect(await picker.evaluate((node:HTMLTextAreaElement)=>node.selectionStart)).toBe(start);
+ expect(await picker.evaluate((node:HTMLTextAreaElement)=>node.selectionEnd)).toBe(end);
+ expect(await picker.evaluate((node:HTMLTextAreaElement)=>node.scrollTop)).toBeGreaterThan(0);
+ await expect(dialog.getByTestId('ai-sent-text')).toHaveText(selected);
+ await expect(dialog.getByRole('button',{name:'生成润色建议'})).toBeDisabled();
+ await dialog.getByLabel('确认发送选定段落').check();
+ const response=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/ai/suggestions'&&r.request().method()==='POST');
+ await dialog.getByRole('button',{name:'生成润色建议'}).click();
+ const sent=await response,proposal=await sent.json();
+ expect(proposal.original).toBe(first);expect(proposal.selectedOriginal).toBe(selected);
+ expect(proposal.selectionStart).toBe(start);expect(proposal.selectionEnd).toBe(end);
+ expect(sent.request().postData()).not.toContain('PRIVATE-');
+ await expect(dialog.getByTestId('ai-original-text')).toHaveText(selected);
+ await fs.mkdir(path.join(root,'output'),{recursive:true});await page.screenshot({path:path.join(root,'output/ai-selected-sentence.png'),animations:'disabled'});
+ await dialog.getByLabel('确认建议事实与表达').check();await dialog.getByRole('button',{name:'确认应用建议'}).click();
+ await expect(dialog).toHaveCount(0);
+ const applied=await(await request.get('/api/resumes/'+source.id)).json();
+ const changed=applied.document.content.sections.find((item:any)=>item.id===section.id).entries[0].bullets;
+ expect(changed[0]).toBe(first.slice(0,start)+proposal.replacement+first.slice(end));
+ expect(changed.slice(1)).toEqual(source.document.content.sections.find((item:any)=>item.id===section.id).entries[0].bullets.slice(1));
+ expect((await(await request.get(`/api/resumes/${source.id}/versions`)).json()).some((version:any)=>version.label.startsWith('AI 应用前自动保留'))).toBe(true);
+ await page.getByRole('button',{name:'撤销',exact:true}).click();
+ await expect.poll(async()=>(await(await request.get('/api/resumes/'+source.id)).json()).document).toEqual(source.document);
+
+ const restored=page.getByRole('textbox',{name:'条目正文'}).first(),text=await restored.inputValue(),lineEnd=text.indexOf('\n');
+ await restored.evaluate((node:HTMLTextAreaElement,index)=>{node.focus();node.setSelectionRange(index-3,index+4);},lineEnd);
+ await page.getByRole('button',{name:'AI 段落润色',exact:true}).first().click();
+ const cross=page.getByRole('dialog',{name:'AI 段落润色',exact:true});
+ await expect(cross.getByText(/一次只能选择同一段落中的文字/)).toBeVisible();
+ await cross.getByLabel('确认发送选定段落').check();
+ await expect(cross.getByRole('button',{name:'生成润色建议'})).toBeDisabled();
+ await cross.getByLabel('选取要润色的句段').evaluate((node:HTMLTextAreaElement)=>{node.focus();node.setSelectionRange(1,6);node.dispatchEvent(new Event('select',{bubbles:true}));});
+ await expect(cross.getByTestId('ai-sent-text')).toHaveText(first.slice(1,6));
+ await expect(cross.getByLabel('确认发送选定段落')).not.toBeChecked();
+ await expect(cross.getByText(/一次只能选择同一段落中的文字/)).toHaveCount(0);
+ await cross.getByRole('button',{name:'取消',exact:true}).click();
+});
+
 test('failed generation and stale source cannot overwrite saved text',async({page,request})=>{
  const profile=await config(request,'qa-error');const source=await resume(request);const dialog=await open(page,source.id);await dialog.getByLabel('确认发送选定段落').check();await dialog.getByRole('button',{name:'生成润色建议'}).click();await expect(dialog.getByRole('alert')).toContainText('MODEL_AUTH_FAILED');expect(await(await request.get('/api/resumes/'+source.id)).json()).toEqual(source);await dialog.getByRole('button',{name:'取消',exact:true}).click();
  const current=await state(request);await request.put('/api/models/profiles/'+profile.id,{headers,data:{expectedRevision:current.revision,name:'修复后的服务',provider:'compatible',baseUrl:'http://127.0.0.1:18770/v1',model:'qa-model',apiKey:'',clearKey:false}});
