@@ -33,7 +33,7 @@
 
 Chromium 由 Playwright 官方安装器准备，保留浏览器分发物中的许可证和 third-party notices；它不进入源码仓库。fonttools、Pillow、pypdf 与 Poppler 只用于开发准备或 QA，不是应用运行依赖。
 
-`0.1.0` 的[完整依赖清单](docs/dependency-licenses.md)覆盖 61 个已解析 Maven 运行期依赖（53 个实际分发 JAR）和 75 个 npm 锁定包。POM 父级许可、npm SPDX 声明、依赖 SHA-256 / integrity、上游 LICENSE / NOTICE 与可获取的源码版权头保存在应用 JAR 的 `META-INF/third-party/`；`verify-distribution.py` 检查实际分发 JAR 与清单的完整性。未安装的平台可选 npm 包记录锁定声明，不作为运行期分发物。
+`0.7.0` 的[完整依赖清单](docs/dependency-licenses.md)覆盖 92 个已解析 Maven 运行期依赖（84 个实际分发 JAR）和 75 个 npm 锁定包。POM 父级许可、npm SPDX 声明、依赖 SHA-256 / integrity、上游 LICENSE / NOTICE 与可获取的源码版权头保存在应用 JAR 的 `META-INF/third-party/`；`verify-distribution.py` 检查实际分发 JAR 与清单的完整性。未安装的平台可选 npm 包记录锁定声明，不作为运行期分发物。
 
 项目 MIT 不替代第三方许可证。Logback 的 EPL-2.0 / LGPL-2.1-only 双许可及 Jakarta 的 EPL / GPL + Classpath Exception 声明完整保留；库的官方源码归档位置列在清单中。Adobe XMP 按上游 POM 的 BSD-3-Clause 声明分发，并附 [Adobe SDK 的上游 BSD 许可](https://github.com/adobe/XMP-Toolkit-SDK/blob/main/LICENSE)。JDK、基础系统、Chromium、Playwright 自身分发条款保留在镜像原有的 legal / copyright / license 目录，不将它们改为本项目 MIT。
 
@@ -49,4 +49,4 @@ Chromium 由 Playwright 官方安装器准备，保留浏览器分发物中的�
 
 ## 可选文字模型接入
 
-开发版使用 Spring AI 1.1.8 的兼容文字接口适配器，按上游 Apache-2.0 条款分发，用于 DashScope、DeepSeek、GLM 与用户配置的兼容服务。各新增 Java 依赖的上游条款、来源和 SHA-256 记录在 `META-INF/third-party/inventory.json`，随应用分发。项目不分发模型权重，也不包含用户 API Key。
+0.7.0 使用 Spring AI 1.1.8 的兼容文字接口适配器，按上游 Apache-2.0 条款分发，用于 DashScope、DeepSeek、GLM 与用户配置的兼容服务。各新增 Java 依赖的上游条款、来源和 SHA-256 记录在 `META-INF/third-party/inventory.json`，随应用分发。项目不分发模型权重，也不包含用户 API Key。

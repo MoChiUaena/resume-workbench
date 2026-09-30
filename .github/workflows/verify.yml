@@ -169,6 +169,15 @@ jobs:
           python scripts/verify-upgrade.py before --isolated --source-schema 4 --source-version 0.5.0 --automatic-enabled --unsupported-webp-backup output/webp-cross-instance.zip
           RESUME_APP_IMAGE=resume-workbench:ci docker compose -p resume-ci-upgrade-five -f .tools/ci/upgrade-five/compose.yml --env-file .tools/ci/upgrade-five/.env up -d --wait --wait-timeout 120
           python scripts/verify-upgrade.py after --isolated --source-schema 4 --source-version 0.5.0
+          docker compose -p resume-ci-upgrade-five -f .tools/ci/upgrade-five/compose.yml --env-file .tools/ci/upgrade-five/.env down
+          mkdir -p .tools/ci/upgrade-six
+          cp compose.yml .tools/ci/upgrade-six/compose.yml
+          printf 'RESUME_PORT=18769\n' > .tools/ci/upgrade-six/.env
+          docker pull ghcr.io/mochiuaena/resume-workbench:0.6.0
+          RESUME_APP_IMAGE=ghcr.io/mochiuaena/resume-workbench:0.6.0 docker compose -p resume-ci-upgrade-six -f .tools/ci/upgrade-six/compose.yml --env-file .tools/ci/upgrade-six/.env up -d --wait --wait-timeout 120
+          python scripts/verify-upgrade.py before --isolated --source-schema 4 --source-version 0.6.0 --automatic-enabled
+          RESUME_APP_IMAGE=resume-workbench:ci docker compose -p resume-ci-upgrade-six -f .tools/ci/upgrade-six/compose.yml --env-file .tools/ci/upgrade-six/.env up -d --wait --wait-timeout 120
+          python scripts/verify-upgrade.py after --isolated --source-schema 4 --source-version 0.6.0
       - name: Upload upgrade evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -199,7 +208,7 @@ jobs:
         run: |
           docker stop resume-model-fixture || true
           docker rm resume-model-fixture || true
-          for side in source target upgrade upgrade-three upgrade-four upgrade-five; do
+          for side in source target upgrade upgrade-three upgrade-four upgrade-five upgrade-six; do
             if [ -f .tools/ci/$side/compose.yml ]; then
               docker compose -p resume-ci-$side -f .tools/ci/$side/compose.yml --env-file .tools/ci/$side/.env down
             fi
