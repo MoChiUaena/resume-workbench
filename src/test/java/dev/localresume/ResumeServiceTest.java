@@ -76,6 +76,9 @@ class ResumeServiceTest {
         assertThat(applied.revision()).isEqualTo(2);assertThat(service.versions(original.id())).hasSize(count+1);
         var safety=service.versions(original.id()).stream().filter(v->v.label().startsWith("AI 应用前")).findFirst().orElseThrow();assertThat(service.version(original.id(),safety.id()).document()).isEqualTo(original.document());
         assertThat(service.applyParagraph(original.id(),1,section.id(),entry.id(),0,before,"测试新的表达",token)).isEqualTo(applied);assertThat(service.versions(original.id())).hasSize(count+1);
+        assertThatThrownBy(()->service.applyParagraph(original.id(),1,section.id(),entry.id(),0,before,"不同的重试文字",token))
+            .isInstanceOfSatisfying(ApiException.class,e->assertThat(e.code).isEqualTo("AI_APPLY_TEXT_CHANGED"));
+        assertThat(service.get(original.id())).isEqualTo(applied);assertThat(service.versions(original.id())).hasSize(count+1);
         assertThat(applied.document().layout()).isEqualTo(original.document().layout());assertThat(applied.document().content().phone()).isEqualTo(original.document().content().phone());
     }
     @Test void staleOrMismatchedParagraphDoesNotCreateVersionOrOverwriteAnotherEdit(){

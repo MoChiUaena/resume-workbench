@@ -78,7 +78,11 @@ public class ResumeService {
     /** Apply one reviewed paragraph and its safety snapshot in the same transaction. */
     public Resume applyParagraph(UUID id,long revision,String sectionId,String entryId,int index,String original,String replacement,UUID mutationId) {
         var existing=load(id,true);
-        if(mutationId.equals(existing.lastMutationId()))return existing;
+        if(mutationId.equals(existing.lastMutationId())){
+            if(!paragraph(existing.document(),sectionId,entryId,index).equals(replacement))
+                throw new ApiException("AI_APPLY_TEXT_CHANGED","这条建议已应用另一份文字，请刷新简历后重新生成。",409);
+            return existing;
+        }
         requireRevision(existing,revision);
         if(!paragraph(existing.document(),sectionId,entryId,index).equals(original))throw new ApiException("AI_SOURCE_CHANGED","原段落已改变，请重新生成建议。",409);
         if(replacement==null||replacement.isBlank()||replacement.length()>800||replacement.equals(original))throw new ApiException("AI_NO_CHANGE","建议未产生可应用的变化。",422);

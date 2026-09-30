@@ -7,3 +7,9 @@ export function claimWarnings(before:string,after:string){
  const introduced=(phrases:readonly string[])=>phrases.filter(phrase=>count(after,phrase)>count(before,phrase));
  return{roles:introduced(roleClaims),outcomes:introduced(outcomeClaims)};
 }
+
+export function addedNumericClaims(before:string,after:string){
+ const pattern=/[0-9]+(?:[.,][0-9]+)?%?/g;
+ const original=new Set(before.match(pattern)||[]);
+ return (after.match(pattern)||[]).some(value=>!original.has(value));
+}

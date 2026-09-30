@@ -122,6 +122,37 @@ test('selected sentence is the only model input and only that range is applied',
  await cross.getByRole('button',{name:'取消',exact:true}).click();
 });
 
+test('human edits refresh the diff and risk hints before one confirmed apply',async({page,request})=>{
+ await config(request);const source=await resume(request);
+ await page.goto('/?view=models');await page.getByLabel('界面风格').selectOption('b');await page.getByRole('switch',{name:'深色模式'}).click();
+ const dialog=await open(page,source.id);await dialog.getByLabel('确认发送选定段落').check();
+ let sends=0;page.on('request',sent=>{if(new URL(sent.url()).pathname==='/api/ai/suggestions'&&sent.method()==='POST')sends++;});
+ const reply=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/ai/suggestions'&&r.request().method()==='POST');
+ await dialog.getByRole('button',{name:'生成润色建议'}).click();const modelReply=await(await reply).json();
+ const editor=dialog.getByTestId('ai-edit-suggestion');await expect(editor).toHaveValue(modelReply.replacement);
+ await dialog.getByLabel('确认建议事实与表达').check();
+ await editor.fill('主导联调，提升 30%。');
+ await expect(dialog.getByLabel('确认建议事实与表达')).not.toBeChecked();
+ await expect(dialog.getByTestId('ai-role-risk')).toContainText('主导');
+ await expect(dialog.getByTestId('ai-outcome-risk')).toContainText('提升');
+ await expect(dialog.getByTestId('ai-number-risk')).toContainText('数字');
+ await expect(dialog.getByTestId('ai-result-text')).toHaveText('主导联调，提升 30%。');
+ await page.setViewportSize({width:1480,height:1540});await fs.mkdir(path.join(root,'output'),{recursive:true});await page.screenshot({path:path.join(root,'output/ai-manual-review-dark.png'),animations:'disabled'});
+ await editor.fill('人工核对后的句段。');
+ await expect(dialog.getByTestId('ai-role-risk')).toHaveCount(0);
+ await expect(dialog.getByTestId('ai-outcome-risk')).toHaveCount(0);
+ await expect(dialog.getByTestId('ai-number-risk')).toHaveCount(0);
+ expect(sends).toBe(1);
+ expect(await(await request.get('/api/resumes/'+source.id)).json()).toEqual(source);
+ await dialog.getByLabel('确认建议事实与表达').check();await dialog.getByRole('button',{name:'确认应用建议'}).click();
+ await expect(dialog).toHaveCount(0);
+ const applied=await(await request.get('/api/resumes/'+source.id)).json();
+ const target=applied.document.content.sections.find((section:any)=>section.id===modelReply.sectionId).entries.find((entry:any)=>entry.id===modelReply.entryId);
+ expect(target.bullets[modelReply.paragraph]).toBe(modelReply.original.slice(0,modelReply.selectionStart)+'人工核对后的句段。'+modelReply.original.slice(modelReply.selectionEnd));
+ await page.getByRole('button',{name:'撤销',exact:true}).click();
+ await expect.poll(async()=>(await(await request.get('/api/resumes/'+source.id)).json()).document).toEqual(source.document);
+});
+
 test('failed generation and stale source cannot overwrite saved text',async({page,request})=>{
  const profile=await config(request,'qa-error');const source=await resume(request);const dialog=await open(page,source.id);await dialog.getByLabel('确认发送选定段落').check();await dialog.getByRole('button',{name:'生成润色建议'}).click();await expect(dialog.getByRole('alert')).toContainText('MODEL_AUTH_FAILED');expect(await(await request.get('/api/resumes/'+source.id)).json()).toEqual(source);await dialog.getByRole('button',{name:'取消',exact:true}).click();
  const current=await state(request);await request.put('/api/models/profiles/'+profile.id,{headers,data:{expectedRevision:current.revision,name:'修复后的服务',provider:'compatible',baseUrl:'http://127.0.0.1:18770/v1',model:'qa-model',apiKey:'',clearKey:false}});
@@ -131,6 +162,16 @@ test('failed generation and stale source cannot overwrite saved text',async({pag
 test('cancelling an in-flight reply and retrying a lost apply acknowledgement retain safe history',async({page,request})=>{
  const profile=await config(request,'qa-slow');const source=await resume(request);const dialog=await open(page,source.id);await dialog.getByLabel('确认发送选定段落').check();const sent=page.waitForRequest(r=>new URL(r.url()).pathname==='/api/ai/suggestions');await dialog.getByRole('button',{name:'生成润色建议'}).click();await sent;await dialog.getByRole('button',{name:'取消',exact:true}).click();await expect(dialog).toHaveCount(0);expect(await(await request.get('/api/resumes/'+source.id)).json()).toEqual(source);
  await expect.poll(async()=>{const response=await request.post('/api/ai/suggestions',{headers,data:{resumeId:source.id,expectedRevision:source.revision,sectionId:source.document.content.sections[0].id,entryId:source.document.content.sections[0].entries[0].id,paragraph:0,profileId:profile.id,settingsRevision:(await state(request)).revision,confirmSend:true}});return response.status();},{timeout:10000}).toBe(200);
- const review=await open(page,source.id);await review.getByLabel('确认发送选定段落').check();await review.getByRole('button',{name:'生成润色建议'}).click();await expect(review.getByTestId('ai-result-text')).toContainText('表述优化');await review.getByLabel('确认建议事实与表达').check();
- let dropped=false;await page.route('**/api/ai/suggestions/*/apply',async route=>{if(!dropped){dropped=true;await route.fetch();await route.abort();}else await route.continue();});await review.getByRole('button',{name:'确认应用建议'}).click();await expect(review.getByRole('alert')).toContainText('NETWORK_ERROR');const versionCount=(await(await request.get(`/api/resumes/${source.id}/versions`)).json()).length;await review.getByRole('button',{name:'确认应用建议'}).click();await expect(review).toHaveCount(0);expect((await(await request.get(`/api/resumes/${source.id}/versions`)).json()).length).toBe(versionCount);
+ const review=await open(page,source.id);await review.getByLabel('确认发送选定段落').check();const reply=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/ai/suggestions'&&r.request().method()==='POST');await review.getByRole('button',{name:'生成润色建议'}).click();const proposal=await(await reply).json();await expect(review.getByTestId('ai-result-text')).toContainText('表述优化');
+ const edited='人工校正后的文字。';await review.getByTestId('ai-edit-suggestion').fill(edited);await review.getByLabel('确认建议事实与表达').check();
+ let dropped=false;await page.route('**/api/ai/suggestions/*/apply',async route=>{if(!dropped){dropped=true;await route.fetch();await route.abort();}else await route.continue();});
+ await review.getByRole('button',{name:'确认应用建议'}).click();await expect(review.getByRole('alert')).toContainText('NETWORK_ERROR');
+ await expect(review.getByTestId('ai-edit-suggestion')).toBeDisabled();
+ await expect(review.getByText(/应用结果尚未确认，建议文字暂时锁定/)).toBeVisible();
+ const versionCount=(await(await request.get(`/api/resumes/${source.id}/versions`)).json()).length;
+ await review.getByRole('button',{name:'确认应用建议'}).click();await expect(review).toHaveCount(0);
+ expect((await(await request.get(`/api/resumes/${source.id}/versions`)).json()).length).toBe(versionCount);
+ const applied=await(await request.get('/api/resumes/'+source.id)).json();
+ const target=applied.document.content.sections.find((section:any)=>section.id===proposal.sectionId).entries.find((entry:any)=>entry.id===proposal.entryId);
+ expect(target.bullets[proposal.paragraph]).toBe(proposal.original.slice(0,proposal.selectionStart)+edited+proposal.original.slice(proposal.selectionEnd));
 });
