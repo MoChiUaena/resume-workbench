@@ -17,6 +17,7 @@ public class StoragePreviewService {
     private final ObjectMapper mapper;
     private final WorkspaceGate gate;
     private final TransactionTemplate tx;
+    private final TransactionTemplate referenceTx;
     private final Path data;
     private final QuarantineStore quarantine;
     private final Clock clock;
@@ -28,6 +29,7 @@ public class StoragePreviewService {
     StoragePreviewService(JdbcTemplate jdbc,ObjectMapper mapper,WorkspaceGate gate,PlatformTransactionManager transactions,String data,QuarantineStore quarantine,Clock clock){
         this.jdbc=jdbc;this.mapper=mapper;this.gate=gate;this.data=Path.of(data);this.quarantine=quarantine;this.clock=clock;
         this.tx=new TransactionTemplate(transactions);tx.setReadOnly(true);tx.setTimeout(20);tx.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        referenceTx=new TransactionTemplate(transactions);referenceTx.setReadOnly(true);referenceTx.setTimeout(20);referenceTx.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);referenceTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
     public StorageInspector.Report preview(){
         try(var lease=gate.exclusive()){
@@ -38,9 +40,15 @@ public class StoragePreviewService {
     }
     /** Caller owns the exclusive lease; fresh evidence never renews displayed authorization. */
     StorageInspector.Snapshot freshSnapshot(){
-        try{var refs=tx.execute(status->references());return new StorageInspector(data,mapper,refs,clock).snapshot(quarantine.inventory());}
+        try{var refs=tx.execute(status->references());return new StorageInspector(data,mapper,refs,clock).snapshot(quarantine.inventory(),quarantine.purgedInventory());}
         catch(java.io.IOException e){throw new ApiException("STORAGE_SCAN_FAILED","本机文件检查未完成，请检查数据目录的读取权限后重试。",503);}
     }
+    /** One independent repeatable-read transaction, even if a caller already has a weaker transaction. */
+    StorageInspector.References freshReferences(){
+        try{var refs=referenceTx.execute(status->references());if(refs==null)throw new IllegalStateException("Missing reference snapshot");return refs;}
+        catch(ApiException e){throw e;}catch(RuntimeException e){throw new ApiException("STORAGE_SCAN_FAILED","引用检查未完成，请保留文件并稍后重试。",503);}
+    }
+    QuarantineArchive defaultArchive(){return new QuarantineArchive(data.toString(),mapper);}
     void requireDisplayed(String digest){
         synchronized(displayed){var timestamp=displayed.get(digest);var now=clock.instant();
             if(timestamp==null||timestamp.isAfter(now)||!timestamp.plus(Duration.ofMinutes(10)).isAfter(now))

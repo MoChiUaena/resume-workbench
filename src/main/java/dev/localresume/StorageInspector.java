@@ -35,6 +35,7 @@ final class StorageInspector {
     private final Map<Path,String> hashes=new HashMap<>();
     private final Map<String,QuarantineFiles.Target> candidates=new TreeMap<>();
     private final Set<String> emptyOriginalImages=new HashSet<>();
+    private final Set<String> blockedOriginalImages=new HashSet<>();
     private boolean bytesComplete=true;
     private int entries;
     private long hashed;
@@ -45,6 +46,9 @@ final class StorageInspector {
     }
     Report inspect() throws IOException {return snapshot(List.of()).report();}
     Snapshot snapshot(List<QuarantineStore.HeldItem> held) throws IOException {
+        return snapshot(held,List.of());
+    }
+    Snapshot snapshot(List<QuarantineStore.HeldItem> held,List<QuarantineStore.PurgedItem> purged) throws IOException {
         evidence(refs.fingerprint());
         if(Files.exists(root,LinkOption.NOFOLLOW_LINKS)&&!ordinaryDirectory(root)){
             bytesComplete=false;items.add(new Item("other",null,"check","unexpected_path",0,null));
@@ -57,10 +61,24 @@ final class StorageInspector {
             items.add(new Item(target.kind(),target.id(),target.complete()?"quarantined":"check",target.complete()?"quarantined_file":"incomplete_quarantine",target.bytes(),target.createdAt()));
         }
         evidence(sortedHeld);
-        items.sort(Comparator.comparingInt((Item i)->List.of("check","candidate","recent","in_use","quarantined").indexOf(i.status()))
+        var sortedPurged=purged.stream().sorted(Comparator.comparing(QuarantineStore.PurgedItem::kind).thenComparing(QuarantineStore.PurgedItem::id).thenComparing(QuarantineStore.PurgedItem::createdAt)).toList();
+        var merged=new HashSet<String>();
+        for(var target:sortedPurged){
+            String key=target.kind()+":"+target.id();
+            if(!target.complete()||!uuid(target.id())||!Set.of("image","pdf").contains(target.kind())||!refs.consistent()||!bytesComplete||blockedOriginalImages.contains(target.id())
+                ||sortedHeld.stream().anyMatch(h->h.kind().equals(target.kind())&&h.id().equals(target.id()))||merged.contains(key))continue;
+            if(target.kind().equals("image")&&(refs.currentImages().contains(target.id())||refs.historicalImages().contains(target.id())))continue;
+            var original=items.stream().filter(i->i.kind().equals(target.kind())&&target.id().equals(i.id())).toList();
+            if(original.stream().anyMatch(i->!target.kind().equals("image")||!i.status().equals("check")
+                ||!(i.reason().equals("missing_image")||i.reason().equals("incomplete_image")&&emptyOriginalImages.contains(i.id()))))continue;
+            items.removeAll(original);candidates.remove(key);merged.add(key);
+            items.add(new Item(target.kind(),target.id(),"purged","purged_file",0,target.createdAt()));
+        }
+        evidence(sortedPurged);
+        items.sort(Comparator.comparingInt((Item i)->List.of("check","candidate","recent","in_use","quarantined","purged").indexOf(i.status()))
             .thenComparing(Item::kind).thenComparing(i->i.id()==null?"":i.id()));
         evidence(items);
-        var kinds=counts(List.of("image","pdf","other"),true);var statuses=counts(List.of("in_use","recent","candidate","check","quarantined"),false);
+        var kinds=counts(List.of("image","pdf","other"),true);var statuses=counts(List.of("in_use","recent","candidate","check","quarantined","purged"),false);
         var report=new Report(checkedAt,GRACE_DAYS,refs.consistent(),bytesComplete,kinds,statuses,List.copyOf(items),HexFormat.of().formatHex(fingerprint.digest()));
         return new Snapshot(report,Map.copyOf(candidates));
     }
@@ -69,7 +87,7 @@ final class StorageInspector {
         var found=new HashSet<String>();
         for(Path path:listRoot(root.resolve("attachments"))){
             String id=path.getFileName().toString();
-            if(uuid(id)&&ordinaryDirectory(path)){found.add(id);image(path,id);}else unknown(path);
+            if(uuid(id)&&ordinaryDirectory(path)){found.add(id);image(path,id);}else{if(uuid(id))blockedOriginalImages.add(id);unknown(path);}
         }
         var required=new TreeSet<>(refs.catalogs().keySet());required.addAll(refs.currentImages());required.addAll(refs.historicalImages());
         for(String id:required)if(!found.contains(id))items.add(new Item("image",uuid(id)?id:null,"check","missing_image",0,null));
