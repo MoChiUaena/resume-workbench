@@ -30,6 +30,7 @@ public class QuarantineStore {
     private record Unit(String path,List<QuarantineFiles.Entry> files,boolean directory) {}
     @FunctionalInterface interface Move { void move(Path source,Path destination)throws IOException; }
     private final Path root;
+    private final QuarantineFs fs;
     private final ObjectMapper mapper;
     private final Clock clock;
     private final Move move;
@@ -42,7 +43,7 @@ public class QuarantineStore {
         this(data,mapper,clock,move,new QuarantineJournalIo());
     }
     QuarantineStore(Path data,ObjectMapper mapper,Clock clock,Move move,QuarantineJournalIo journalIo){
-        this.root=data.toAbsolutePath().normalize();this.mapper=mapper.copy().disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS).enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
+        this.fs=new QuarantineFs(data);this.root=fs.root();this.mapper=mapper.copy().disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS).enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
             .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,DeserializationFeature.FAIL_ON_TRAILING_TOKENS);this.clock=clock;this.move=move;this.journalIo=Objects.requireNonNull(journalIo);
     }
     public synchronized Receipt existing(String id)throws IOException {var stored=read(id);return stored==null?null:receipt(stored);}
@@ -235,55 +236,21 @@ public class QuarantineStore {
         // ATOMIC_MOVE is deliberately excluded: its contract can replace an existing destination.
         move.move(source,destination);
     }
-    private void sameStore(Path source,Path destination)throws IOException {
-        checked(source);checked(destination);Path parent=destination.getParent();
-        while(parent!=null&&!present(parent))parent=parent.getParent();
-        if(parent==null||!parent.startsWith(root))throw conflict();ordinaryDirectory(parent);
-        if(!Files.getFileStore(source).equals(Files.getFileStore(parent)))throw conflict();
-    }
+    private void sameStore(Path source,Path destination)throws IOException {fs.sameStore(source,destination);}
     private void ensureAbsent(Path file)throws IOException {checked(file);if(present(file))throw conflict();}
     private Path payload(String id)throws IOException {require(uuid(id));return path("quarantine/"+id+"/payload");}
-    private Path path(String relative)throws IOException {Path value=root.resolve(relative).normalize();checked(value);return value;}
-    private void checked(Path value)throws IOException {
-        Path absolute=value.toAbsolutePath().normalize();if(!absolute.startsWith(root))throw conflict();
-        Path cursor=absolute.getRoot();for(Path part:absolute){cursor=cursor.resolve(part);if(present(cursor)){
-            var attr=Files.readAttributes(cursor,BasicFileAttributes.class,NOFOLLOW);
-            if(attr.isSymbolicLink()||attr.isOther()||!cursor.toRealPath(NOFOLLOW).equals(cursor.toRealPath()))throw conflict();
-            if(!cursor.equals(absolute)&&!attr.isDirectory())throw conflict();
-        }}
-    }
-    private void directory(Path value)throws IOException {
-        checked(value);if(present(value)){ordinaryDirectory(value);return;}
-        if(value.equals(root)){Files.createDirectories(root);ordinaryDirectory(root);return;}
-        Path parent=value.getParent();if(parent==null)throw conflict();directory(parent);Files.createDirectory(value);ordinaryDirectory(value);
-    }
-    private void ordinaryDirectory(Path value)throws IOException {checked(value);var attr=Files.readAttributes(value,BasicFileAttributes.class,NOFOLLOW);if(!attr.isDirectory()||attr.isSymbolicLink()||attr.isOther())throw conflict();}
-    private BasicFileAttributes regular(Path value)throws IOException {checked(value);var attr=Files.readAttributes(value,BasicFileAttributes.class,NOFOLLOW);if(!attr.isRegularFile()||attr.isSymbolicLink()||attr.isOther())throw conflict();return attr;}
-    private static boolean present(Path value){return Files.exists(value,NOFOLLOW);}
-    private static InputStream open(Path value)throws IOException {return Channels.newInputStream(Files.newByteChannel(value,Set.of(StandardOpenOption.READ,NOFOLLOW)));}
+    private Path path(String relative)throws IOException {return fs.path(relative);}
+    private void checked(Path value)throws IOException {fs.checked(value);}
+    private void directory(Path value)throws IOException {fs.directory(value);}
+    private void ordinaryDirectory(Path value)throws IOException {fs.ordinaryDirectory(value);}
+    private BasicFileAttributes regular(Path value)throws IOException {return fs.regular(value);}
+    private static boolean present(Path value){return QuarantineFs.present(value);}
+    private static InputStream open(Path value)throws IOException {return QuarantineFs.open(value);}
     private static Set<String> fields(JsonNode node){var names=new HashSet<String>();node.fieldNames().forEachRemaining(names::add);return names;}
     private static Set<String> keys(QuarantineFiles.Plan plan){var result=new HashSet<String>();for(var target:plan.items())result.add(target.kind()+"/"+target.id());return result;}
-    private static void validate(QuarantineFiles.Plan plan){
-        require(plan!=null&&uuid(plan.id())&&sha(plan.requestDigest())&&sha(plan.previewDigest())&&plan.createdAt()!=null&&plan.items()!=null&&!plan.items().isEmpty()&&plan.items().size()<=100);
-        var targets=new HashSet<String>();long total=0;
-        for(var target:plan.items()){
-            require(target!=null&&target.kind()!=null&&Set.of("image","pdf").contains(target.kind())&&uuid(target.id())&&target.files()!=null&&target.bytes()>0&&target.bytes()<=MAX_BYTES&&targets.add(target.kind()+"/"+target.id()));
-            var paths=new HashSet<String>();long size=0;
-            for(var file:target.files()){
-                require(file!=null&&file.path()!=null&&file.bytes()>0&&file.bytes()<=MAX_BYTES&&sha(file.sha256())&&file.modified()!=null&&paths.add(file.path()));
-                size+=file.bytes();require(size<=MAX_BYTES);
-            }
-            require(size==target.bytes());
-            if(target.kind().equals("pdf"))require(paths.equals(Set.of("exports/"+target.id()+".pdf","exports/"+target.id()+".json")));
-            else{
-                String prefix="attachments/"+target.id()+"/";require(paths.size()==3&&paths.contains(prefix+"metadata.json")&&paths.contains(prefix+"image.png")
-                    &&paths.stream().filter(p->Set.of(prefix+"original.png",prefix+"original.jpeg",prefix+"original.webp").contains(p)).count()==1);
-            }
-            total+=size;require(total<=MAX_BYTES);
-        }
-    }
-    private static boolean uuid(String value){return value!=null&&value.matches("[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}");}
-    private static boolean sha(String value){return value!=null&&value.matches("[0-9a-f]{64}");}
+    private static void validate(QuarantineFiles.Plan plan){QuarantineFiles.validate(plan);}
+    private static boolean uuid(String value){return QuarantineFiles.uuid(value);}
+    private static boolean sha(String value){return QuarantineFiles.sha(value);}
     private static void require(boolean valid){if(!valid)throw new ApiException("QUARANTINE_INVALID","暂存请求或文件清单无效。",422);}
     private static ApiException conflict(){return new ApiException("QUARANTINE_CONFLICT","文件或暂存状态已变化，请刷新后重试；现有文件已保留。",409);}
     private static MessageDigest digest(){try{return MessageDigest.getInstance("SHA-256");}catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}}
