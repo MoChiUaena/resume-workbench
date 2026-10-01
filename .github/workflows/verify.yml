@@ -34,6 +34,7 @@ jobs:
       RESUME_DB_PASSWORD: ci-test-only
       RESUME_TEST_BASE_URL: http://127.0.0.1:18767
       RESUME_TEST_ISOLATED: '1'
+      RESUME_TEST_APP_CONTAINER: resume-ci-source-app-1
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.tools/ms-playwright
       PLAYWRIGHT_SKIP_BROWSER_GC: '1'
     steps:
