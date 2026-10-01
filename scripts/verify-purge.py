@@ -5,15 +5,19 @@ retry with the fixture's original body; it never seeds or initially purges data.
 """
 import argparse
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
+import stat
 import subprocess
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / 'output/purge-persistence.json'
 REPORT = ROOT / 'output/purge-verification.json'
+TEXT_ENTRY = '说明.txt'
+LEGACY_TEXT_KEY = '\u02f5\ufffd\ufffd.txt'
 
 spec = importlib.util.spec_from_file_location('quarantine_verifier', ROOT / 'scripts/verify-quarantine.py')
 qa = importlib.util.module_from_spec(spec)
@@ -26,6 +30,20 @@ def canonical_uuid(value):
 
 def canonical_sha(value):
     return isinstance(value, str) and qa.SHA.fullmatch(value) is not None
+
+
+def plain_evidence_path(path, directory):
+    """Check each path component without following symlinks or Windows reparse points."""
+    for current in (*reversed(path.parents), path):
+        entry = current.lstat()
+        qa.require(not stat.S_ISLNK(entry.st_mode)
+                   and not (getattr(entry, 'st_file_attributes', 0)
+                            & getattr(stat, 'FILE_ATTRIBUTE_REPARSE_POINT', 0)),
+                   'Purge evidence path contains a link or reparse point')
+        qa.require(stat.S_ISDIR(entry.st_mode) if current != path or directory
+                   else stat.S_ISREG(entry.st_mode),
+                   'Purge evidence path is not a plain directory or regular file')
+    return entry
 
 
 def validate_fixture(value, container):
@@ -80,9 +98,9 @@ def validate_fixture(value, container):
     qa.require(isinstance(archive_files, dict) and isinstance(archive_bytes, dict)
                and set(archive_files) == set(archive_bytes) and len(archive_files) == 5
                and 'manifest.json' in archive_files
-               and len([name for name in archive_files if '/' not in name and name.endswith('.txt')]) == 1
+               and len([name for name in archive_files if name in {TEXT_ENTRY, LEGACY_TEXT_KEY}]) == 1
                and set(archive_files) == {'manifest.json',
-                   *[name for name in archive_files if '/' not in name and name.endswith('.txt')],
+                   *[name for name in archive_files if name in {TEXT_ENTRY, LEGACY_TEXT_KEY}],
                    *[prefix + name for name in qa.FILES]}
                and all(archive_files.get(prefix + name) == file_hash for name, file_hash in files.items())
                and all(canonical_sha(file_hash) for file_hash in archive_files.values())
@@ -109,41 +127,59 @@ def validate_fixture(value, container):
     for name, expected in [('zipPath', 'purge-files-' + value['exportId'] + '.zip'),
                            ('extractionPath', 'purge-unpacked-' + value['exportId'])]:
         path = value[name]
+        expected_path = ROOT / 'output' / expected
         qa.require(isinstance(path, str) and Path(path).is_absolute()
-                   and Path(path).resolve() == (ROOT / 'output' / expected).resolve(),
+                   and Path(path) == expected_path,
                    'Purge evidence path escapes expected output location: ' + name)
+        plain_evidence_path(expected_path, directory=name == 'extractionPath')
     return value
+
+
+def archive_snapshot(path):
+    expected = plain_evidence_path(path, directory=False)
+    flags = os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_BINARY', 0)
+    descriptor = os.open(path, flags)
+    with os.fdopen(descriptor, 'rb') as stream:
+        opened = os.fstat(stream.fileno())
+        qa.require(stat.S_ISREG(opened.st_mode)
+                   and not (getattr(opened, 'st_file_attributes', 0)
+                            & getattr(stat, 'FILE_ATTRIBUTE_REPARSE_POINT', 0))
+                   and (opened.st_dev, opened.st_ino) == (expected.st_dev, expected.st_ino),
+                   'Saved ZIP changed to a link or different file before read')
+        content = stream.read()
+    current = plain_evidence_path(path, directory=False)
+    qa.require((current.st_dev, current.st_ino) == (expected.st_dev, expected.st_ino),
+               'Saved ZIP changed during read')
+    return content
 
 
 def validate_downloaded_archive(fixture):
     archive_path = Path(fixture['zipPath'])
-    content = archive_path.read_bytes()
+    qa.require(archive_path == ROOT / 'output' / ('purge-files-' + fixture['exportId'] + '.zip'),
+               'Saved ZIP is outside expected output path')
+    content = archive_snapshot(archive_path)
     qa.require(len(content) == fixture['archiveBytes']
                and qa.hash_bytes(content) == fixture['archiveSHA256'],
                'Saved file ZIP bytes or SHA-256 changed')
-    with zipfile.ZipFile(archive_path) as archive:
+    with zipfile.ZipFile(io.BytesIO(content)) as archive:
         actual_names = set(archive.namelist())
         fixture_names = set(fixture['zipEntrySHA256'])
-        actual_text = [name for name in actual_names if '/' not in name and name.endswith('.txt')]
-        fixture_text = [name for name in fixture_names if '/' not in name and name.endswith('.txt')]
+        fixture_text = [name for name in fixture_names if name in {TEXT_ENTRY, LEGACY_TEXT_KEY}]
         # The Windows browser runner can decode Python's GBK stdout as UTF-8,
         # corrupting only this display name in its JSON fixture. Its ZIP bytes,
         # extracted file, size and SHA-256 remain independently checkable.
-        qa.require(len(actual_text) == len(fixture_text) == 1
-                   and actual_names - set(actual_text) == fixture_names - set(fixture_text)
+        qa.require(len(fixture_text) == 1
+                   and actual_names == (fixture_names - set(fixture_text)) | {TEXT_ENTRY}
                    and archive.testzip() is None,
                    'Saved file ZIP entries or CRC changed')
         for name, expected_hash in fixture['zipEntrySHA256'].items():
-            actual_name = actual_text[0] if name == fixture_text[0] else name
+            actual_name = TEXT_ENTRY if name == fixture_text[0] else name
             data = archive.read(actual_name)
             qa.require(qa.hash_bytes(data) == expected_hash
                        and len(data) == fixture['zipEntryBytes'][name],
                        'Saved file ZIP entry changed: ' + name)
             extracted = Path(fixture['extractionPath']) / actual_name
-            qa.require(not any(part.is_symlink() for part in
-                               (extracted, *extracted.parents))
-                       and extracted.is_file()
-                       and qa.hash_bytes(extracted.read_bytes()) == expected_hash,
+            qa.require(qa.hash_bytes(archive_snapshot(extracted)) == expected_hash,
                        'Extracted file ZIP entry changed: ' + name)
 
 
