@@ -104,6 +104,7 @@ jobs:
           python scripts/verify-template-pdfs.py
           python scripts/verify-redacted-pdfs.py
           python scripts/verify-quarantine.py before --isolated --container "$RESUME_TEST_APP_CONTAINER"
+          python scripts/verify-purge.py before --isolated --container "$RESUME_TEST_APP_CONTAINER"
       - name: Recreate containers without deleting volumes
         run: |
           docker stop resume-model-fixture
@@ -113,6 +114,7 @@ jobs:
             docker compose -p resume-ci-$side -f .tools/ci/$side/compose.yml --env-file .tools/ci/$side/.env up -d --wait --wait-timeout 120
           done
           docker run -d --name resume-model-fixture --network container:resume-ci-source-app-1 --mount type=bind,source="$PWD/scripts/qa-model-server.mjs",target=/qa-model-server.mjs,readonly --entrypoint /ms-playwright-driver/node resume-workbench:ci /qa-model-server.mjs
+          python scripts/verify-purge.py after --isolated --container "$RESUME_TEST_APP_CONTAINER"
           python scripts/verify-backup.py --isolated --check-persistence
           python scripts/verify-automatic-backups.py --isolated --check-persistence
           python scripts/verify-webp.py --isolated --check-persistence
