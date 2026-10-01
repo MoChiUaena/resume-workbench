@@ -2,7 +2,7 @@
 import {computed,onMounted,onUnmounted,ref,watch} from 'vue';
 import {api,ApiFailure} from './api';
 import QuarantineHistory from './QuarantineHistory.vue';
-import {type StorageItem,type StorageReport as Report,type QuarantineRequest,type QuarantineReceipt,storageSize as size,storageDate as date,quarantineStates} from './storageTypes';
+import {type StorageItem,type StorageReport as Report,type QuarantineRequest,isQuarantineReceipt,storageSize as size,storageDate as date,quarantineStates} from './storageTypes';
 const emit=defineEmits<{busy:[boolean]}>();
 const report=ref<Report>(),busy=ref(false),error=ref(''),filter=ref('review'),page=ref(0);
 const selected=ref<StorageItem[]>([]),reviewing=ref(false),confirmed=ref(false),pending=ref<QuarantineRequest>(),historyBusy=ref(false),history=ref<InstanceType<typeof QuarantineHistory>>(),message=ref('');
@@ -33,7 +33,9 @@ async function refresh(){
 async function quarantine(){
  if(busy.value||historyBusy.value||!confirmed.value||!report.value||!selected.value.length)return;
  pending.value??={operationId:crypto.randomUUID(),previewDigest:report.value.digest,items:selected.value.map(item=>({kind:item.kind as 'image'|'pdf',id:item.id!})),confirm:true};busy.value=true;error.value='';message.value='';
- try{const receipt=await api<QuarantineReceipt>('/api/storage/quarantine',pending.value,undefined,controller?.signal);if(disposed)return;pending.value=undefined;
+ try{const receipt=await api<unknown>('/api/storage/quarantine',pending.value,undefined,controller?.signal);if(disposed)return;
+  if(!isQuarantineReceipt(receipt,pending.value.operationId))throw new ApiFailure('NETWORK_ERROR','暂存回执未能确认原操作，请保持页面并用同一清单重试。');
+  pending.value=undefined;
   if(receipt.state==='quarantined'&&!receipt.errorCode)message.value='已暂存选中项，仍占磁盘空间。可在下方记录恢复。';else error.value=`暂存尚未完成：${quarantineStates[receipt.state]}${receipt.errorCode?'（'+receipt.errorCode+'）':''}。文件与记录保留，请在下方查看恢复清单。`;
   selected.value=[];reviewing.value=false;confirmed.value=false;await loadReport();await history.value?.refresh(0);
  }catch(cause){if(disposed)return;error.value=cause instanceof Error?cause.message:String(cause);if(!(cause instanceof ApiFailure&&cause.code==='NETWORK_ERROR')){pending.value=undefined;selected.value=[];reviewing.value=false;confirmed.value=false;try{await loadReport();await history.value?.refresh(0);}catch{/* Keep the original failure visible. */}}}

@@ -35,6 +35,36 @@ test('unreadable acknowledgement retains the exact pending request',async({page}
  const d=await open(page);await d.getByTestId('storage-item-'+ids[1]).getByRole('checkbox').check();await d.getByRole('button',{name:'查看暂存清单'}).click();await d.getByLabel('确认暂存这些未使用文件').check();await d.getByRole('button',{name:'确认暂存选中项'}).click();await expect(d.getByRole('alert').filter({hasText:'NETWORK_ERROR'})).toBeVisible();await expect(d.getByTestId('storage-item-'+ids[1]).getByRole('checkbox')).toBeDisabled();await d.getByRole('button',{name:'用同一清单重试暂存'}).click();await expect(d.getByRole('status').filter({hasText:'已暂存选中项'})).toBeVisible();expect(bodies[1]).toEqual(bodies[0]);
 });
 
+const malformedReceipts=[
+ {name:'empty object',make:(_receipt:any)=>({})},
+ {name:'null',make:(_receipt:any)=>null},
+ {name:'partial receipt',make:(receipt:any)=>({...receipt,items:undefined})},
+ {name:'mismatched operation',make:(receipt:any)=>({...receipt,id:ids[3]})}
+];
+for(const action of ['quarantine','restore'] as const)for(const malformed of malformedReceipts){
+ test(`${action} parseable ${malformed.name} acknowledgement preserves renderable locked review and exact retry`,async({page})=>{
+  const bodies:any[]=[],urls:string[]=[],pageErrors:string[]=[];let completed=false;
+  const receipt={id:ids[0],state:'quarantined',createdAt:'2026-10-01T00:00:00Z',updatedAt:'2026-10-01T00:00:00Z',items:[{kind:'image',id:ids[1],bytes:1024}],bytes:1024,backupId:null,digest:'b'.repeat(64),errorCode:null};
+  page.on('pageerror',error=>pageErrors.push(error.message));
+  await page.route('**/api/storage/preview',r=>r.fulfill({json:report()}));
+  await page.route('**/api/storage/quarantine?page=*',r=>r.fulfill({json:{items:action==='restore'?[{...receipt,state:completed?'restored':'quarantined'}]:[],page:0,hasMore:false,unreadable:0}}));
+  await page.route(action==='restore'?'**/api/storage/quarantine/*/restore':'**/api/storage/quarantine',r=>{
+   const body=r.request().postDataJSON();bodies.push(body);urls.push(r.request().url());completed=true;
+   const valid={...receipt,id:action==='restore'?receipt.id:body.operationId,state:action==='restore'?'restored':'quarantined'};
+   return r.fulfill({contentType:'application/json',body:JSON.stringify(bodies.length===1?malformed.make(valid):valid)});
+  });
+  const d=await open(page);
+  if(action==='restore'){await d.getByRole('button',{name:'查看恢复清单'}).click();await d.getByLabel('确认恢复这些暂存文件').check();await d.getByRole('button',{name:'确认恢复原位置'}).click();}
+  else{await d.getByTestId('storage-item-'+ids[1]).getByRole('checkbox').check();await d.getByRole('button',{name:'查看暂存清单'}).click();await d.getByLabel('确认暂存这些未使用文件').check();await d.getByRole('button',{name:'确认暂存选中项'}).click();}
+  await expect(d.getByRole('alert').filter({hasText:'NETWORK_ERROR'})).toBeVisible();await expect(d.getByRole('button',{name:'关闭备份与恢复'})).toBeDisabled();for(let i=0;i<4;i++)await expect(d.getByRole('tab').nth(i)).toBeDisabled();
+  const confirmation=d.getByLabel(action==='restore'?'确认恢复这些暂存文件':'确认暂存这些未使用文件');await expect(confirmation).toBeChecked();await expect(confirmation).toBeDisabled();
+  const review=d.locator(action==='restore'?'[aria-label="暂存恢复确认"]':'[aria-label="暂存确认"]');await expect(review).toContainText(ids[1]);await expect(review).toContainText('1 项');await page.keyboard.press('Escape');await expect(d).toBeVisible();
+  if(action==='quarantine'){await expect(d.getByTestId('storage-item-'+ids[1]).getByRole('checkbox')).toBeChecked();await expect(d.getByTestId('storage-item-'+ids[1]).getByRole('checkbox')).toBeDisabled();await expect(d.getByRole('button',{name:'重新检查空间'})).toBeDisabled();}
+  await d.getByRole('button',{name:action==='restore'?'用同一请求重试恢复':'用同一清单重试暂存'}).click();await expect(d.getByRole('status').filter({hasText:action==='restore'?'已恢复原位置':'已暂存选中项'})).toBeVisible();expect(bodies).toHaveLength(2);expect(bodies[1]).toEqual(bodies[0]);expect(urls[1]).toBe(urls[0]);expect(pageErrors).toEqual([]);
+  if(action==='restore')expect(bodies[0]).toEqual({expectedDigest:'b'.repeat(64),confirm:true});else{expect(bodies[0].operationId).toMatch(/^[0-9a-f-]{36}$/);expect(bodies[0].previewDigest).toBe('a'.repeat(64));expect(bodies[0].items).toEqual([{kind:'image',id:ids[1]}]);}
+ });
+}
+
 test('page selection respects 100 item and one GiB caps',async({page})=>{
  await page.route('**/api/storage/preview',r=>r.fulfill({json:report(600*1048576)}));await page.route('**/api/storage/quarantine?page=*',r=>r.fulfill({json:{items:[],page:0,hasMore:false,unreadable:0}}));
  const d=await open(page);await d.getByTestId('storage-item-'+ids[1]).getByRole('checkbox').check();await expect(d.getByTestId('storage-item-'+ids[2]).getByRole('checkbox')).toBeDisabled();await expect(d.getByRole('button',{name:'选择本页候选'})).toBeDisabled();

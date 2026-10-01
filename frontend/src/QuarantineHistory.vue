@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {onMounted,onUnmounted,ref,watch,computed} from 'vue';
 import {api,ApiFailure} from './api';
-import {type QuarantineHistory,type QuarantineReceipt,storageSize as size,storageDate as date,quarantineStates as states} from './storageTypes';
+import {type QuarantineHistory,type QuarantineReceipt,isQuarantineReceipt,storageSize as size,storageDate as date,quarantineStates as states} from './storageTypes';
 const props=defineProps<{locked:boolean}>(),emit=defineEmits<{busy:[boolean];changed:[]}>();
 const history=ref<QuarantineHistory>(),selected=ref<QuarantineReceipt>(),confirmed=ref(false),working=ref(false),error=ref(''),message=ref('');
 const pending=ref<{id:string;body:{expectedDigest:string;confirm:true}}>(),uncertain=ref(false);
@@ -14,7 +14,9 @@ function review(item:QuarantineReceipt){selected.value=item;confirmed.value=fals
 async function restore(){
  if(working.value||props.locked||!confirmed.value||!selected.value)return;
  pending.value??={id:selected.value.id,body:{expectedDigest:selected.value.digest,confirm:true}};working.value=true;error.value='';message.value='';
- try{const receipt=await api<QuarantineReceipt>(`/api/storage/quarantine/${pending.value.id}/restore`,pending.value.body,undefined,controller.signal);if(disposed)return;uncertain.value=false;pending.value=undefined;
+ try{const receipt=await api<unknown>(`/api/storage/quarantine/${pending.value.id}/restore`,pending.value.body,undefined,controller.signal);if(disposed)return;
+  if(!isQuarantineReceipt(receipt,pending.value.id))throw new ApiFailure('NETWORK_ERROR','恢复回执未能确认原记录，请保持页面并用同一请求重试。');
+  uncertain.value=false;pending.value=undefined;
   if(receipt.state==='restored'&&!receipt.errorCode){message.value='已恢复原位置，文件重新进入 30 天保护期。';selected.value=undefined;confirmed.value=false;}
   else{selected.value=receipt;error.value=`恢复尚未完成：${states[receipt.state]}${receipt.errorCode?'（'+receipt.errorCode+'）':''}。文件保留，请查看记录后继续恢复。`;}
   await refresh();emit('changed');
