@@ -13,11 +13,14 @@ const knownErrors=new Set(['QUARANTINE_CONFIRM_REQUIRED','QUARANTINE_BACKUP_REQU
 let disposed=false;const controller=new AbortController();
 watch(()=>working.value||uncertain.value,value=>emit('busy',value));
 function unknown(message:string):never{throw new ApiFailure('NETWORK_ERROR',message+'请保持页面并用同一请求重试。');}
-async function reconcile(adopt=false){
- const previous=proof.value,latest=await props.refresh();
- if(disposed)return;
- if(adopt&&latest&&latest.digest===current.value.digest&&latest.cleanup&&latest.cleanup.exportId===previous?.exportId&&latest.cleanup.sha256===previous.sha256&&latest.cleanup.bytes===previous.bytes){current.value=latest;saved.value=false;confirmation.value='';}
- emit('changed');
+async function reconcile(){await props.refresh();if(!disposed)emit('changed');}
+async function reconcileKnownPurgeError(body:PurgeRequest){
+ const previous=proof.value;let latest:QuarantineReceipt|undefined;
+ try{latest=await props.refresh();}catch{return false;}
+ if(disposed||!latest||!isQuarantineReceipt(latest,current.value.id)||latest.digest!==body.expectedDigest)return false;
+ if(latest.state==='quarantined'&&latest.cleanup==null){emit('changed');return true;}
+ if(!['purging','purged'].includes(latest.state)||latest.cleanup?.exportId!==body.exportId||latest.cleanup.sha256!==body.archiveSha256||latest.cleanup.bytes!==previous?.bytes)return false;
+ current.value=latest;saved.value=false;confirmation.value='';emit('changed');return true;
 }
 async function submit(action:'export'|'purge'){
  if(working.value||props.locked||uncertain.value&&pending.value?.action!==action)return;
@@ -41,8 +44,14 @@ async function submit(action:'export'|'purge'){
   uncertain.value=false;pending.value=undefined;await reconcile();
  }catch(cause){
   if(disposed)return;error.value=cause instanceof Error?cause.message:String(cause);
-  uncertain.value=!(cause instanceof ApiFailure&&knownErrors.has(cause.code));
-  if(!uncertain.value){pending.value=undefined;await reconcile(request.action==='purge');if(cause instanceof ApiFailure&&['QUARANTINE_BACKUP_EXPIRED','QUARANTINE_BACKUP_NOT_FOUND'].includes(cause.code))ticket.value=undefined;}
+  const known=cause instanceof ApiFailure&&knownErrors.has(cause.code);
+  if(!known){uncertain.value=true;return;}
+  if(request.action==='purge'&&!await reconcileKnownPurgeError(request.body)){
+   uncertain.value=true;error.value+=' 暂存记录未能确认本批次，请保持页面并用同一请求重试。';return;
+  }
+  if(request.action==='export')await reconcile();
+  uncertain.value=false;pending.value=undefined;
+  if(['QUARANTINE_BACKUP_EXPIRED','QUARANTINE_BACKUP_NOT_FOUND'].includes(cause.code))ticket.value=undefined;
  }finally{working.value=false;}
 }
 async function checkDownload(){

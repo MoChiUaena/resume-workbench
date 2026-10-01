@@ -13,9 +13,9 @@ watch(()=>working.value||uncertain.value||cleanupBusy.value,value=>emit('busy',v
 async function refresh(page=history.value?.page||0){try{
  const result=await api<QuarantineHistory>('/api/storage/quarantine?page='+page,undefined,undefined,controller.signal);
  if(!result||!Array.isArray(result.items)||!Number.isSafeInteger(result.page)||result.page<0||typeof result.hasMore!=='boolean'||!Number.isSafeInteger(result.unreadable)||result.unreadable<0)throw new ApiFailure('NETWORK_ERROR','暂存记录响应无法确认，请重新检查。');
- if(!disposed){const valid=result.items.filter(item=>item&&isQuarantineReceipt(item,item.id));history.value={...result,items:valid,unreadable:result.unreadable+result.items.length-valid.length};}
-}catch(cause){if(!disposed)error.value=cause instanceof Error?cause.message:String(cause);}}
-async function refreshCleanup(){await refresh();return history.value?.items.find(item=>item.id===cleanup.value?.id);}
+ if(!disposed){const valid=result.items.filter(item=>item&&isQuarantineReceipt(item,item.id));history.value={...result,items:valid,unreadable:result.unreadable+result.items.length-valid.length};return true;}
+}catch(cause){if(!disposed)error.value=cause instanceof Error?cause.message:String(cause);}return false;}
+async function refreshCleanup(){if(!await refresh())return undefined;return history.value?.items.find(item=>item.id===cleanup.value?.id);}
 async function reload(page=0){if(locked.value)return;working.value=true;error.value='';try{await refresh(page);}finally{working.value=false;}}
 function review(item:QuarantineReceipt){cleanup.value=undefined;selected.value=item;confirmed.value=false;error.value='';message.value='';pending.value=undefined;}
 async function restore(){

@@ -98,6 +98,29 @@ test('known purge failure adopts matching persisted proof and renews human confi
  await expect(d.getByRole('button',{name:'关闭备份与恢复'})).toBeEnabled();await expect(d.getByLabel('我已将 ZIP 保存到其他位置并确认可用')).not.toBeChecked();await expect(d.getByLabel('输入批次末六位')).toHaveValue('');await expect(d.getByRole('link',{name:'下载暂存文件 ZIP'})).toHaveCount(0);await expect(d.locator('[aria-label="永久清理确认"]')).toContainText('先前下载证明已保留');
 });
 
+for(const unavailable of ['aborted','missing','malformed'] as const)test(`known purge failure keeps same-body retry locked when history is ${unavailable}`,async({page})=>{
+ const bodies:any[]=[];let historyMode:string=unavailable;
+ await page.route('**/api/storage/quarantine/*/file-backups',r=>r.fulfill({json:ticket(r.request().postDataJSON().requestId,true)}));
+ await page.route('**/api/storage/quarantine/*/purge',r=>{bodies.push(r.request().postDataJSON());return r.fulfill({status:503,json:{code:'QUARANTINE_IO_FAILED',message:'合成清理中断，请核对记录。'}});});
+ const d=await setup(page);await page.unroute('**/api/storage/quarantine?page=*');
+ await page.route('**/api/storage/quarantine?page=*',r=>{
+  if(historyMode==='aborted')return r.abort();
+  if(historyMode==='malformed')return r.fulfill({json:{items:null,page:0,hasMore:false,unreadable:0}});
+  const items=historyMode==='missing'?[]:[{...receipt('purging'),cleanup:{exportId:bodies[0].exportId,sha256:sha,bytes:1500}}];
+  return r.fulfill({json:{items,page:0,hasMore:false,unreadable:0}});
+ });
+ await d.getByRole('button',{name:'生成暂存文件 ZIP'}).click();await d.getByLabel('我已将 ZIP 保存到其他位置并确认可用').check();await d.getByLabel('输入批次末六位').fill(id.slice(-6));await d.getByRole('button',{name:'确认永久清理',exact:true}).click();
+ const retry=d.getByRole('button',{name:'用同一请求重试永久清理'});await expect(retry).toBeVisible();await expect(d.getByRole('button',{name:'关闭备份与恢复'})).toBeDisabled();await expect(d.getByLabel('我已将 ZIP 保存到其他位置并确认可用')).toBeChecked();await expect(d.getByLabel('输入批次末六位')).toHaveValue(id.slice(-6));
+ historyMode='fresh';await retry.click();await expect(d.getByRole('button',{name:'关闭备份与恢复'})).toBeEnabled();expect(bodies).toHaveLength(2);expect(bodies[1]).toEqual(bodies[0]);await expect(d.getByLabel('我已将 ZIP 保存到其他位置并确认可用')).not.toBeChecked();await expect(d.getByLabel('输入批次末六位')).toHaveValue('');await expect(d.locator('[aria-label="永久清理确认"]')).toContainText('先前下载证明已保留');
+});
+
+test('known expired purge proof with fresh quarantined history discards the old ticket',async({page})=>{
+ await page.route('**/api/storage/quarantine/*/file-backups',r=>r.fulfill({json:ticket(r.request().postDataJSON().requestId,true)}));
+ await page.route('**/api/storage/quarantine/*/purge',r=>r.fulfill({status:409,json:{code:'QUARANTINE_BACKUP_EXPIRED',message:'下载证明已过期。'}}));
+ const d=await setup(page);await d.getByRole('button',{name:'生成暂存文件 ZIP'}).click();await d.getByLabel('我已将 ZIP 保存到其他位置并确认可用').check();await d.getByLabel('输入批次末六位').fill(id.slice(-6));await d.getByRole('button',{name:'确认永久清理',exact:true}).click();
+ await expect(d.getByRole('button',{name:'关闭备份与恢复'})).toBeEnabled();await expect(d.getByRole('link',{name:'下载暂存文件 ZIP'})).toHaveCount(0);await expect(d.getByRole('button',{name:'生成暂存文件 ZIP'})).toBeEnabled();await expect(d.getByRole('button',{name:'确认永久清理',exact:true})).toBeDisabled();
+});
+
 test('persisted partial proof requires renewed confirmation and locks refresh; dark mobile and focus',async({page})=>{
  let calls=0,release!:()=>void,started!:()=>void;const held=new Promise<void>(r=>release=r),scan=new Promise<void>(r=>started=r);const bodies:any[]=[];
  await page.route('**/api/storage/quarantine/*/purge',r=>{calls++;bodies.push(r.request().postDataJSON());return r.fulfill({json:receipt(calls===1?'purging':'purged')});});
