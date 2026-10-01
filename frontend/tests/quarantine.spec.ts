@@ -35,13 +35,16 @@ test('unreadable acknowledgement retains the exact pending request',async({page}
  const d=await open(page);await d.getByTestId('storage-item-'+ids[1]).getByRole('checkbox').check();await d.getByRole('button',{name:'查看暂存清单'}).click();await d.getByLabel('确认暂存这些未使用文件').check();await d.getByRole('button',{name:'确认暂存选中项'}).click();await expect(d.getByRole('alert').filter({hasText:'NETWORK_ERROR'})).toBeVisible();await expect(d.getByTestId('storage-item-'+ids[1]).getByRole('checkbox')).toBeDisabled();await d.getByRole('button',{name:'用同一清单重试暂存'}).click();await expect(d.getByRole('status').filter({hasText:'已暂存选中项'})).toBeVisible();expect(bodies[1]).toEqual(bodies[0]);
 });
 
-const malformedReceipts=[
- {name:'empty object',make:(_receipt:any)=>({})},
- {name:'null',make:(_receipt:any)=>null},
- {name:'partial receipt',make:(receipt:any)=>({...receipt,items:undefined})},
- {name:'mismatched operation',make:(receipt:any)=>({...receipt,id:ids[3]})}
+const malformedAcknowledgements=[
+ {name:'empty object',status:200,make:(_receipt:any)=>({})},
+ {name:'null',status:200,make:(_receipt:any)=>null},
+ {name:'partial receipt',status:200,make:(receipt:any)=>({...receipt,items:undefined})},
+ {name:'mismatched operation',status:200,make:(receipt:any)=>({...receipt,id:ids[3]})},
+ {name:'non-success empty object',status:503,make:(_receipt:any)=>({})},
+ {name:'non-success null',status:503,make:(_receipt:any)=>null},
+ {name:'non-success invalid field types',status:503,make:(_receipt:any)=>({code:12,message:'broken'})}
 ];
-for(const action of ['quarantine','restore'] as const)for(const malformed of malformedReceipts){
+for(const action of ['quarantine','restore'] as const)for(const malformed of malformedAcknowledgements){
  test(`${action} parseable ${malformed.name} acknowledgement preserves renderable locked review and exact retry`,async({page})=>{
   const bodies:any[]=[],urls:string[]=[],pageErrors:string[]=[];let completed=false;
   const receipt={id:ids[0],state:'quarantined',createdAt:'2026-10-01T00:00:00Z',updatedAt:'2026-10-01T00:00:00Z',items:[{kind:'image',id:ids[1],bytes:1024}],bytes:1024,backupId:null,digest:'b'.repeat(64),errorCode:null};
@@ -51,7 +54,7 @@ for(const action of ['quarantine','restore'] as const)for(const malformed of mal
   await page.route(action==='restore'?'**/api/storage/quarantine/*/restore':'**/api/storage/quarantine',r=>{
    const body=r.request().postDataJSON();bodies.push(body);urls.push(r.request().url());completed=true;
    const valid={...receipt,id:action==='restore'?receipt.id:body.operationId,state:action==='restore'?'restored':'quarantined'};
-   return r.fulfill({contentType:'application/json',body:JSON.stringify(bodies.length===1?malformed.make(valid):valid)});
+   return r.fulfill({status:bodies.length===1?malformed.status:200,contentType:'application/json',body:JSON.stringify(bodies.length===1?malformed.make(valid):valid)});
   });
   const d=await open(page);
   if(action==='restore'){await d.getByRole('button',{name:'查看恢复清单'}).click();await d.getByLabel('确认恢复这些暂存文件').check();await d.getByRole('button',{name:'确认恢复原位置'}).click();}
@@ -64,6 +67,19 @@ for(const action of ['quarantine','restore'] as const)for(const malformed of mal
   if(action==='restore')expect(bodies[0]).toEqual({expectedDigest:'b'.repeat(64),confirm:true});else{expect(bodies[0].operationId).toMatch(/^[0-9a-f-]{36}$/);expect(bodies[0].previewDigest).toBe('a'.repeat(64));expect(bodies[0].items).toEqual([{kind:'image',id:ids[1]}]);}
  });
 }
+
+for(const action of ['quarantine','restore'] as const)test(`${action} valid known error refreshes evidence and unlocks parent`,async({page})=>{
+ let scans=0,historyReads=0;const errors:string[]=[];
+ const receipt={id:ids[0],state:'quarantined',createdAt:'2026-10-01T00:00:00Z',updatedAt:'2026-10-01T00:00:00Z',items:[{kind:'image',id:ids[1],bytes:1024}],bytes:1024,backupId:null,digest:'b'.repeat(64),errorCode:null};
+ page.on('pageerror',error=>errors.push(error.message));await page.route('**/api/storage/preview',r=>{scans++;return r.fulfill({json:report()});});await page.route('**/api/storage/quarantine?page=*',r=>{historyReads++;return r.fulfill({json:{items:action==='restore'?[receipt]:[],page:0,hasMore:false,unreadable:0}});});
+ await page.route(action==='restore'?'**/api/storage/quarantine/*/restore':'**/api/storage/quarantine',r=>r.fulfill({status:409,json:{code:action==='restore'?'QUARANTINE_CONFLICT':'STORAGE_PREVIEW_CHANGED',message:'合成已确认失败，文件保留。'}}));
+ const d=await open(page);await expect(d.getByRole('button',{name:'关闭备份与恢复'})).toBeEnabled();const originalScans=scans,originalHistory=historyReads;
+ if(action==='restore'){await d.getByRole('button',{name:'查看恢复清单'}).click();await d.getByLabel('确认恢复这些暂存文件').check();await d.getByRole('button',{name:'确认恢复原位置'}).click();}
+ else{await d.getByTestId('storage-item-'+ids[1]).getByRole('checkbox').check();await d.getByRole('button',{name:'查看暂存清单'}).click();await d.getByLabel('确认暂存这些未使用文件').check();await d.getByRole('button',{name:'确认暂存选中项'}).click();}
+ await expect(d.getByRole('alert').filter({hasText:action==='restore'?'QUARANTINE_CONFLICT':'STORAGE_PREVIEW_CHANGED'})).toBeVisible();await expect(d.getByRole('button',{name:'关闭备份与恢复'})).toBeEnabled();await expect(d.getByRole('tab',{name:'备份与恢复',exact:true})).toBeEnabled();expect(scans).toBeGreaterThan(originalScans);expect(historyReads).toBeGreaterThan(originalHistory);expect(errors).toEqual([]);
+ if(action==='restore'){await expect(d.getByLabel('确认恢复这些暂存文件')).toBeChecked();await expect(d.getByRole('button',{name:'确认恢复原位置'})).toBeEnabled();}
+ else{await expect(d.locator('[aria-label="暂存确认"]')).toHaveCount(0);await expect(d.getByTestId('quarantine-selection')).toContainText('已选 0 项');await expect(d.getByTestId('storage-item-'+ids[1]).getByRole('checkbox')).toBeEnabled();}
+});
 
 test('page selection respects 100 item and one GiB caps',async({page})=>{
  await page.route('**/api/storage/preview',r=>r.fulfill({json:report(600*1048576)}));await page.route('**/api/storage/quarantine?page=*',r=>r.fulfill({json:{items:[],page:0,hasMore:false,unreadable:0}}));

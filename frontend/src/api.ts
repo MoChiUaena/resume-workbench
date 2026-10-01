@@ -12,12 +12,21 @@ export type Resume = { id: string; title: string; document: ResumeDocument; revi
 export type Summary = Omit<Resume, 'document' | 'lastMutationId'>;
 export type Version = { id: string; title: string; label: string; sourceRevision: number; createdAt: string };
 export type VersionDetail = Version & { document: ResumeDocument };
+function storageErrorEnvelope(value:unknown):value is {code:string;message:string} {
+  if(typeof value!=='object'||value===null||Array.isArray(value))return false;
+  const error=value as Record<string,unknown>;
+  return typeof error.code==='string'&&/^[A-Z][A-Z0-9_]{0,79}$/.test(error.code)&&typeof error.message==='string'&&error.message.length<=1024&&error.message.trim().length>0;
+}
 export async function api<T>(url: string, body?: object | FormData, method?: string, signal?:AbortSignal): Promise<T> {
   let response: Response;
   const timeout=AbortSignal.timeout(url.startsWith('/api/backups')?120000:url.startsWith('/api/storage/')||url.startsWith('/api/ai/')||url.endsWith('/test')||url.endsWith('/export')?90000:15000);
   try { response = await fetch(url, { method: method || (body ? 'POST' : 'GET'), headers: body instanceof FormData ? { 'X-Local-Resume': '1' } : body ? { 'Content-Type': 'application/json', 'X-Local-Resume': '1' } : {}, body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined, signal:signal?AbortSignal.any([signal,timeout]):timeout }); }
   catch { throw new ApiFailure('NETWORK_ERROR',url.startsWith('/api/storage/quarantine')&&body?'暂存或恢复结果尚未确认，请保持页面并用同一请求重试。':url.startsWith('/api/storage/')?'空间检查未完成，请检查本地服务后重试。':url.startsWith('/api/ai/suggestions/')&&url.endsWith('/apply')?'应用结果尚未确认，请保持页面并用同一份文字重试。':url.startsWith('/api/models')||url.startsWith('/api/ai/')?'模型操作未完成，原文保留，请重试。':'无法连接本地服务，本次修改可能尚未保存。请保留页面并重试。'); }
-  if (!response.ok) { const e = await response.json().catch(() => ({ code: 'NETWORK_ERROR', message: '无法连接本地服务，请检查服务是否正在运行。' })); throw new ApiFailure(e.code,e.message); }
+  if (!response.ok) {
+    const e = await response.json().catch(() => ({ code: 'NETWORK_ERROR', message: '无法连接本地服务，请检查服务是否正在运行。' }));
+    if(url.startsWith('/api/storage/')&&!storageErrorEnvelope(e))throw new ApiFailure('NETWORK_ERROR',body?'暂存或恢复错误回执无法确认，请保持页面并用同一请求重试。':'空间检查错误响应无法确认，请检查本地服务后重试。');
+    throw new ApiFailure(e.code,e.message);
+  }
   try { return await response.json(); }
   catch(cause) { if(url.startsWith('/api/storage/'))throw new ApiFailure('NETWORK_ERROR',body?'暂存或恢复回执无法读取，请保持页面并用同一请求重试。':'空间检查响应无法读取，请检查本地服务后重试。');throw cause; }
 }
