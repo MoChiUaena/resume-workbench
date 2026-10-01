@@ -34,6 +34,7 @@ jobs:
       RESUME_DB_PASSWORD: ci-test-only
       RESUME_TEST_BASE_URL: http://127.0.0.1:18767
       RESUME_TEST_ISOLATED: '1'
+      RESUME_TEST_APP_CONTAINER: resume-ci-source-app-1
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.tools/ms-playwright
       PLAYWRIGHT_SKIP_BROWSER_GC: '1'
     steps:
@@ -102,6 +103,7 @@ jobs:
           python scripts/verify-layout-pdfs.py
           python scripts/verify-template-pdfs.py
           python scripts/verify-redacted-pdfs.py
+          python scripts/verify-quarantine.py before --isolated --container "$RESUME_TEST_APP_CONTAINER"
       - name: Recreate containers without deleting volumes
         run: |
           docker stop resume-model-fixture
@@ -115,6 +117,7 @@ jobs:
           python scripts/verify-automatic-backups.py --isolated --check-persistence
           python scripts/verify-webp.py --isolated --check-persistence
           python scripts/verify-model-settings.py --isolated --check-persistence
+          python scripts/verify-quarantine.py after --isolated --container "$RESUME_TEST_APP_CONTAINER"
       - name: Upload verification evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import java.nio.file.*;
 import java.nio.file.attribute.FileTime;
 import java.time.*;
@@ -77,5 +79,71 @@ class StorageInspectorTest {
     @Test void completeDetailsKeepCountsAndSizesForEveryFileBeyondTheFirstPage()throws Exception {
         Files.createDirectories(data.resolve("exports"));for(int index=0;index<205;index++)Files.writeString(data.resolve("exports/private-name-"+index+".tmp"),"123");
         var report=new StorageInspector(data,mapper,empty(),clock).inspect();assertThat(report.items()).hasSize(205);assertThat(report.statuses().stream().filter(c->c.key().equals("check")).findFirst().orElseThrow().count()).isEqualTo(205);assertThat(report.kinds().get(2).bytes()).isEqualTo(615);assertThat(mapper.writeValueAsString(report)).doesNotContain("private-name-");
+    }
+    @Test void privateSnapshotCarriesTheExactVerifiedFilesButPublicReportNeverExposesEvidence()throws Exception {
+        var asset=image(true);String pdf=pdf(null,null,null,true);var snapshot=new StorageInspector(data,mapper,empty(),clock).snapshot(List.of());
+        assertThat(snapshot.candidates()).containsOnlyKeys("image:"+asset.id(),"pdf:"+pdf);
+        for(var target:snapshot.candidates().values())for(var entry:target.files()){
+            Path actual=data.resolve(entry.path());assertThat(entry.sha256()).isEqualTo(ImageService.sha(Files.readAllBytes(actual)));
+            assertThat(entry.bytes()).isEqualTo(Files.size(actual));assertThat(entry.modified()).isEqualTo(Files.getLastModifiedTime(actual).toInstant());
+        }
+        assertThat(snapshot.candidates().get("image:"+asset.id()).files()).hasSize(3);assertThat(snapshot.candidates().get("pdf:"+pdf).files()).hasSize(2);
+        assertThat(mapper.writeValueAsString(snapshot.report())).doesNotContain("metadata.json","original.png","sha256","attachments/",data.toString());
+        Path broken=data.resolve("exports/"+pdf+".pdf");Files.writeString(broken,"%PDF-corrupt");Files.setLastModifiedTime(broken,FileTime.from(old));
+        assertThat(new StorageInspector(data,mapper,empty(),clock).snapshot(List.of()).candidates()).doesNotContainKey("pdf:"+pdf);
+    }
+    @Test void completeHeldImagesReplaceOnlyUnreferencedMissingOrEmptyOriginalEntries()throws Exception {
+        var asset=image(true);var catalog=catalog(asset);BackupArchive.removeTree(data.resolve("attachments/"+asset.id()));
+        var held=new QuarantineStore.HeldItem("image",asset.id(),1234,old,true);
+        var orphan=refs(Map.of(asset.id(),catalog),Set.of(),Set.of(),Set.of(),Map.of(),true);
+        var complete=new StorageInspector(data,mapper,orphan,clock).snapshot(List.of(held)).report();
+        assertThat(complete.items()).singleElement().satisfies(i->{assertThat(i.status()).isEqualTo("quarantined");assertThat(i.bytes()).isEqualTo(1234);});
+        Files.createDirectory(data.resolve("attachments/"+asset.id()));
+        assertThat(new StorageInspector(data,mapper,orphan,clock).snapshot(List.of(held)).report().items()).singleElement().satisfies(i->assertThat(i.status()).isEqualTo("quarantined"));
+        var referenced=refs(Map.of(asset.id(),catalog),Set.of(asset.id()),Set.of(),Set.of(),Map.of(),true);
+        BackupArchive.removeTree(data.resolve("attachments/"+asset.id()));
+        var required=new StorageInspector(data,mapper,referenced,clock).snapshot(List.of(held)).report();
+        assertThat(required.items()).hasSize(2).anyMatch(i->i.reason().equals("missing_image"));
+        var partial=new StorageInspector(data,mapper,orphan,clock).snapshot(List.of(new QuarantineStore.HeldItem("image",asset.id(),100,old,false))).report();
+        assertThat(partial.items()).hasSize(2).anyMatch(i->i.reason().equals("missing_image")).anyMatch(i->i.reason().equals("incomplete_quarantine"));
+        assertThat(partial.digest()).isNotEqualTo(complete.digest());
+        assertThat(complete.statuses()).anyMatch(c->c.key().equals("quarantined")&&c.count()==1&&c.bytes()==1234);
+        var unverified=refs(Map.of(asset.id(),catalog),Set.of(),Set.of(),Set.of(),Map.of(),false);
+        assertThat(new StorageInspector(data,mapper,unverified,clock).snapshot(List.of(held)).report().items()).hasSize(2).anyMatch(i->i.reason().equals("missing_image"));
+    }
+    @Test void directoryLinkIsNotTraversedIntoTrustedCandidateEvidence()throws Exception {
+        var asset=image(true);Path source=data.resolve("attachments/"+asset.id()),outside=data.resolve("external-image");Files.move(source,outside);
+        if(System.getProperty("os.name").startsWith("Windows")){
+            var process=new ProcessBuilder("cmd.exe","/c","mklink","/J",source.toString(),outside.toString()).redirectErrorStream(true).start();
+            assertThat(process.waitFor()).isZero();
+        }else Files.createSymbolicLink(source,outside);
+        try{var snapshot=new StorageInspector(data,mapper,empty(),clock).snapshot(List.of());assertThat(snapshot.candidates()).isEmpty();assertThat(snapshot.report().bytesComplete()).isFalse();}
+        finally{Files.deleteIfExists(source);}
+    }
+    @ParameterizedTest @ValueSource(strings={"unexpected.tmp","image.png,original.png"})
+    void completeHeldImageKeepsNonemptyZeroByteOriginalWithoutMetadataVisible(String names)throws Exception {
+        var asset=image(true);var catalog=catalog(asset);Path original=data.resolve("attachments/"+asset.id());BackupArchive.removeTree(original);Files.createDirectory(original);
+        for(String name:names.split(","))Files.createFile(original.resolve(name));
+        var orphan=refs(Map.of(asset.id(),catalog),Set.of(),Set.of(),Set.of(),Map.of(),true);
+        var held=new QuarantineStore.HeldItem("image",asset.id(),1234,old,true);
+        var report=new StorageInspector(data,mapper,orphan,clock).snapshot(List.of(held)).report();
+        assertThat(report.items()).hasSize(2).anySatisfy(i->{assertThat(i.id()).isEqualTo(asset.id());assertThat(i.status()).isEqualTo("check");assertThat(i.reason()).isEqualTo("incomplete_image");assertThat(i.bytes()).isZero();})
+            .anySatisfy(i->{assertThat(i.status()).isEqualTo("quarantined");assertThat(i.bytes()).isEqualTo(1234);});
+        assertThat(report.statuses()).anyMatch(c->c.key().equals("check")&&c.count()==1).anyMatch(c->c.key().equals("quarantined")&&c.count()==1);
+        for(String name:names.split(","))assertThat(Files.size(original.resolve(name))).isZero();
+    }
+    @Test void completeHeldImageKeepsZeroByteMetadataAnomalyVisible()throws Exception {
+        var asset=image(true);var catalog=catalog(asset);Path original=data.resolve("attachments/"+asset.id());BackupArchive.removeTree(original);Files.createDirectory(original);Files.createFile(original.resolve("metadata.json"));
+        var orphan=refs(Map.of(asset.id(),catalog),Set.of(),Set.of(),Set.of(),Map.of(),true);
+        var report=new StorageInspector(data,mapper,orphan,clock).snapshot(List.of(new QuarantineStore.HeldItem("image",asset.id(),1234,old,true))).report();
+        assertThat(report.items()).hasSize(2).anyMatch(i->i.status().equals("check")&&i.reason().equals("invalid_metadata")&&i.bytes()==0).anyMatch(i->i.status().equals("quarantined"));
+        assertThat(Files.size(original.resolve("metadata.json"))).isZero();
+    }
+    @Test void completeHeldImageSuppressesGenuinelyEmptyUnreferencedOriginalDirectory()throws Exception {
+        var asset=image(true);var catalog=catalog(asset);Path original=data.resolve("attachments/"+asset.id());BackupArchive.removeTree(original);Files.createDirectory(original);
+        var orphan=refs(Map.of(asset.id(),catalog),Set.of(),Set.of(),Set.of(),Map.of(),true);
+        var report=new StorageInspector(data,mapper,orphan,clock).snapshot(List.of(new QuarantineStore.HeldItem("image",asset.id(),1234,old,true))).report();
+        assertThat(report.items()).singleElement().satisfies(i->{assertThat(i.status()).isEqualTo("quarantined");assertThat(i.bytes()).isEqualTo(1234);});
+        try(var entries=Files.list(original)){assertThat(entries.toList()).isEmpty();}
     }
 }

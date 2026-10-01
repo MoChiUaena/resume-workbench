@@ -1,9 +1,10 @@
 import {test,expect} from '@playwright/test';
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import {requireIsolatedQuarantineWorkspace} from './quarantine-fixture';
 const root=path.resolve(import.meta.dirname,'../..'),headers={'X-Local-Resume':'1'};
 let owned:string[]=[];
-test.beforeEach(()=>{owned=[];test.skip(process.env.RESUME_TEST_ISOLATED!=='1','Storage tests require a disposable workspace.');});
+test.beforeEach(()=>{owned=[];test.skip(process.env.RESUME_TEST_ISOLATED!=='1','Storage tests require a disposable workspace.');requireIsolatedQuarantineWorkspace();});
 test.afterEach(async({request})=>{if(process.env.RESUME_TEST_ISOLATED!=='1')return;for(const id of owned){const response=await request.get('/api/resumes/'+id);if(response.ok())await request.delete('/api/resumes/'+id,{headers,data:{expectedRevision:(await response.json()).revision}});}});
 
 test('real inventory preserves images, PDFs and revisions across checks and deleted resumes',async({page,request})=>{
@@ -32,13 +33,14 @@ test('preview explains candidate and uncertain files, handles refresh failure an
  for(let index=0;index<22;index++)report.items.push({kind:'image',id:`44444444-4444-4444-8444-${String(index).padStart(12,'0')}`,status:'in_use',reason:'current_image',bytes:8192,lastModified:'2026-08-01T00:00:00Z'});
  report.kinds[0].count+=22;report.kinds[0].bytes+=22*8192;report.statuses[0].count+=22;report.statuses[0].bytes+=22*8192;
  let fail=false;const methods:string[]=[];await page.route('**/api/storage/preview',async route=>{methods.push(route.request().method());await route.fulfill({status:fail?503:200,contentType:'application/json',body:JSON.stringify(fail?{code:'STORAGE_SCAN_FAILED',message:'合成检查失败，文件保留。'}:report)});});
+ await page.route('**/api/storage/quarantine?page=*',route=>{methods.push(route.request().method());return route.fulfill({json:{items:[],page:0,hasMore:false,unreadable:0}});});
  await page.goto('/');const trigger=page.getByRole('button',{name:'备份与恢复',exact:true});await trigger.click();const dialog=page.getByRole('dialog',{name:'备份与恢复',exact:true});await dialog.getByRole('tab',{name:'空间检查',exact:true}).click();
  await expect(dialog.getByTestId('storage-summary-candidate')).toContainText('1');await expect(dialog.getByTestId('storage-item-'+ids[1])).toContainText('对应简历和历史版本已不存在');await expect(dialog.getByTestId('storage-item-'+ids[0])).toContainText('校验值');
  await expect(dialog.getByRole('button',{name:/删除|清理文件|确认清理/})).toHaveCount(0);await dialog.getByLabel('空间检查文件范围').selectOption('in_use');await expect(dialog.getByTestId('storage-item-'+ids[2])).toContainText('历史版本仍引用');await expect(dialog.getByTestId('storage-item-'+ids[1])).toHaveCount(0);
  await expect(dialog.locator('.storage-items>li')).toHaveCount(20);await dialog.getByRole('group',{name:'空间清单分页'}).getByRole('button',{name:'下一页'}).click();await expect(dialog.locator('.storage-items>li')).toHaveCount(3);await expect(dialog.getByTestId('storage-item-'+ids[2])).toHaveCount(0);
  await dialog.getByLabel('空间检查文件范围').selectOption('review');await expect(dialog.getByRole('group',{name:'空间清单分页'})).toContainText('第 1 / 1 页');await page.setViewportSize({width:1480,height:1350});await fs.mkdir(path.join(root,'output'),{recursive:true});await page.screenshot({path:path.join(root,'output/storage-preview.png'),animations:'disabled'});
  fail=true;await dialog.getByRole('button',{name:'重新检查空间'}).click();await expect(dialog.getByRole('alert')).toContainText('STORAGE_SCAN_FAILED');await expect(dialog.getByTestId('storage-total')).toHaveCount(0);fail=false;await dialog.getByRole('button',{name:'重新检查空间'}).click();await expect(dialog.getByTestId('storage-total')).toBeVisible();
- await page.keyboard.press('Escape');await expect(trigger).toBeFocused();await page.getByLabel('界面风格').selectOption('b');await page.getByRole('switch',{name:'深色模式'}).click();await page.setViewportSize({width:390,height:1000});await trigger.click();await page.getByRole('tab',{name:'空间检查',exact:true}).click();
+  await expect(dialog.getByRole('button',{name:'关闭备份与恢复'})).toBeEnabled();await page.keyboard.press('Escape');await expect(trigger).toBeFocused();await page.getByLabel('界面风格').selectOption('b');await page.getByRole('switch',{name:'深色模式'}).click();await page.setViewportSize({width:390,height:1000});await trigger.click();await page.getByRole('tab',{name:'空间检查',exact:true}).click();
  await expect(dialog.getByTestId('storage-total')).toBeVisible();expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);expect(await dialog.evaluate(el=>el.getBoundingClientRect().left>=0&&el.getBoundingClientRect().right<=innerWidth)).toBe(true);
  await page.screenshot({path:path.join(root,'output/storage-preview-dark-mobile.png'),animations:'disabled'});await dialog.getByRole('button',{name:'关闭备份与恢复'}).focus();await page.keyboard.press('Shift+Tab');await expect(dialog.getByRole('button',{name:'关闭',exact:true})).toBeFocused();await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);expect(methods.every(method=>method==='GET')).toBe(true);
 });

@@ -9,7 +9,7 @@ import java.nio.file.*;
 import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 
-@SpringBootTest(properties={"spring.datasource.hikari.schema=resume_test","spring.flyway.schemas=resume_test","spring.flyway.default-schema=resume_test","resume.data-dir=./target/integration-data"})
+@SpringBootTest(properties={"spring.datasource.hikari.schema=quarantine_preview_test","spring.flyway.schemas=quarantine_preview_test","spring.flyway.default-schema=quarantine_preview_test","resume.data-dir=./target/quarantine-preview-test-files"})
 @Transactional
 class StoragePreviewServiceTest {
     @Autowired StoragePreviewService inventory;
@@ -17,7 +17,7 @@ class StoragePreviewServiceTest {
     @Autowired ImageService images;
     @Autowired JdbcTemplate jdbc;
     @Test void hiddenAndHistoricalImageReferencesAreProtectedAndBrokenLinksFailClosed()throws Exception {
-        assertThat(jdbc.queryForObject("SELECT current_schema()",String.class)).isEqualTo("resume_test");
+        assertThat(jdbc.queryForObject("SELECT current_schema()",String.class)).isEqualTo("quarantine_preview_test");
         var asset=images.importImage(Files.readAllBytes(Path.of("fixtures/university-logo.png")));var plain=ResumeDocument.sample("one");var layout=plain.layout();
         var photo=new ResumeDraft.ImageSlot(asset.id(),false,26,34,"cover",0,1,50,50);
         var document=new ResumeDocument(ResumeDocument.SCHEMA_VERSION,plain.content(),new ResumeDocument.Layout(layout.template(),layout.font(),layout.fontSize(),layout.lineHeight(),layout.sectionGapMm(),layout.marginMm(),false,photo,layout.logo(),layout.presentation()));
