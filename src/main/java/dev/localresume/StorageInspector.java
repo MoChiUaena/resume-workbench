@@ -21,6 +21,7 @@ final class StorageInspector {
     record Count(String key,long count,long bytes) {}
     record Report(Instant checkedAt,int graceDays,boolean referencesVerified,boolean bytesComplete,
                   List<Count> kinds,List<Count> statuses,List<Item> items,String digest) {}
+    record Snapshot(Report report,Map<String,QuarantineFiles.Target> candidates) {}
     private record FileInfo(Path path,long bytes,Instant modified,Object key) {}
     private static final class Check extends Exception {final String reason;Check(String reason){this.reason=reason;}}
     private final Path root;
@@ -31,6 +32,8 @@ final class StorageInspector {
     private final long hashLimit;
     private final MessageDigest fingerprint=BackupArchive.digest();
     private final List<Item> items=new ArrayList<>();
+    private final Map<Path,String> hashes=new HashMap<>();
+    private final Map<String,QuarantineFiles.Target> candidates=new TreeMap<>();
     private boolean bytesComplete=true;
     private int entries;
     private long hashed;
@@ -39,16 +42,26 @@ final class StorageInspector {
         this.root=root.toAbsolutePath().normalize();this.mapper=mapper;this.refs=refs;this.checkedAt=clock.instant();
         this.cutoff=checkedAt.minus(Duration.ofDays(GRACE_DAYS));this.hashLimit=hashLimit;
     }
-    Report inspect() throws IOException {
+    Report inspect() throws IOException {return snapshot(List.of()).report();}
+    Snapshot snapshot(List<QuarantineStore.HeldItem> held) throws IOException {
         evidence(refs.fingerprint());
         if(Files.exists(root,LinkOption.NOFOLLOW_LINKS)&&!ordinaryDirectory(root)){
             bytesComplete=false;items.add(new Item("other",null,"check","unexpected_path",0,null));
         }else{images();exports();}
-        items.sort(Comparator.comparingInt((Item i)->List.of("check","candidate","recent","in_use").indexOf(i.status()))
+        var sortedHeld=held.stream().sorted(Comparator.comparing(QuarantineStore.HeldItem::kind).thenComparing(QuarantineStore.HeldItem::id).thenComparing(QuarantineStore.HeldItem::createdAt)).toList();
+        for(var target:sortedHeld){
+            if(target.complete()&&refs.consistent()&&target.kind().equals("image")&&!refs.currentImages().contains(target.id())&&!refs.historicalImages().contains(target.id()))
+                items.removeIf(i->i.kind().equals("image")&&target.id().equals(i.id())&&i.status().equals("check")
+                    &&(i.reason().equals("missing_image")||i.reason().equals("incomplete_image")&&i.bytes()==0));
+            items.add(new Item(target.kind(),target.id(),target.complete()?"quarantined":"check",target.complete()?"quarantined_file":"incomplete_quarantine",target.bytes(),target.createdAt()));
+        }
+        evidence(sortedHeld);
+        items.sort(Comparator.comparingInt((Item i)->List.of("check","candidate","recent","in_use","quarantined").indexOf(i.status()))
             .thenComparing(Item::kind).thenComparing(i->i.id()==null?"":i.id()));
         evidence(items);
-        var kinds=counts(List.of("image","pdf","other"),true);var statuses=counts(List.of("in_use","recent","candidate","check"),false);
-        return new Report(checkedAt,GRACE_DAYS,refs.consistent(),bytesComplete,kinds,statuses,List.copyOf(items),HexFormat.of().formatHex(fingerprint.digest()));
+        var kinds=counts(List.of("image","pdf","other"),true);var statuses=counts(List.of("in_use","recent","candidate","check","quarantined"),false);
+        var report=new Report(checkedAt,GRACE_DAYS,refs.consistent(),bytesComplete,kinds,statuses,List.copyOf(items),HexFormat.of().formatHex(fingerprint.digest()));
+        return new Snapshot(report,Map.copyOf(candidates));
     }
     private List<Count> counts(List<String> keys,boolean kind){return keys.stream().map(key->{var matches=items.stream().filter(i->key.equals(kind?i.kind():i.status())).toList();return new Count(key,matches.size(),matches.stream().mapToLong(Item::bytes).sum());}).toList();}
     private void images()throws IOException {
@@ -79,7 +92,8 @@ final class StorageInspector {
             else if(!refs.consistent()){status="check";reason="references_unverified";}
             else if(!modified.isBefore(cutoff)){status="recent";reason="recent_file";}
             else{verify(files.get(original),asset.sha256(),false);verify(files.get("image.png"),asset.normalizedSha256(),false);status="candidate";reason="unreferenced_image";}
-            stable(path,files);items.add(new Item("image",id,status,reason,bytes,modified));
+            stable(path,files);if(status.equals("candidate"))candidate("image",id,bytes,files.values());
+            items.add(new Item("image",id,status,reason,bytes,modified));
         }catch(Check e){items.add(new Item("image",id,"check",e.reason,bytes,modified));}
         catch(IOException|RuntimeException e){if(e instanceof ApiException a)throw a;if(e instanceof IOException)bytesComplete=false;items.add(new Item("image",id,"check","unreadable_file",bytes,modified));}
     }
@@ -114,6 +128,7 @@ final class StorageInspector {
             else if(!modified.isBefore(cutoff)){status="recent";reason="recent_file";}
             else{verify(files.get("pdf"),value.sha256(),true);status="candidate";reason=bound?"deleted_pdf":"unlinked_pdf";}
             for(var file:files.values())stable(file);
+            if(status.equals("candidate"))candidate("pdf",id,bytes,files.values());
             items.add(new Item("pdf",id,status,reason,bytes,modified));
         }catch(Check e){items.add(new Item("pdf",id,"check",e.reason,bytes,modified));}
         catch(IOException|RuntimeException e){if(e instanceof ApiException a)throw a;if(e instanceof IOException)bytesComplete=false;items.add(new Item("pdf",id,"check","unreadable_file",bytes,modified));}
@@ -133,7 +148,7 @@ final class StorageInspector {
     }
     private FileInfo info(Path path)throws IOException,Check {
         var attr=Files.readAttributes(path,BasicFileAttributes.class,LinkOption.NOFOLLOW_LINKS);
-        if(!attr.isRegularFile()||attr.isSymbolicLink()) {bytesComplete=false;throw new Check("unexpected_path");}
+        if(!attr.isRegularFile()||!unlinked(path,attr)) {bytesComplete=false;throw new Check("unexpected_path");}
         evidence(List.of(path.getFileName().toString(),attr.size(),attr.lastModifiedTime().toInstant()));
         return new FileInfo(path,attr.size(),attr.lastModifiedTime().toInstant(),attr.fileKey());
     }
@@ -143,7 +158,7 @@ final class StorageInspector {
     private byte[] metadata(FileInfo file)throws IOException,Check {
         if(file.bytes()<1||file.bytes()>65536)throw new Check("invalid_metadata");
         byte[] bytes;try(var in=open(file.path())){bytes=in.readNBytes(65537);}
-        if(bytes.length!=file.bytes())throw new Check("changed_during_scan");stable(file);evidence(ImageService.sha(bytes));return bytes;
+        if(bytes.length!=file.bytes())throw new Check("changed_during_scan");stable(file);String hash=ImageService.sha(bytes);evidence(hash);hashes.put(file.path(),hash);return bytes;
     }
     private void verify(FileInfo file,String expected,boolean pdf)throws IOException,Check {
         if(file.bytes()>hashLimit-hashed)throw new Check("verification_limit");hashed+=file.bytes();
@@ -151,12 +166,17 @@ final class StorageInspector {
             if(pdf){byte[] prefix=in.readNBytes(5);if(!Arrays.equals(prefix,"%PDF-".getBytes(java.nio.charset.StandardCharsets.US_ASCII)))throw new Check("file_mismatch");digest.update(prefix);}
             byte[] buffer=new byte[65536];int length;while((length=in.read(buffer))!=-1){limit();digest.update(buffer,0,length);}
         }
-        stable(file);String actual=HexFormat.of().formatHex(digest.digest());evidence(actual);if(!actual.equals(expected))throw new Check("file_mismatch");
+        stable(file);String actual=HexFormat.of().formatHex(digest.digest());evidence(actual);if(!actual.equals(expected))throw new Check("file_mismatch");hashes.put(file.path(),actual);
+    }
+    private void candidate(String kind,String id,long bytes,Collection<FileInfo> files){
+        var evidence=files.stream().map(file->new QuarantineFiles.Entry(root.relativize(file.path()).toString().replace('\\','/'),file.bytes(),hashes.get(file.path()),file.modified()))
+            .sorted(Comparator.comparing(QuarantineFiles.Entry::path)).toList();
+        candidates.put(kind+":"+id,new QuarantineFiles.Target(kind,id,bytes,evidence));
     }
     private static InputStream open(Path path)throws IOException{return Channels.newInputStream(Files.newByteChannel(path,Set.of(StandardOpenOption.READ,LinkOption.NOFOLLOW_LINKS)));}
     private void stable(FileInfo file)throws IOException,Check {
         var current=Files.readAttributes(file.path(),BasicFileAttributes.class,LinkOption.NOFOLLOW_LINKS);
-        if(!current.isRegularFile()||current.isSymbolicLink()||current.size()!=file.bytes()||!current.lastModifiedTime().toInstant().equals(file.modified())||!Objects.equals(current.fileKey(),file.key()))throw new Check("changed_during_scan");
+        if(!current.isRegularFile()||!unlinked(file.path(),current)||current.size()!=file.bytes()||!current.lastModifiedTime().toInstant().equals(file.modified())||!Objects.equals(current.fileKey(),file.key()))throw new Check("changed_during_scan");
     }
     private void stable(Path directory,Map<String,FileInfo> files)throws IOException,Check {
         if(!ordinaryDirectory(directory))throw new Check("changed_during_scan");
@@ -165,14 +185,15 @@ final class StorageInspector {
     }
     private void unknown(Path path)throws IOException {
         long bytes=0;Instant modified=null;String reason="unexpected_file";
-        try{var attr=Files.readAttributes(path,BasicFileAttributes.class,LinkOption.NOFOLLOW_LINKS);modified=attr.lastModifiedTime().toInstant();if(attr.isRegularFile())bytes=attr.size();else{bytesComplete=false;reason="unexpected_path";}evidence(List.of(path.getFileName().toString(),bytes,String.valueOf(modified)));}
+        try{var attr=Files.readAttributes(path,BasicFileAttributes.class,LinkOption.NOFOLLOW_LINKS);modified=attr.lastModifiedTime().toInstant();if(attr.isRegularFile()&&unlinked(path,attr))bytes=attr.size();else{bytesComplete=false;reason="unexpected_path";}evidence(List.of(path.getFileName().toString(),bytes,String.valueOf(modified)));}
         catch(IOException e){bytesComplete=false;reason="unreadable_file";}
         items.add(new Item("other",null,"check",reason,bytes,modified));
     }
     private void evidence(Object value)throws IOException {fingerprint.update(mapper.writeValueAsBytes(value));fingerprint.update((byte)'\n');}
     private void limit(){if(System.nanoTime()>deadline)throw limitError();}
     private static ApiException limitError(){return new ApiException("STORAGE_SCAN_LIMIT","文件检查超出本次数量或时间范围，请保留数据并检查数据目录规模。",422);}
-    private static boolean ordinaryDirectory(Path path){return Files.isDirectory(path,LinkOption.NOFOLLOW_LINKS)&&!Files.isSymbolicLink(path);}
+    private static boolean ordinaryDirectory(Path path){try{var attrs=Files.readAttributes(path,BasicFileAttributes.class,LinkOption.NOFOLLOW_LINKS);return attrs.isDirectory()&&unlinked(path,attrs);}catch(IOException e){return false;}}
+    private static boolean unlinked(Path path,BasicFileAttributes attrs)throws IOException{return !attrs.isSymbolicLink()&&!attrs.isOther()&&path.toRealPath(LinkOption.NOFOLLOW_LINKS).equals(path.toRealPath());}
     static boolean uuid(String value){return value!=null&&value.matches("[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}");}
     private static boolean sha(String value){return value!=null&&value.matches("[0-9a-f]{64}");}
     private static Instant max(Instant a,Instant b){return a==null?b:b==null?a:a.isAfter(b)?a:b;}

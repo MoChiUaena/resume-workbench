@@ -18,15 +18,34 @@ public class StoragePreviewService {
     private final WorkspaceGate gate;
     private final TransactionTemplate tx;
     private final Path data;
-    public StoragePreviewService(JdbcTemplate jdbc,ObjectMapper mapper,WorkspaceGate gate,PlatformTransactionManager transactions,@Value("${resume.data-dir}") String data){
-        this.jdbc=jdbc;this.mapper=mapper;this.gate=gate;this.data=Path.of(data);
+    private final QuarantineStore quarantine;
+    private final Clock clock;
+    private final Map<String,Instant> displayed=new LinkedHashMap<>();
+    @org.springframework.beans.factory.annotation.Autowired
+    public StoragePreviewService(JdbcTemplate jdbc,ObjectMapper mapper,WorkspaceGate gate,PlatformTransactionManager transactions,@Value("${resume.data-dir}") String data,QuarantineStore quarantine){
+        this(jdbc,mapper,gate,transactions,data,quarantine,Clock.systemUTC());
+    }
+    StoragePreviewService(JdbcTemplate jdbc,ObjectMapper mapper,WorkspaceGate gate,PlatformTransactionManager transactions,String data,QuarantineStore quarantine,Clock clock){
+        this.jdbc=jdbc;this.mapper=mapper;this.gate=gate;this.data=Path.of(data);this.quarantine=quarantine;this.clock=clock;
         this.tx=new TransactionTemplate(transactions);tx.setReadOnly(true);tx.setTimeout(20);tx.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
     }
     public StorageInspector.Report preview(){
         try(var lease=gate.exclusive()){
-            var refs=tx.execute(status->references());
-            return new StorageInspector(data,mapper,refs,Clock.systemUTC()).inspect();
-        }catch(java.io.IOException e){throw new ApiException("STORAGE_SCAN_FAILED","本机文件检查未完成，请检查数据目录的读取权限后重试。",503);}
+            var report=freshSnapshot().report();
+            synchronized(displayed){displayed.remove(report.digest());displayed.put(report.digest(),clock.instant());while(displayed.size()>32)displayed.remove(displayed.keySet().iterator().next());}
+            return report;
+        }
+    }
+    /** Caller owns the exclusive lease; fresh evidence never renews displayed authorization. */
+    StorageInspector.Snapshot freshSnapshot(){
+        try{var refs=tx.execute(status->references());return new StorageInspector(data,mapper,refs,clock).snapshot(quarantine.inventory());}
+        catch(java.io.IOException e){throw new ApiException("STORAGE_SCAN_FAILED","本机文件检查未完成，请检查数据目录的读取权限后重试。",503);}
+    }
+    void requireDisplayed(String digest){
+        synchronized(displayed){var timestamp=displayed.get(digest);var now=clock.instant();
+            if(timestamp==null||timestamp.isAfter(now)||!timestamp.plus(Duration.ofMinutes(10)).isAfter(now))
+                throw new ApiException("STORAGE_PREVIEW_EXPIRED","空间检查已过期，请重新检查并确认候选文件。",409);
+        }
     }
     StorageInspector.References references(){
         var catalogs=new TreeMap<String,StorageInspector.Catalog>();var resumes=new TreeSet<String>();var versions=new TreeMap<String,StorageInspector.Owner>();

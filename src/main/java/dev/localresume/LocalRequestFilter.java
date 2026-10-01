@@ -33,7 +33,8 @@ public class LocalRequestFilter extends OncePerRequestFilter {
         if (req.getRequestURI().startsWith("/api/")) res.setHeader("Cache-Control", "no-store");
         // Provider calls only read a source snapshot. Do not hold the workspace lock during network I/O.
         boolean providerCall=req.getRequestURI().equals("/api/ai/suggestions")||req.getRequestURI().matches("/api/models/profiles/[0-9a-f-]{36}/test");
-        try (WorkspaceGate.Lease lease = mutation && !providerCall && !req.getRequestURI().startsWith("/api/backups") ? gate.mutation() : null) {
+        boolean storageCall=req.getRequestURI().equals("/api/storage")||req.getRequestURI().startsWith("/api/storage/");
+        try (WorkspaceGate.Lease lease = mutation && !providerCall && !storageCall && !req.getRequestURI().startsWith("/api/backups") ? gate.mutation() : null) {
             chain.doFilter(req, res);
         } catch (ApiException e) {
             if (res.isCommitted()) throw e;
