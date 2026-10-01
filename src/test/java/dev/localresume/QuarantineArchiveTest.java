@@ -50,6 +50,7 @@ class QuarantineArchiveTest {
         var manifest=mapper.readTree(entries.get("manifest.json"));assertThat(manifest.path("format").asText()).isEqualTo("resume-workbench-quarantine-files");assertThat(manifest.path("version").asInt()).isEqualTo(1);
         assertThat(manifest.path("operationId").asText()).isEqualTo(OP);assertThat(manifest.path("parentDigest").asText()).isEqualTo(DIGEST);assertThat(mapper.treeToValue(manifest.path("plan"),QuarantineFiles.Plan.class)).isEqualTo(plan);
         for(var target:plan.items())for(var file:target.files()){assertThat(entries.get("files/"+file.path())).hasSize((int)file.bytes());assertThat(hash(entries.get("files/"+file.path()))).isEqualTo(file.sha256());assertThat(Files.readAllBytes(payload(OP).resolve(file.path()))).isEqualTo(entries.get("files/"+file.path()));}
+        try(var zip=new ZipFile(result.path().toFile())){var names=new HashSet<String>();var central=zip.entries();while(central.hasMoreElements()){var entry=central.nextElement();names.add(entry.getName());try(var in=zip.getInputStream(entry)){assertThat(in.readAllBytes()).isEqualTo(entries.get(entry.getName()));}}assertThat(names).isEqualTo(entries.keySet());}
         assertThat(result.bytes()).isEqualTo(Files.size(result.path()));assertThat(result.sha256()).isEqualTo(hash(Files.readAllBytes(result.path())));assertThat(result.path()).startsWith(cache()).isNotEqualTo(payload(OP));
         archive.verify(result);try(var in=archive.open(result)){assertThat(hash(in.readAllBytes())).isEqualTo(result.sha256());}
     }
@@ -100,6 +101,25 @@ class QuarantineArchiveTest {
         assertThat(Files.readString(payload(OP).resolve("attachments/"+IMAGE+"/original.png"))).isEqualTo("original-canary");assertThat(Files.readString(payload(OP).resolve("exports/"+PDF+".pdf"))).isEqualTo("%PDF-pdf-canary");
     }
     void replaceBytes(byte[] bytes,byte[] from,byte[] to){assertThat(to).hasSameSizeAs(from);for(int i=0;i<=bytes.length-from.length;i++){boolean equal=true;for(int j=0;j<from.length;j++)if(bytes[i+j]!=from[j]){equal=false;break;}if(equal){System.arraycopy(to,0,bytes,i,to.length);i+=from.length-1;}}}
+    // Catches validating local-header bytes while trusting a different central-directory mapping.
+    @Test void centralDirectoryOffsetRedirectIsRejectedBeforePublishingAndLeavesSourcesUnchanged()throws Exception {
+        var plan=plan(OP);var good=archive().create(plan,DIGEST);byte[] bad=Files.readAllBytes(good.path());
+        String original="files/attachments/"+IMAGE+"/original.png",metadata="files/attachments/"+IMAGE+"/metadata.json";
+        var bytes=ByteBuffer.wrap(bad).order(java.nio.ByteOrder.LITTLE_ENDIAN);int originalRecord=centralRecord(bad,original),metadataRecord=centralRecord(bad,metadata);bytes.putInt(originalRecord+42,bytes.getInt(metadataRecord+42));
+        Path probe=temp.resolve("redirected.zip");Files.write(probe,bad);
+        assertThat(new String(unzip(probe).get(original),java.nio.charset.StandardCharsets.UTF_8)).isEqualTo("original-canary");
+        try(var zip=new ZipFile(probe.toFile());var in=zip.getInputStream(zip.getEntry(original))){assertThat(new String(in.readAllBytes(),java.nio.charset.StandardCharsets.UTF_8)).isEqualTo("metadata-canary");}
+        var before=new HashMap<String,byte[]>();for(var target:plan.items())for(var entry:target.files())before.put(entry.path(),Files.readAllBytes(payload(OP).resolve(entry.path())));
+        Path failureCache=temp.resolve("redirect-cache");var failing=new QuarantineArchive(data(),failureCache,mapper,clock,1024*1024,32,channel->{channel.truncate(0);channel.position(0);var buffer=ByteBuffer.wrap(bad);while(buffer.hasRemaining())channel.write(buffer);channel.force(true);});
+        assertThatThrownBy(()->failing.create(plan,DIGEST)).isInstanceOf(ApiException.class);
+        for(var target:plan.items())for(var entry:target.files()){Path source=payload(OP).resolve(entry.path());assertThat(Files.readAllBytes(source)).isEqualTo(before.get(entry.path()));assertThat(Files.getLastModifiedTime(source).toInstant()).isEqualTo(entry.modified());}
+        try(var paths=Files.walk(failureCache)){assertThat(paths.filter(Files::isRegularFile).toList()).isEmpty();}
+    }
+    int centralRecord(byte[] bytes,String name){
+        var buffer=ByteBuffer.wrap(bytes).order(java.nio.ByteOrder.LITTLE_ENDIAN);int end=bytes.length-22;while(end>=0&&buffer.getInt(end)!=0x06054b50)end--;assertThat(end).isGreaterThanOrEqualTo(0);
+        int record=buffer.getInt(end+16);while(record+46<=end&&buffer.getInt(record)==0x02014b50){int length=Short.toUnsignedInt(buffer.getShort(record+28));String current=new String(bytes,record+46,length,java.nio.charset.StandardCharsets.UTF_8);if(current.equals(name))return record;record+=46+length+Short.toUnsignedInt(buffer.getShort(record+30))+Short.toUnsignedInt(buffer.getShort(record+32));}
+        throw new AssertionError("Missing central record: "+name);
+    }
     @Test void metadataLimitRefusesThirtyThirdArtifactWithoutDeletingLiveFiles()throws Exception {
         var archive=archive();var artifacts=new ArrayList<QuarantineArchive.Artifact>();
         for(int i=0;i<32;i++){String id=String.format("%08x-3333-4333-8333-333333333333",i);artifacts.add(archive.create(plan(id),DIGEST));}

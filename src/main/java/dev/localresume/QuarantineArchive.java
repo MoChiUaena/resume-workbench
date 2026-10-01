@@ -141,15 +141,22 @@ public class QuarantineArchive {
     private void verifyZip(Artifact artifact)throws IOException {
         var expected=new HashMap<String,QuarantineFiles.Entry>();for(var target:artifact.plan().items())for(var file:target.files())expected.put("files/"+file.path(),file);
         var names=new HashSet<>(expected.keySet());names.add("manifest.json");names.add("说明.txt");var central=new HashMap<String,ZipEntry>();
-        try(var zip=new ZipFile(artifact.path().toFile())){var entries=zip.entries();while(entries.hasMoreElements()){var entry=entries.nextElement();if(entry.isDirectory()||!names.contains(entry.getName())||central.put(entry.getName(),entry)!=null)throw conflict();}if(!central.keySet().equals(names))throw conflict();}
+        try(var zip=new ZipFile(artifact.path().toFile())){
+            var entries=zip.entries();while(entries.hasMoreElements()){var entry=entries.nextElement();if(entry.isDirectory()||!names.contains(entry.getName())||central.put(entry.getName(),entry)!=null)throw conflict();}if(!central.keySet().equals(names))throw conflict();
+            // Bind each central name to the actual bytes an ordinary ZIP extractor will recover.
+            for(var entry:central.values())try(var in=zip.getInputStream(entry)){verifyEntry(artifact,entry.getName(),expected.get(entry.getName()),entry,in);}
+        }catch(ZipException e){throw conflict();}
         var seen=new HashSet<String>();try(var zip=new ZipInputStream(QuarantineFs.open(artifact.path()))){ZipEntry entry;while((entry=zip.getNextEntry())!=null){
-            String name=entry.getName();if(!names.contains(name)||!seen.add(name)||entry.isDirectory())throw conflict();var file=expected.get(name);long limit=file==null?(name.equals("manifest.json")?MAX_MANIFEST:4096):file.bytes();long count=0;var digest=digest();var crc=new CRC32();var text=file==null?new ByteArrayOutputStream():null;
-            byte[] buffer=new byte[65536];int length;while((length=zip.read(buffer))!=-1){count+=length;if(count>limit)throw conflict();digest.update(buffer,0,length);crc.update(buffer,0,length);if(text!=null)text.write(buffer,0,length);}
-            var directoryEntry=central.get(name);if(directoryEntry.getSize()!=count||directoryEntry.getCrc()!=crc.getValue())throw conflict();
-            if(file!=null){if(count!=file.bytes()||!HexFormat.of().formatHex(digest.digest()).equals(file.sha256()))throw conflict();}
-            else if(name.equals("manifest.json")){if(!mapper.readTree(text.toByteArray()).equals(mapper.readTree(manifest(artifact))))throw conflict();}
-            else if(!Arrays.equals(text.toByteArray(),INSTRUCTIONS))throw conflict();zip.closeEntry();
+            String name=entry.getName();if(!names.contains(name)||!seen.add(name)||entry.isDirectory())throw conflict();verifyEntry(artifact,name,expected.get(name),central.get(name),zip);zip.closeEntry();
         }}catch(ZipException e){throw conflict();}if(!seen.equals(names))throw conflict();
+    }
+    private void verifyEntry(Artifact artifact,String name,QuarantineFiles.Entry file,ZipEntry central,InputStream in)throws IOException {
+        long limit=file==null?(name.equals("manifest.json")?MAX_MANIFEST:4096):file.bytes();long count=0;var digest=digest();var crc=new CRC32();var text=file==null?new ByteArrayOutputStream():null;
+        byte[] buffer=new byte[65536];int length;while((length=in.read(buffer))!=-1){count+=length;if(count>limit)throw conflict();digest.update(buffer,0,length);crc.update(buffer,0,length);if(text!=null)text.write(buffer,0,length);}
+        if(central.getSize()!=count||central.getCrc()!=crc.getValue())throw conflict();
+        if(file!=null){if(count!=file.bytes()||!HexFormat.of().formatHex(digest.digest()).equals(file.sha256()))throw conflict();}
+        else if(name.equals("manifest.json")){if(!mapper.readTree(text.toByteArray()).equals(mapper.readTree(manifest(artifact))))throw conflict();}
+        else if(!Arrays.equals(text.toByteArray(),INSTRUCTIONS))throw conflict();
     }
     private static void writeBytes(ZipOutputStream zip,String name,byte[] bytes)throws IOException {zip.putNextEntry(new ZipEntry(name));zip.write(bytes);zip.closeEntry();}
     private static void stable(BasicFileAttributes before,BasicFileAttributes after){if(before.size()!=after.size()||!before.lastModifiedTime().equals(after.lastModifiedTime())||!Objects.equals(before.fileKey(),after.fileKey()))throw conflict();}
