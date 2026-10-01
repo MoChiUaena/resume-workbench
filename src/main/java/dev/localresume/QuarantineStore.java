@@ -33,13 +33,17 @@ public class QuarantineStore {
     private final ObjectMapper mapper;
     private final Clock clock;
     private final Move move;
+    private final QuarantineJournalIo journalIo;
 
     @Autowired
     public QuarantineStore(@Value("${resume.data-dir}") String data,ObjectMapper mapper){this(Path.of(data),mapper,Clock.systemUTC());}
     QuarantineStore(Path data,ObjectMapper mapper,Clock clock){this(data,mapper,clock,(source,destination)->Files.move(source,destination));}
     QuarantineStore(Path data,ObjectMapper mapper,Clock clock,Move move){
+        this(data,mapper,clock,move,new QuarantineJournalIo());
+    }
+    QuarantineStore(Path data,ObjectMapper mapper,Clock clock,Move move,QuarantineJournalIo journalIo){
         this.root=data.toAbsolutePath().normalize();this.mapper=mapper.copy().disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS).enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
-            .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,DeserializationFeature.FAIL_ON_TRAILING_TOKENS);this.clock=clock;this.move=move;
+            .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,DeserializationFeature.FAIL_ON_TRAILING_TOKENS);this.clock=clock;this.move=move;this.journalIo=Objects.requireNonNull(journalIo);
     }
     public synchronized Receipt existing(String id)throws IOException {var stored=read(id);return stored==null?null:receipt(stored);}
     public synchronized Receipt existing(String id,String requestDigest)throws IOException {
@@ -67,7 +71,7 @@ public class QuarantineStore {
             if(!Objects.equals(journal.backupId(),backupId))throw conflict();return receipt(stored);
         }
         journal=transition(journal,"moving",backupId,null,null);write(journal);
-        var units=units(journal.plan());var attempted=new ArrayList<Unit>();Path payload=payload(id);
+        var units=units(journal.plan());var attempted=new ArrayList<Unit>();Path payload=payload(id);boolean finalizing=false;
         try{
             if(present(payload))throw conflict();
             // Validate the entire batch before creating payload or moving its first unit.
@@ -80,11 +84,14 @@ public class QuarantineStore {
             }
             // Never publish success against evidence that changed during or after a move.
             checkPayload(journal.plan());for(var unit:units)verify(payload,unit,true);
+            finalizing=true;
             return receipt(write(transition(journal,"quarantined",backupId,null,null)));
         }catch(ApiException e){
             rollback(journal,attempted);write(transition(journal,"attention",backupId,null,"QUARANTINE_CONFLICT"));throw e;
         }catch(IOException e){
-            rollback(journal,attempted);return receipt(write(transition(journal,"attention",backupId,null,"QUARANTINE_MOVE_FAILED")));
+            // A final journal replacement may already be committed despite the reported I/O error.
+            // Keep verified payload consistent with either moving or quarantined if attention also fails.
+            if(!finalizing)rollback(journal,attempted);return receipt(write(transition(journal,"attention",backupId,null,"QUARANTINE_MOVE_FAILED")));
         }
     }
     public synchronized Receipt restore(String id,String expectedDigest)throws IOException {
@@ -169,10 +176,10 @@ public class QuarantineStore {
         Path destination=batch.resolve("journal.json"),temp=batch.resolve(".journal-"+UUID.randomUUID()+".tmp");checked(destination);if(present(destination))regular(destination);
         try{
             try(var channel=FileChannel.open(temp,StandardOpenOption.CREATE_NEW,StandardOpenOption.WRITE,NOFOLLOW)){
-                var buffer=java.nio.ByteBuffer.wrap(bytes);while(buffer.hasRemaining())channel.write(buffer);channel.force(true);
+                var buffer=java.nio.ByteBuffer.wrap(bytes);while(buffer.hasRemaining())journalIo.write(channel,buffer);journalIo.force(channel);
             }
             checked(temp);checked(destination);if(present(destination))regular(destination);
-            Files.move(temp,destination,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);
+            journalIo.replace(temp,destination);
         }finally{Files.deleteIfExists(temp);}
         return new Stored(journal,digest);
     }
