@@ -34,6 +34,7 @@ final class StorageInspector {
     private final List<Item> items=new ArrayList<>();
     private final Map<Path,String> hashes=new HashMap<>();
     private final Map<String,QuarantineFiles.Target> candidates=new TreeMap<>();
+    private final Set<String> emptyOriginalImages=new HashSet<>();
     private boolean bytesComplete=true;
     private int entries;
     private long hashed;
@@ -52,7 +53,7 @@ final class StorageInspector {
         for(var target:sortedHeld){
             if(target.complete()&&refs.consistent()&&target.kind().equals("image")&&!refs.currentImages().contains(target.id())&&!refs.historicalImages().contains(target.id()))
                 items.removeIf(i->i.kind().equals("image")&&target.id().equals(i.id())&&i.status().equals("check")
-                    &&(i.reason().equals("missing_image")||i.reason().equals("incomplete_image")&&i.bytes()==0));
+                    &&(i.reason().equals("missing_image")||i.reason().equals("incomplete_image")&&emptyOriginalImages.contains(i.id())));
             items.add(new Item(target.kind(),target.id(),target.complete()?"quarantined":"check",target.complete()?"quarantined_file":"incomplete_quarantine",target.bytes(),target.createdAt()));
         }
         evidence(sortedHeld);
@@ -77,6 +78,7 @@ final class StorageInspector {
         long bytes=0;Instant modified=null;
         try{
             var files=files(path);bytes=files.values().stream().mapToLong(FileInfo::bytes).sum();modified=latest(path,files);
+            if(files.isEmpty()){stable(path,files);emptyOriginalImages.add(id);}
             FileInfo metadata=files.get("metadata.json");if(metadata==null)throw new Check("incomplete_image");
             var asset=mapper.readValue(metadata(metadata),ImageService.Asset.class);
             if(asset==null||!id.equals(asset.id())||asset.format()==null||!Set.of("PNG","JPEG","WEBP").contains(asset.format())||asset.bytes()<1
