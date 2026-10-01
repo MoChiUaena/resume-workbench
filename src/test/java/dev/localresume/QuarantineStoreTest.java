@@ -213,4 +213,36 @@ class QuarantineStoreTest {
     @Test void partialOrInterruptedBatchNeverClaimsCompleteHeldTargets()throws Exception {
         quarantine(plan(image(),pdf()));Files.delete(payload("exports/"+PDF+".json"));assertThat(store().inventory()).hasSize(2).allMatch(i->!i.complete());
     }
+    // A later same-size/mtime-preserving change must be caught at that unit's move boundary.
+    @Test void laterPdfChangedAfterFirstMoveIsNotMovedOrCommittedAgainstStaleEvidence()throws Exception {
+        store().reserve(plan(image(),pdf()));int[] calls={0};
+        var changing=new QuarantineStore(data,mapper,clock,(source,destination)->{
+            Files.move(source,destination);if(++calls[0]==1){Path later=data.resolve("exports/"+PDF+".pdf");Files.writeString(later,"%PDF-PDF-CANARY");Files.setLastModifiedTime(later,FileTime.from(old));}
+        });
+        assertThatThrownBy(()->changing.moveToQuarantine(OP,BACKUP)).isInstanceOf(ApiException.class);
+        assertThat(store().existing(OP).state()).isEqualTo("attention");assertThat(Files.readString(data.resolve("exports/"+PDF+".pdf"))).isEqualTo("%PDF-PDF-CANARY");
+        assertThat(Files.readString(data.resolve("exports/"+PDF+".json"))).isEqualTo("pdf-metadata-canary");assertThat(Files.readString(data.resolve("attachments/"+IMAGE+"/original.png"))).isEqualTo("original-canary");
+        assertThat(payload("exports/"+PDF+".pdf")).doesNotExist();
+    }
+    // Whole-directory moves must not carry an entry introduced after the full-batch preflight.
+    @Test void unexpectedRegularImageEntryAddedAfterPreflightIsPreservedAtOriginalLocation()throws Exception {
+        store().reserve(plan(pdf(),image()));int[] calls={0};
+        var changing=new QuarantineStore(data,mapper,clock,(source,destination)->{
+            Files.move(source,destination);if(++calls[0]==1)Files.writeString(data.resolve("attachments/"+IMAGE+"/extra-canary.txt"),"new-external-canary");
+        });
+        assertThatThrownBy(()->changing.moveToQuarantine(OP,BACKUP)).isInstanceOf(ApiException.class);assertThat(store().existing(OP).state()).isEqualTo("attention");
+        assertThat(Files.readString(data.resolve("attachments/"+IMAGE+"/extra-canary.txt"))).isEqualTo("new-external-canary");assertThat(Files.readString(data.resolve("attachments/"+IMAGE+"/original.png"))).isEqualTo("original-canary");
+        assertThat(Files.readString(data.resolve("exports/"+PDF+".pdf"))).isEqualTo("%PDF-pdf-canary");assertThat(Files.readString(data.resolve("exports/"+PDF+".json"))).isEqualTo("pdf-metadata-canary");assertThat(payload("attachments/"+IMAGE)).doesNotExist();
+    }
+    // The final payload check must refuse altered held content without rolling it over an original.
+    @Test void payloadChangedAfterFinalMoveNeverPublishesSuccessfulQuarantine()throws Exception {
+        store().reserve(plan(image(),pdf()));int[] calls={0};
+        var changing=new QuarantineStore(data,mapper,clock,(source,destination)->{
+            Files.move(source,destination);if(++calls[0]==3){Path held=payload("attachments/"+IMAGE+"/original.png");Files.writeString(held,"original-CANARY");Files.setLastModifiedTime(held,FileTime.from(old));}
+        });
+        assertThatThrownBy(()->changing.moveToQuarantine(OP,BACKUP)).isInstanceOf(ApiException.class);assertThat(store().existing(OP).state()).isEqualTo("attention");
+        assertThat(Files.readString(payload("attachments/"+IMAGE+"/original.png"))).isEqualTo("original-CANARY");assertThat(data.resolve("attachments/"+IMAGE)).doesNotExist();
+        assertThat(Files.readString(data.resolve("exports/"+PDF+".pdf"))).isEqualTo("%PDF-pdf-canary");assertThat(Files.readString(data.resolve("exports/"+PDF+".json"))).isEqualTo("pdf-metadata-canary");
+        assertThat(store().inventory()).singleElement().satisfies(i->{assertThat(i.kind()).isEqualTo("image");assertThat(i.complete()).isFalse();});
+    }
 }

@@ -73,7 +73,13 @@ public class QuarantineStore {
             // Validate the entire batch before creating payload or moving its first unit.
             for(var unit:units){verify(root,unit,true);ensureAbsent(payload.resolve(unit.path()));sameStore(root.resolve(unit.path()),payload.resolve(unit.path()));}
             directory(payload);
-            for(var unit:units){Path destination=payload.resolve(unit.path());directory(destination.getParent());ensureAbsent(destination);attempted.add(unit);safeMove(root.resolve(unit.path()),destination);}
+            for(var unit:units){
+                Path destination=payload.resolve(unit.path());directory(destination.getParent());ensureAbsent(destination);
+                // Earlier moves do not prevent an external writer changing a later unit.
+                verify(root,unit,true);attempted.add(unit);safeMove(root.resolve(unit.path()),destination);
+            }
+            // Never publish success against evidence that changed during or after a move.
+            checkPayload(journal.plan());for(var unit:units)verify(payload,unit,true);
             return receipt(write(transition(journal,"quarantined",backupId,null,null)));
         }catch(ApiException e){
             rollback(journal,attempted);write(transition(journal,"attention",backupId,null,"QUARANTINE_CONFLICT"));throw e;
