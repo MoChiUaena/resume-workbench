@@ -142,7 +142,10 @@ class QuarantinePurgeTest {
     @Test void changedLaterFileAfterActualFirstUnlinkStopsBeforeDeletingChangedBytes()throws Exception {
         var calls=new AtomicInteger();Path changed=discard().resolve("exports/"+PDF+".pdf");
         var s=new QuarantineStore(data,mapper,CLOCK,MOVE,new QuarantineJournalIo(),p->{Files.delete(p);if(calls.incrementAndGet()==1)Files.writeString(changed,"%PDF-CANARY");});
-        assertThatThrownBy(()->purge(s)).isInstanceOf(ApiException.class);assertThat(Files.readString(changed)).isEqualTo("%PDF-CANARY");pending(store().existing(OP));
+        assertThatThrownBy(()->purge(s)).isInstanceOf(ApiException.class);assertThat(calls).hasValue(1);
+        assertThat(discard().resolve("attachments/"+IMAGE+"/metadata.json")).doesNotExist();
+        for(String path:List.of("attachments/"+IMAGE+"/image.png","attachments/"+IMAGE+"/original.png","exports/"+PDF+".json"))assertThat(Files.readAllBytes(discard().resolve(path))).as(path+" retained after first unlink").isEqualTo(contents.get(path));
+        assertThat(Files.readString(changed)).isEqualTo("%PDF-CANARY");pending(store().existing(OP));
     }
     @Test void processStopsAfterRealUnlinkAndFreshReadsNeverResumeAutomatically()throws Exception {
         var s=new QuarantineStore(data,mapper,CLOCK,MOVE,new QuarantineJournalIo(),p->{Files.delete(p);throw new AssertionError("process stop");});assertThatThrownBy(()->purge(s)).isInstanceOf(AssertionError.class);

@@ -90,7 +90,7 @@ public class QuarantineStore {
             if(present(payload)){safeMove(payload,discard);checkRemaining(journal.plan(),false);}
             for(var target:journal.plan().items())for(var entry:target.files()){
                 // An external writer can introduce unknown entries or originals after any earlier action.
-                checkRemaining(journal.plan(),false,false);Path file=discard.resolve(entry.path());
+                checkRemaining(journal.plan(),false);Path file=discard.resolve(entry.path());
                 if(present(file)){verify(discard,new Unit(entry.path(),List.of(entry),false),false);delete.delete(file);if(present(file))throw conflict();}
             }
             deleteEmptyDirectories(journal.plan());ensureAbsent(payload);ensureAbsent(discard);
@@ -313,14 +313,11 @@ public class QuarantineStore {
     private Path discard(String id)throws IOException {require(uuid(id));return path("quarantine/"+id+"/discard");}
     /** Closed-world structure plus hashes for either the complete payload or remaining planned subset. */
     private Path checkRemaining(QuarantineFiles.Plan plan,boolean complete)throws IOException {
-        return checkRemaining(plan,complete,true);
-    }
-    private Path checkRemaining(QuarantineFiles.Plan plan,boolean complete,boolean hashes)throws IOException {
         Path payload=payload(plan.id()),discard=discard(plan.id());boolean p=present(payload),d=present(discard);
         if(p&&d||complete&&(!p||d))throw conflict();for(var unit:units(plan))ensureAbsent(root.resolve(unit.path()));
         Path base=d?discard:payload;if(!p&&!d)return base;ordinaryDirectory(base);inspectPayload(base,base,allowed(plan),0);
         for(var target:plan.items())for(var entry:target.files()){
-            Path file=base.resolve(entry.path());checked(file);if(present(file)){if(hashes)verify(base,new Unit(entry.path(),List.of(entry),false),false);else regular(file);}else if(complete)throw conflict();
+            Path file=base.resolve(entry.path());checked(file);if(present(file))verify(base,new Unit(entry.path(),List.of(entry),false),false);else if(complete)throw conflict();
         }return base;
     }
     private Set<String> allowed(QuarantineFiles.Plan plan){
@@ -337,7 +334,7 @@ public class QuarantineStore {
         for(String relative:sorted)deleteEmptyDirectory(base.resolve(relative),plan);deleteEmptyDirectory(base,plan);
     }
     private void deleteEmptyDirectory(Path directory,QuarantineFiles.Plan plan)throws IOException {
-        checkRemaining(plan,false,false);checked(directory);if(!present(directory))return;ordinaryDirectory(directory);
+        checkRemaining(plan,false);checked(directory);if(!present(directory))return;ordinaryDirectory(directory);
         try(var stream=Files.newDirectoryStream(directory)){if(stream.iterator().hasNext())throw conflict();}
         delete.delete(directory);if(present(directory))throw conflict();
     }
