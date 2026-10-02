@@ -1,6 +1,7 @@
 """Stage C: restore into a fresh instance and prove editable history survives.
 
-Only accepts loopback URLs and requires TWO EMPTY, explicitly isolated workspaces.
+Only accepts loopback URLs and requires a fresh empty isolated target workspace.
+The isolated source may contain records that must survive the restore unchanged.
 Leaves its synthetic records in place for the separate persistence check.
 """
 import argparse
@@ -83,10 +84,76 @@ def canonical_zip(content):
         return workspace
 
 
+def backup_inventory(content):
+    with zipfile.ZipFile(io.BytesIO(content)) as backup:
+        workspace = json.loads(backup.read('workspace.json'))
+        manifest = json.loads(backup.read('manifest.json'))
+        files = {}
+        for item in manifest['files']:
+            path = item['path']
+            payload = backup.read(path)
+            assert len(payload) == item['bytes'] and hashlib.sha256(payload).hexdigest() == item['sha256'], f'Archive file changed: {path}'
+            assert path not in files, f'Duplicate archive file: {path}'
+            files[path] = item['sha256']
+    return workspace, files
+
+
+def backup_counts(workspace):
+    return {group: len(workspace[group]) for group in ['resumes', 'versions', 'attachments', 'exports']}
+
+
+def baseline_fingerprints(content):
+    workspace, files = backup_inventory(content)
+    return {
+        'rows': {group: {row['id']: digest(row) for row in workspace[group]}
+                 for group in ['resumes', 'versions', 'attachments', 'exports']},
+        'files': {path: sha for path, sha in files.items()
+                  if path not in ['workspace.json', 'settings.json']},
+    }
+
+
+def assert_baseline_preserved(baseline, content):
+    current = baseline_fingerprints(content)
+    for group, rows in baseline['rows'].items():
+        for identifier, fingerprint in rows.items():
+            assert current['rows'][group].get(identifier) == fingerprint, f'Baseline {group} row changed: {identifier}'
+    for path, sha in baseline['files'].items():
+        assert current['files'].get(path) == sha, f'Baseline file changed: {path}'
+
+
+def assert_restore_counts(counts, restored):
+    for group, expected in counts.items():
+        assert restored[group] == expected, f'Restored {group} count differs from complete backup'
+    assert len(restored['resumeIds']) == counts['resumes']
+    assert len(set(restored['resumeIds'])) == counts['resumes']
+
+
+def stage_c_record(imported, title):
+    matches = [record for record in imported if record['title'] == title]
+    assert len(matches) == 1, 'Stage C record must map to exactly one imported resume'
+    return matches[0]
+
+
+def isolated_port(base):
+    url = urlparse(base)
+    assert url.scheme == 'http' and url.hostname in ['127.0.0.1', 'localhost'] and url.port
+    assert url.port != 18765, 'Port 18765 is the real workspace and cannot be used for backup verification'
+    assert not (url.username or url.password or url.path not in ['', '/'] or url.query or url.fragment)
+    return url.port
+
+
 def run(source, target):
-    assert call(source, '/api/resumes') == [], 'Source must be an empty isolated workspace'
     assert call(target, '/api/resumes') == [], 'Target must be a fresh empty workspace'
-    resume = call(source, '/api/resumes', {'title': '阶段 C · 全新实例恢复', 'sample': 'two'})
+    _, baseline_content = archive(source)
+    canonical_zip(baseline_content)
+    baseline_workspace, _ = backup_inventory(baseline_content)
+    baseline_counts = backup_counts(baseline_workspace)
+    baseline = baseline_fingerprints(baseline_content)
+    baseline_ids = set(baseline['rows']['resumes'])
+    assert {record['id'] for record in call(source, '/api/resumes')} == baseline_ids
+    title = '阶段 C · 全新实例恢复 · ' + uuid.uuid4().hex
+    resume = call(source, '/api/resumes', {'title': title, 'sample': 'two'})
+    assert resume['id'] not in baseline_ids
     original = copy.deepcopy(resume['document']['layout']['photo'])
     old_photo = upload(source, '/api/assets', 'exif.jpg', (ROOT / 'fixtures/portrait-exif-6.jpg').read_bytes())
     assert old_photo['exifOrientation'] == 6
@@ -101,20 +168,31 @@ def run(source, target):
     projected = call(source, '/api/resumes/' + resume['id'] + '/export/preview', {'expectedRevision': resume['revision'], 'redaction': options})
     redacted = call(source, '/api/resumes/' + resume['id'] + '/export', {'expectedRevision': resume['revision'], 'redaction': options, 'previewDigest': projected['digest']})
     meta, content = archive(source)
+    workspace, _ = backup_inventory(content)
+    counts = backup_counts(workspace)
+    assert counts['resumes'] == baseline_counts['resumes'] + 1
+    assert {row['id'] for row in workspace['resumes']} == baseline_ids | {resume['id']}
+    assert all(meta[group] == count for group, count in counts.items()), 'Backup metadata differs from archive contents'
+    assert_baseline_preserved(baseline, content)
     OUT.mkdir(exist_ok=True)
     (OUT / 'stage-c-fresh-instance.zip').write_bytes(content)
     restored = upload(target, '/api/backups/restore', 'workspace.zip', content)
-    assert restored['resumes'] == 1 and restored['attachments'] == 3
-    imported_id = restored['resumeIds'][0]
+    assert_restore_counts(counts, restored)
+    imported_records = [call(target, '/api/resumes/' + identifier) for identifier in restored['resumeIds']]
+    assert {record['id'] for record in call(target, '/api/resumes')} == set(restored['resumeIds'])
+    imported = stage_c_record(imported_records, title)
+    imported_id = imported['id']
     assert imported_id != resume['id']
-    imported = call(target, '/api/resumes/' + imported_id)
     assert imported['document']['content'] == resume['document']['content']
     assert imported['revision'] == resume['revision']
     _, recovered = archive(target)
     assert canonical_zip(content) == canonical_zip(recovered), 'Structure, originals, PNGs, history or PDF changed'
     with zipfile.ZipFile(io.BytesIO(recovered)) as recovered_archive:
         recovered_workspace = json.loads(recovered_archive.read('workspace.json'))
-        recovered_redacted = next(item for item in recovered_workspace['exports'] if item['sha256'] == redacted['sha256'])
+        redacted_matches = [item for item in recovered_workspace['exports']
+                            if item['sha256'] == redacted['sha256'] and item['resumeId'] == imported_id]
+        assert len(redacted_matches) == 1
+        recovered_redacted = redacted_matches[0]
     redacted_pdf = call(target, '/api/exports/' + recovered_redacted['id'] + '/pdf', raw=True)
     assert hashlib.sha256(redacted_pdf).hexdigest() == redacted['sha256']
     (OUT / 'pdf').mkdir(exist_ok=True)
@@ -135,18 +213,25 @@ def run(source, target):
     (OUT / 'pdf').mkdir(exist_ok=True)
     (OUT / 'pdf/restored-new-instance.pdf').write_bytes(pdf)
     assert call(source, '/api/resumes/' + resume['id']) == resume, 'Source was modified by restore'
-    result = {'source': source, 'target': target, 'counts': {k: meta[k] for k in ['resumes', 'versions', 'attachments', 'exports']},
+    assert {record['id'] for record in call(source, '/api/resumes')} == baseline_ids | {resume['id']}
+    _, source_after = archive(source)
+    assert_baseline_preserved(baseline, source_after)
+    result = {'source': source, 'target': target, 'counts': counts,
+        'baselineCounts': baseline_counts, 'baselineFingerprints': baseline,
         'sourceId': resume['id'], 'targetId': imported_id,
         'sourceDigest': digest(resume), 'targetDigest': digest(imported),
         'structureAndAllFileHashesMatch': True, 'historicalExifPhotoRestored': True,
         'restoredRecordEditable': True, 'redactedPdfHashPreserved': True, 'redactedPdfSha256': redacted['sha256'], 'pdfSha256': exported['sha256']}
     (OUT / 'stage-c-backup-verification.json').write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    print(json.dumps({key: value for key, value in result.items() if key != 'baselineFingerprints'}, ensure_ascii=False, indent=2))
 
 
 def persistence():
     report_path = OUT / 'stage-c-backup-verification.json'
     result = json.loads(report_path.read_text(encoding='utf-8'))
+    _, source_archive = archive(result['source'])
+    assert_baseline_preserved(result['baselineFingerprints'], source_archive)
+    assert {record['id'] for record in call(result['source'], '/api/resumes')} == set(result['baselineFingerprints']['rows']['resumes']) | {result['sourceId']}
     for side in ['source', 'target']:
         current = call(result[side], '/api/resumes/' + result[side + 'Id'])
         assert digest(current) == result[side + 'Digest'], 'Resume changed after container recreation'
@@ -167,11 +252,9 @@ if __name__ == '__main__':
     parser.add_argument('--check-persistence', action='store_true')
     args = parser.parse_args()
     assert args.isolated, 'Run only in explicitly isolated test instances; supply --isolated'
-    for base in [args.source, args.target]:
-        url = urlparse(base)
-        assert url.scheme == 'http' and url.hostname in ['127.0.0.1', 'localhost'] and url.port
+    source_port, target_port = [isolated_port(base) for base in [args.source, args.target]]
     if args.check_persistence:
         persistence()
     else:
-        assert args.source != args.target
+        assert source_port != target_port, 'Source and target must use different isolated ports'
         run(args.source.rstrip('/'), args.target.rstrip('/'))
