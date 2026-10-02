@@ -20,7 +20,7 @@ import java.util.zip.*;
 public class QuarantineArchive {
     private static final long MAX_CACHE_BYTES=1024L*1024*1024+1024*1024, MAX_MANIFEST=1024*1024;
     private static final int MAX_ARTIFACTS=32;
-    private static final Duration RETENTION=Duration.ofMinutes(10);
+    static final Duration RETENTION=Duration.ofMinutes(10);
     @FunctionalInterface interface Force {void force(FileChannel channel)throws IOException;}
     private static final byte[] INSTRUCTIONS=("本 ZIP 保存本批暂存的原始图片、处理后的图片、PDF 和文件元数据。\n"+
         "请另存本 ZIP。可通过解压 files 目录取回文件；此 ZIP 不包含简历或历史，不用于完整工作区导入。\n").getBytes(java.nio.charset.StandardCharsets.UTF_8);
@@ -37,8 +37,7 @@ public class QuarantineArchive {
     private final long byteLimit;
     private final int countLimit;
     private final Map<Key,Cached> cache=new LinkedHashMap<>();
-    private QuarantineFs cacheFs;
-    private Object cacheRootKey;
+    private final QuarantineArchiveCache storage;
 
     @Autowired
     public QuarantineArchive(@Value("${resume.data-dir}") String data,ObjectMapper mapper){this(Path.of(data),Path.of(System.getProperty("java.io.tmpdir")),mapper,Clock.systemUTC());}
@@ -51,64 +50,70 @@ public class QuarantineArchive {
         this.byteLimit=byteLimit;this.countLimit=countLimit;this.force=Objects.requireNonNull(force);
         this.mapper=mapper.copy().disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS).enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
             .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
+        this.storage=new QuarantineArchiveCache(sourceFs,parentFs,this.mapper,byteLimit,countLimit);
     }
     public synchronized Artifact create(QuarantineFiles.Plan plan,String digest)throws IOException {
         QuarantineFiles.validate(plan);if(!QuarantineFiles.sha(digest))throw invalid();
-        reclaimExpired();var key=new Key(plan.id(),digest);var existing=cache.get(key);
-        if(existing!=null){if(!existing.artifact.plan().equals(plan))throw conflict();verify(existing.artifact);validateSources(plan);existing.expiresAt=clock.instant().plus(RETENTION);return existing.artifact;}
-        if(cache.size()>=countLimit)throw limit();validateSources(plan);ensureCache();
-        Path file=cacheFs.path(UUID.randomUUID()+".zip");Instant createdAt=clock.instant();BasicFileAttributes initial=null;boolean published=false;
-        try {
-            try(var channel=FileChannel.open(file,StandardOpenOption.CREATE_NEW,StandardOpenOption.WRITE,LinkOption.NOFOLLOW_LINKS)){
-                initial=cacheFs.regular(file);long available=byteLimit-activeBytes();
-                try(var zip=new ZipOutputStream(new LimitedChannelOutput(channel,available))){
-                    var candidate=new Artifact(plan,digest,file,0,"",createdAt);writeBytes(zip,"manifest.json",manifest(candidate));writeBytes(zip,"说明.txt",INSTRUCTIONS);
-                    for(var target:plan.items())for(var entry:target.files())copy(zip,plan.id(),entry);
-                    validateSources(plan);zip.finish();zip.flush();force.force(channel);
+        validateSources(plan);storage.ensure();
+        try(var guard=storage.lock()){
+            reclaimExpired(guard);var key=new Key(plan.id(),digest);var existing=cache.get(key);
+            if(existing!=null){if(!existing.artifact.plan().equals(plan))throw conflict();verifyLocal(existing.artifact);storage.fs().regular(existing.artifact.path());guard.renew(guard.find(existing.artifact),clock.instant().plus(RETENTION));existing.expiresAt=clock.instant().plus(RETENTION);return existing.artifact;}
+            var owned=guard.list();Path file=storage.fs().path(UUID.randomUUID()+".zip");Instant createdAt=clock.instant();
+            var candidate=new Artifact(plan,digest,file,0,"",createdAt);long reservation=guard.reservation(candidate);guard.room(owned,reservation);
+            BasicFileAttributes initial=null;boolean published=false;
+            try {
+                try(var channel=FileChannel.open(file,StandardOpenOption.CREATE_NEW,StandardOpenOption.WRITE,LinkOption.NOFOLLOW_LINKS)){
+                    initial=storage.fs().regular(file);long available=byteLimit-guard.physical()-reservation;
+                    try(var zip=new ZipOutputStream(new LimitedChannelOutput(channel,available))){
+                        writeBytes(zip,"manifest.json",manifest(candidate));writeBytes(zip,"说明.txt",INSTRUCTIONS);
+                        for(var target:plan.items())for(var entry:target.files())copy(zip,plan.id(),entry);
+                        validateSources(plan);zip.finish();zip.flush();force.force(channel);
+                    }
                 }
+                var attr=storage.fs().regular(file);var result=new Artifact(plan,digest,file,attr.size(),hashFile(file,storage.fs(),attr),createdAt);
+                verifyPersisted(result,attr);guard.publish(result,attr);
+                var cached=new Cached(result,attr,createdAt);cache.put(key,cached);published=true;return result;
+            }finally{
+                if(!published&&initial!=null){storage.fs().regular(file);var current=storage.fs().regular(file);if(!Objects.equals(initial.fileKey(),current.fileKey()))throw conflict();Files.delete(file);}
             }
-            var attr=cacheFs.regular(file);var result=new Artifact(plan,digest,file,attr.size(),hashFile(file,cacheFs,attr),createdAt);
-            var cached=new Cached(result,attr,createdAt);cache.put(key,cached);
-            try{verify(result);}catch(IOException|RuntimeException e){cache.remove(key);throw e;}
-            published=true;return result;
-        }finally{
-            if(!published&&initial!=null){checkCacheRoot();var current=cacheFs.regular(file);if(!Objects.equals(initial.fileKey(),current.fileKey()))throw conflict();Files.delete(file);}
         }
     }
     /** Read-only: expiration is a POST lifecycle policy, never a reason to delete here. */
     public synchronized void verify(Artifact artifact)throws IOException {
-        var cached=owned(artifact);checkCacheRoot();var before=cacheFs.regular(artifact.path());stable(cached.attributes,before);
-        if(before.size()!=artifact.bytes()||!hashFile(artifact.path(),cacheFs,before).equals(artifact.sha256()))throw conflict();
-        verifyZip(artifact);stable(before,cacheFs.regular(artifact.path()));
-        if(!hashFile(artifact.path(),cacheFs,before).equals(artifact.sha256()))throw conflict();
+        owned(artifact);try(var guard=storage.lock()){guard.find(artifact);verifyLocal(artifact);}
     }
     public synchronized InputStream open(Artifact artifact)throws IOException {
-        verify(artifact);var cached=owned(artifact);var stream=QuarantineFs.open(artifact.path());
-        try{stable(cached.attributes,cacheFs.regular(artifact.path()));}catch(IOException|RuntimeException e){stream.close();throw e;}
-        cached.readers++;
-        return new FilterInputStream(stream){boolean closed;@Override public void close()throws IOException {synchronized(QuarantineArchive.this){if(closed)return;closed=true;try{super.close();}finally{cached.readers--;}}}};
+        var cached=owned(artifact);try(var guard=storage.lock()){
+            var persisted=guard.find(artifact);var lease=guard.readLease(persisted);
+            try{verifyLocal(artifact);var stream=QuarantineFs.open(artifact.path());
+                try{stable(cached.attributes,storage.fs().regular(artifact.path()));}catch(IOException|RuntimeException e){stream.close();throw e;}
+                cached.readers++;
+                return new FilterInputStream(stream){boolean closed;@Override public void close()throws IOException {synchronized(QuarantineArchive.this){if(closed)return;closed=true;try{super.close();}finally{cached.readers--;lease.close();}}}};
+            }catch(IOException|RuntimeException e){lease.close();throw e;}
+        }
     }
     /** Extend owned cache retention to the successful transfer's time plus ten minutes. */
-    public synchronized void renew(Artifact artifact,Instant now)throws IOException {Objects.requireNonNull(now);verify(artifact);owned(artifact).expiresAt=now.plus(RETENTION);}
+    public synchronized void renew(Artifact artifact,Instant now)throws IOException {Objects.requireNonNull(now);var cached=owned(artifact);try(var guard=storage.lock()){var persisted=guard.find(artifact);verifyLocal(artifact);guard.renew(persisted,now.plus(RETENTION));cached.expiresAt=now.plus(RETENTION);}}
     public synchronized void remove(Artifact artifact)throws IOException {
         var cached=owned(artifact);
-        if(cached.readers!=0)throw conflict();verify(artifact);Files.delete(artifact.path());cache.remove(key(artifact));reclaimExpired();
+        try(var guard=storage.lock()){
+            if(cached.readers!=0)throw conflict();var persisted=guard.find(artifact);
+            guard.delete(persisted,this::verifyOwnedZip,false);cache.remove(key(artifact));reclaimExpired(guard);
+        }
     }
     private Key key(Artifact artifact){if(artifact==null||artifact.plan()==null)throw conflict();return new Key(artifact.plan().id(),artifact.digest());}
     private Cached owned(Artifact artifact){var cached=cache.get(key(artifact));if(cached==null||!cached.artifact.equals(artifact))throw conflict();return cached;}
-    private long activeBytes(){return cache.values().stream().mapToLong(value->value.artifact.bytes()).sum();}
-    private void ensureCache()throws IOException {
-        if(cacheFs!=null){checkCacheRoot();return;}parentFs.directory(parentFs.root());
-        Path root=parentFs.path("resume-quarantine-"+UUID.randomUUID());Files.createDirectory(root);parentFs.ordinaryDirectory(root);
-        cacheFs=new QuarantineFs(root);cacheRootKey=Files.readAttributes(root,BasicFileAttributes.class,LinkOption.NOFOLLOW_LINKS).fileKey();
+    private void verifyLocal(Artifact artifact)throws IOException {var cached=owned(artifact);verifyPersisted(artifact,cached.attributes);}
+    private void verifyPersisted(Artifact artifact,BasicFileAttributes expected)throws IOException {
+        var before=storage.fs().regular(artifact.path());stable(expected,before);
+        if(before.size()!=artifact.bytes()||!hashFile(artifact.path(),storage.fs(),before).equals(artifact.sha256()))throw conflict();
+        verifyZip(artifact);stable(before,storage.fs().regular(artifact.path()));
+        if(!hashFile(artifact.path(),storage.fs(),before).equals(artifact.sha256()))throw conflict();
     }
-    private void checkCacheRoot()throws IOException {
-        if(cacheFs==null)throw conflict();cacheFs.ordinaryDirectory(cacheFs.root());
-        if(!Objects.equals(cacheRootKey,Files.readAttributes(cacheFs.root(),BasicFileAttributes.class,LinkOption.NOFOLLOW_LINKS).fileKey()))throw conflict();
-    }
-    private void reclaimExpired()throws IOException {
-        for(var iterator=cache.entrySet().iterator();iterator.hasNext();){var entry=iterator.next();var cached=entry.getValue();
-            if(cached.readers==0&&!clock.instant().isBefore(cached.expiresAt)){verify(cached.artifact);Files.delete(cached.artifact.path());iterator.remove();}
+    private void verifyOwnedZip(Artifact artifact)throws IOException {verifyPersisted(artifact,storage.fs().regular(artifact.path()));}
+    private void reclaimExpired(QuarantineArchiveCache.Guard guard)throws IOException {
+        for(var owned:guard.list())if(!clock.instant().isBefore(owned.expiresAt())){
+            if(guard.delete(owned,this::verifyOwnedZip,true))cache.entrySet().removeIf(entry->entry.getValue().artifact.equals(owned.artifact()));
         }
     }
     private void validateSources(QuarantineFiles.Plan plan)throws IOException {

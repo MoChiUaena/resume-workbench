@@ -113,7 +113,7 @@ class QuarantineArchiveTest {
         Path failureCache=temp.resolve("redirect-cache");var failing=new QuarantineArchive(data(),failureCache,mapper,clock,1024*1024,32,channel->{channel.truncate(0);channel.position(0);var buffer=ByteBuffer.wrap(bad);while(buffer.hasRemaining())channel.write(buffer);channel.force(true);});
         assertThatThrownBy(()->failing.create(plan,DIGEST)).isInstanceOf(ApiException.class);
         for(var target:plan.items())for(var entry:target.files()){Path source=payload(OP).resolve(entry.path());assertThat(Files.readAllBytes(source)).isEqualTo(before.get(entry.path()));assertThat(Files.getLastModifiedTime(source).toInstant()).isEqualTo(entry.modified());}
-        try(var paths=Files.walk(failureCache)){assertThat(paths.filter(Files::isRegularFile).toList()).isEmpty();}
+        try(var paths=Files.walk(failureCache)){assertThat(paths.filter(Files::isRegularFile).map(p->p.getFileName().toString()).toList()).containsExactlyInAnyOrder(".owner",".lock");}
     }
     int centralRecord(byte[] bytes,String name){
         var buffer=ByteBuffer.wrap(bytes).order(java.nio.ByteOrder.LITTLE_ENDIAN);int end=bytes.length-22;while(end>=0&&buffer.getInt(end)!=0x06054b50)end--;assertThat(end).isGreaterThanOrEqualTo(0);
@@ -138,10 +138,47 @@ class QuarantineArchiveTest {
         assertThatThrownBy(()->archive.remove(forged)).isInstanceOf(ApiException.class);assertThat(own.path()).exists();
     }
     @Test void activeAndInProgressZipBytesShareOnePhysicalBudget()throws Exception {
-        var firstPlan=plan(OP);long firstBytes=archive().create(firstPlan,DIGEST).bytes();var archive=new QuarantineArchive(data(),temp.resolve("bounded-cache"),mapper,clock,firstBytes+1,32);var first=archive.create(firstPlan,DIGEST);
+        var firstPlan=plan(OP);archive().create(firstPlan,DIGEST);long firstPhysical=physical(cache());var archive=new QuarantineArchive(data(),temp.resolve("bounded-cache"),mapper,clock,firstPhysical+1024,32);var first=archive.create(firstPlan,DIGEST);
         assertThatThrownBy(()->archive.create(plan("aaaaaaaa-3333-4333-8333-333333333333"),DIGEST)).isInstanceOf(ApiException.class);archive.verify(first);
-        try(var files=Files.list(first.path().getParent())){assertThat(files.toList()).containsExactly(first.path());}assertThat(first.bytes()).isLessThanOrEqualTo(firstBytes+1);
+        try(var files=Files.list(first.path().getParent())){assertThat(files.filter(p->p.toString().endsWith(".zip")).toList()).containsExactly(first.path());}assertThat(physical(temp.resolve("bounded-cache"))).isLessThanOrEqualTo(firstPhysical+1024);
     }
+    @Test void restartAccountsRetainedBytesAndOnlyPostReclaimsExpiredOwnedZip()throws Exception {
+        var firstPlan=plan(OP);archive().create(firstPlan,DIGEST);long cap=physical(cache())+1024;
+        Path bounded=temp.resolve("restart-cache");var first=new QuarantineArchive(data(),bounded,mapper,clock,cap,1).create(firstPlan,DIGEST);
+        long retained=physical(bounded);assertThat(retained).isLessThanOrEqualTo(cap);
+        var nextPlan=plan("aaaaaaaa-3333-4333-8333-333333333333");var restarted=new QuarantineArchive(data(),bounded,mapper,clock,cap,1);
+        assertThat(physical(bounded)).isEqualTo(retained);
+        assertThatThrownBy(()->restarted.verify(first)).isInstanceOf(ApiException.class);
+        assertThatThrownBy(()->restarted.create(nextPlan,DIGEST)).isInstanceOf(ApiException.class);
+        assertThat(first.path()).exists();assertThat(physical(bounded)).isEqualTo(retained);
+        clock.advance(Duration.ofMinutes(11));assertThat(physical(bounded)).isEqualTo(retained);
+        var second=new QuarantineArchive(data(),bounded,mapper,clock,cap,1).create(nextPlan,DIGEST);
+        assertThat(first.path()).doesNotExist();assertThat(second.path()).exists();assertThat(physical(bounded)).isLessThanOrEqualTo(cap);
+        try(var roots=Files.list(bounded)){assertThat(roots.toList()).hasSize(1);}
+    }
+    @Test void restartedPostPreservesUnknownAndChangedCacheCanaries()throws Exception {
+        var plan=plan(OP);var archive=archive();var first=archive.create(plan,DIGEST);long cap=physical(cache())+4096;
+        Path unknown=first.path().getParent().resolve("unknown-canary.zip");Files.writeString(unknown,"unknown");clock.advance(Duration.ofMinutes(11));
+        var restarted=new QuarantineArchive(data(),cache(),mapper,clock,cap,1);
+        assertThatThrownBy(()->restarted.create(plan,DIGEST)).isInstanceOf(ApiException.class);assertThat(Files.readString(unknown)).isEqualTo("unknown");assertThat(first.path()).exists();
+        Files.delete(unknown);Files.writeString(first.path(),"changed-canary");
+        assertThatThrownBy(()->restarted.create(plan,DIGEST)).isInstanceOf(ApiException.class);assertThat(Files.readString(first.path())).isEqualTo("changed-canary");
+    }
+    @Test void restartedPostPreservesLinkedCacheCanary()throws Exception {
+        var plan=plan(OP);var archive=archive();var first=archive.create(plan,DIGEST);clock.advance(Duration.ofMinutes(11));
+        Files.delete(first.path());Path outside=temp.resolve("outside-canary.zip");Files.writeString(outside,"linked-canary");
+        try{Files.createSymbolicLink(first.path(),outside);}catch(FileSystemException|UnsupportedOperationException ex){org.junit.jupiter.api.Assumptions.assumeTrue(!System.getProperty("os.name").startsWith("Windows"));throw ex;}
+        var restarted=new QuarantineArchive(data(),cache(),mapper,clock,MAX_TEST_BUDGET,1);
+        assertThatThrownBy(()->restarted.create(plan,DIGEST)).isInstanceOf(ApiException.class);assertThat(Files.readString(outside)).isEqualTo("linked-canary");
+    }
+    @Test void crossInstanceReaderLeasePreventsExpiredPostEviction()throws Exception {
+        var firstPlan=plan(OP);var archive=archive();var first=archive.create(firstPlan,DIGEST);var reader=archive.open(first);
+        clock.advance(Duration.ofMinutes(11));var nextPlan=plan("aaaaaaaa-3333-4333-8333-333333333333");
+        var restarted=new QuarantineArchive(data(),cache(),mapper,clock,MAX_TEST_BUDGET,32);
+        restarted.create(nextPlan,DIGEST);assertThat(first.path()).exists();assertThat(reader.readAllBytes()).hasSize((int)first.bytes());
+        reader.close();restarted.create(plan("bbbbbbbb-3333-4333-8333-333333333333"),DIGEST);assertThat(first.path()).doesNotExist();
+    }
+    static final long MAX_TEST_BUDGET=1024*1024;
     @Test void sourceAndCacheJunctionsRejectWithoutFollowingOrDeletingLinkedCanaries()throws Exception {
         var plan=plan(OP);var archive=archive();Path exports=payload(OP).resolve("exports"),outside=temp.resolve("linked-sources");Files.move(exports,outside);directoryLink(exports,outside);
         try{assertThatThrownBy(()->archive.create(plan,DIGEST)).isInstanceOf(ApiException.class);assertThat(Files.readString(outside.resolve(PDF+".pdf"))).isEqualTo("%PDF-pdf-canary");}finally{Files.delete(exports);Files.move(outside,exports);}
@@ -154,7 +191,7 @@ class QuarantineArchiveTest {
     @Test void boundedOutputFailureRemovesOnlyPartialCacheFileAndPreservesSources()throws Exception {
         var plan=plan(OP);var archive=new QuarantineArchive(data(),cache(),mapper,clock,128,32);
         assertThatThrownBy(()->archive.create(plan,DIGEST)).isInstanceOf(ApiException.class);
-        try(var paths=Files.walk(cache())){assertThat(paths.filter(Files::isRegularFile).toList()).isEmpty();}
+        try(var paths=Files.walk(cache())){assertThat(paths.filter(Files::isRegularFile).map(p->p.getFileName().toString()).toList()).containsExactlyInAnyOrder(".owner",".lock");}
         assertThat(Files.readString(payload(OP).resolve("exports/"+PDF+".pdf"))).isEqualTo("%PDF-pdf-canary");assertThat(Files.readString(payload(OP).resolve("attachments/"+IMAGE+"/original.png"))).isEqualTo("original-canary");
     }
     @Test void oversizePlanFailsBeforeTouchingDataOrCache()throws Exception {
@@ -164,4 +201,5 @@ class QuarantineArchiveTest {
     static class MutableClock extends Clock {
         Instant now=Instant.parse("2026-10-01T08:00:00Z");void advance(Duration d){now=now.plus(d);}public ZoneId getZone(){return ZoneOffset.UTC;}public Clock withZone(ZoneId zone){return this;}public Instant instant(){return now;}
     }
+    long physical(Path root)throws IOException {try(var files=Files.walk(root)){return files.filter(Files::isRegularFile).mapToLong(p->{try{return Files.size(p);}catch(IOException e){throw new UncheckedIOException(e);}}).sum();}}
 }
