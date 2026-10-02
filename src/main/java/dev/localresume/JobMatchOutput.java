@@ -14,7 +14,8 @@ public final class JobMatchOutput {
     public static Result decode(ObjectMapper mapper,String raw,JobMatches.Preview preview){
         if(raw==null||raw.length()>12000||preview==null)throw invalid();
         try{
-            var strict=mapper.copy().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
+            var strict=mapper.copy().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
+                .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
             JsonNode root=strict.readTree(raw);
             fields(root,"items","suggestions");
             var itemsNode=root.path("items");var suggestionsNode=root.path("suggestions");

@@ -41,4 +41,10 @@ class JobMatchOutputTest {
         String candidate="{\"sourceId\":\"s2\",\"replacement\":\"清晰表达\"}";
         invalid(item("需要 Java 开发","missing","[]").replace("\"suggestions\":[]","\"suggestions\":["+String.join(",",Collections.nCopies(7,candidate))+"]"));
     }
+    @Test void rejectsTrailingJsonValueAndGarbageButAllowsWhitespaceTail(){
+        String valid=item("需要 Java 开发","missing","[]");
+        invalid(valid+"{\"items\":[],\"suggestions\":[]}");
+        invalid(valid+"garbage");
+        assertThat(JobMatchOutput.decode(mapper,valid+" \n\t",preview).items()).hasSize(1);
+    }
 }

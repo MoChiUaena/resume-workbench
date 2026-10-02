@@ -49,8 +49,8 @@ public class JobMatches {
             var section=resume.document().content().sections().stream().filter(s->s.id().equals(sectionId)&&s.visible()).findFirst()
                 .orElseThrow(JobMatches::invalid);
             for(var entry:section.entries()){
-                String heading=entry.title()+(entry.meta().isBlank()?"":" · "+entry.meta());
-                length=append(sources,length,section,entry,-1,heading);
+                String heading=entry.meta().isBlank()?entry.title():entry.title().isBlank()?entry.meta():entry.title()+" · "+entry.meta();
+                if(!heading.isBlank())length=append(sources,length,section,entry,-1,heading);
                 for(int paragraph=0;paragraph<entry.bullets().size();paragraph++){
                     String value=entry.bullets().get(paragraph);
                     if(!value.isBlank())length=append(sources,length,section,entry,paragraph,value);

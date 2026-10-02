@@ -49,6 +49,15 @@ class JobMatchesTest {
         .content(body instanceof String text?text:mapper.writeValueAsString(body))).andReturn().getResponse().getStatus();}
     Map<String,Object> previewRequest(){return Map.of("resumeId",resume.id(),"expectedRevision",1,"sectionIds",List.of(selectedSection),
         "jobDescription","需要 Java 开发","profileId",model.defaultId(),"settingsRevision",model.revision());}
+    Map<String,Object> requestForBlankHeading(String body){
+        var sample=ResumeDocument.sample("one");
+        var section=new ResumeDocument.Section("blank-section","project","测试模块",true,false,
+            List.of(new ResumeDocument.Entry("blank-entry","","",true,List.of(" ",body))));
+        var content=new ResumeDocument.Content("测试","","","","",List.of(section));
+        var saved=resumes.create("blank heading",new ResumeDocument(ResumeDocument.SCHEMA_VERSION,content,sample.layout()));
+        return Map.of("resumeId",saved.id(),"expectedRevision",1,"sectionIds",List.of(section.id()),
+            "jobDescription","需要 Java 开发","profileId",model.defaultId(),"settingsRevision",model.revision());
+    }
     JsonNode preview()throws Exception{return send("/api/ai/job-matches/preview",previewRequest());}
     Map<String,Object> generation(JsonNode p,boolean confirm){return Map.of("previewId",p.path("id").asText(),"confirmSend",confirm);}
 
@@ -79,6 +88,18 @@ class JobMatchesTest {
         request.put("jobDescription","J".repeat(6001));assertThat(status("/api/ai/job-matches/preview",request)).isEqualTo(422);
         request.put("jobDescription","Java");request.put("sectionIds",List.of("missing"));
         assertThat(status("/api/ai/job-matches/preview",request)).isEqualTo(422);
+        verifyNoInteractions(gateway);
+    }
+    @Test void allBlankSelectedEntryHasNoEffectiveSourceAndCannotBePreviewed()throws Exception{
+        assertThat(status("/api/ai/job-matches/preview",requestForBlankHeading(" "))).isEqualTo(422);
+        verifyNoInteractions(gateway);
+    }
+    @Test void bodyBelowBlankHeadingRemainsAnEditableSource()throws Exception{
+        var p=send("/api/ai/job-matches/preview",requestForBlankHeading("参与 Java 开发"));
+        assertThat(p.path("sources")).hasSize(1);
+        assertThat(p.path("sources").get(0).path("paragraph").asInt()).isEqualTo(1);
+        assertThat(p.path("sources").get(0).path("text").asText()).isEqualTo("参与 Java 开发");
+        assertThat(p.path("payload").asText()).contains("参与 Java 开发").doesNotContain("blank heading");
         verifyNoInteractions(gateway);
     }
     @Test void malformedRequestJsonIsRejectedWithoutProviderCall()throws Exception{
