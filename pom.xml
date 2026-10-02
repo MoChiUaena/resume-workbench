@@ -4,7 +4,7 @@
   <parent><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-parent</artifactId><version>3.5.16</version><relativePath/></parent>
   <groupId>dev.localresume</groupId><artifactId>resume-workbench</artifactId><version>0.8.0-SNAPSHOT</version>
   <name>Resume Workbench</name><description>Local Chinese resume workbench</description>
-  <properties><java.version>21</java.version><playwright.version>1.63.0</playwright.version></properties>
+  <properties><java.version>21</java.version><playwright.version>1.63.0</playwright.version><argLine/></properties>
   <dependencies>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-jdbc</artifactId></dependency>
     <dependency><groupId>org.postgresql</groupId><artifactId>postgresql</artifactId><scope>runtime</scope></dependency>
@@ -20,6 +20,8 @@
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
   </dependencies>
   <build><finalName>resume-workbench</finalName><plugins>
+    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-dependency-plugin</artifactId><executions><execution><id>test-agent-path</id><phase>initialize</phase><goals><goal>properties</goal></goals></execution></executions></plugin>
+    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><configuration><argLine>${argLine} -javaagent:"${org.mockito:mockito-core:jar}" -Xshare:off</argLine></configuration></plugin>
     <plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId><configuration><mainClass>dev.localresume.LocalResumeApplication</mainClass><includeTools>false</includeTools></configuration></plugin>
     <plugin><groupId>org.codehaus.mojo</groupId><artifactId>exec-maven-plugin</artifactId><version>3.6.3</version></plugin>
     <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-resources-plugin</artifactId><executions><execution><id>frontend</id><phase>process-resources</phase><goals><goal>copy-resources</goal></goals><configuration><outputDirectory>${project.build.outputDirectory}/static</outputDirectory><resources><resource><directory>frontend/dist</directory><filtering>false</filtering></resource></resources></configuration></execution></executions></plugin>
