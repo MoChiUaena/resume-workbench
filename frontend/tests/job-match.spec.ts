@@ -1,9 +1,13 @@
 import {test,expect,type APIRequestContext,type Page} from '@playwright/test';
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
 
 const headers={'X-Local-Resume':'1'};
 const root=path.resolve(import.meta.dirname,'../..');
+const execFileAsync=promisify(execFile);
+const fixtureReadScript="const http=require('node:http');const req=http.get('http://127.0.0.1:18770/requests',res=>{if(res.statusCode!==200){res.resume();process.exitCode=1;return;}res.pipe(process.stdout)});req.setTimeout(5000,()=>req.destroy(new Error('fixture timeout')));req.on('error',error=>{console.error(error);process.exitCode=1});";
 test.beforeEach(()=>test.skip(process.env.RESUME_TEST_ISOLATED!=='1','Job match tests require disposable data.'));
 async function models(request:APIRequestContext){return(await request.get('/api/models')).json();}
 async function configure(request:APIRequestContext,model='qa-job-normal'){
@@ -53,7 +57,21 @@ async function ready(page:Page,id:string,jd='具备 Java 项目经验；拥有�
  await expect(dialog.getByTestId('job-payload')).toBeVisible();
  return dialog;
 }
-async function fixtureRequests(request:APIRequestContext){return(await(await request.get('http://127.0.0.1:18770/requests')).json()) as any[];}
+async function fixtureRequests(request:APIRequestContext){
+ const base=process.env.RESUME_TEST_BASE_URL,container=process.env.RESUME_TEST_APP_CONTAINER;
+ if(process.env.RESUME_TEST_ISOLATED!=='1'||!base)throw new Error('Fixture inspection requires an explicit isolated test base.');
+ if(container){
+  if(container!=='resume-ci-source-app-1'||new URL(base).origin!=='http://127.0.0.1:18767')throw new Error('Unknown isolated CI fixture topology.');
+  const {stdout}=await execFileAsync('docker',['exec','resume-ci-source-app-1','/ms-playwright-driver/node','-e',fixtureReadScript],{shell:false,encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});
+  const value=JSON.parse(stdout);
+  if(!Array.isArray(value))throw new Error('Fixture request log is not an array.');
+  return value as any[];
+ }
+ if(new URL(base).origin!=='http://127.0.0.1:18865')throw new Error('Unknown local fixture topology.');
+ const response=await request.get('http://127.0.0.1:18770/requests');
+ expect(response.ok(),await response.text()).toBe(true);
+ return(await response.json()) as any[];
+}
 
 test('editor opens job matching before any model request',async({page,request})=>{
  const created=await(await request.post('/api/resumes',{headers,data:{title:'职位匹配 QA · 合成数据',sample:'one'}})).json();
