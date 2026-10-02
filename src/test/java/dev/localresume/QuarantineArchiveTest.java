@@ -156,6 +156,19 @@ class QuarantineArchiveTest {
         assertThat(first.path()).doesNotExist();assertThat(second.path()).exists();assertThat(physical(bounded)).isLessThanOrEqualTo(cap);
         try(var roots=Files.list(bounded)){assertThat(roots.toList()).hasSize(1);}
     }
+    @Test void windowsCaseAliasRestartSharesOwnedRootAndBudget()throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(System.getProperty("os.name").startsWith("Windows"));
+        var firstPlan=plan(OP);archive().create(firstPlan,DIGEST);long cap=physical(cache())+1024;
+        Path bounded=temp.resolve("case-alias-cache");var first=new QuarantineArchive(data(),bounded,mapper,clock,cap,1).create(firstPlan,DIGEST);
+        long retained=physical(bounded);Path alias=Path.of(data().toString().toUpperCase(Locale.ROOT));
+        assertThat(Files.isSameFile(data(),alias)).isTrue();
+        var nextPlan=plan("aaaaaaaa-3333-4333-8333-333333333333");var restarted=new QuarantineArchive(alias,bounded,mapper,clock,cap,1);
+        assertThatThrownBy(()->restarted.create(nextPlan,DIGEST)).isInstanceOf(ApiException.class);
+        assertThat(physical(bounded)).isEqualTo(retained);try(var roots=Files.list(bounded)){assertThat(roots.toList()).hasSize(1);}
+        clock.advance(Duration.ofMinutes(11));var second=new QuarantineArchive(alias,bounded,mapper,clock,cap,1).create(nextPlan,DIGEST);
+        assertThat(first.path()).doesNotExist();assertThat(second.path()).exists();assertThat(physical(bounded)).isLessThanOrEqualTo(cap);
+        try(var roots=Files.list(bounded)){assertThat(roots.toList()).hasSize(1);}
+    }
     @Test void restartedPostPreservesUnknownAndChangedCacheCanaries()throws Exception {
         var plan=plan(OP);var archive=archive();var first=archive.create(plan,DIGEST);long cap=physical(cache())+4096;
         Path unknown=first.path().getParent().resolve("unknown-canary.zip");Files.writeString(unknown,"unknown");clock.advance(Duration.ofMinutes(11));

@@ -25,7 +25,8 @@ final class QuarantineArchiveCache {
     private static final int EXPIRY_BYTES=20;
     private final QuarantineFs dataFs,parentFs;
     private final ObjectMapper mapper;
-    private final Path root;
+    private Path root;
+    private String ownerDataPath;
     private final long byteLimit;
     private final int countLimit;
     private QuarantineFs rootFs;
@@ -33,7 +34,6 @@ final class QuarantineArchiveCache {
 
     QuarantineArchiveCache(QuarantineFs dataFs,QuarantineFs parentFs,ObjectMapper mapper,long byteLimit,int countLimit){
         this.dataFs=dataFs;this.parentFs=parentFs;this.mapper=mapper;this.byteLimit=byteLimit;this.countLimit=countLimit;
-        this.root=parentFs.root().resolve("resume-quarantine-v2-"+sha(dataFs.root().toString())).normalize();
     }
     Path root(){return root;}
     QuarantineFs fs(){if(rootFs==null)throw conflict();return rootFs;}
@@ -45,23 +45,28 @@ final class QuarantineArchiveCache {
     private static BasicFileAttributes attributes(Path path)throws IOException{return Files.readAttributes(path,BasicFileAttributes.class,LinkOption.NOFOLLOW_LINKS);}
     private static void regular(BasicFileAttributes attr){if(!attr.isRegularFile()||attr.isSymbolicLink()||attr.isOther())throw conflict();}
     private BasicFileAttributes directRegular(Path path)throws IOException {if(!path.getParent().equals(root))throw conflict();var attr=attributes(path);regular(attr);return attr;}
+    private Path canonicalDataRoot()throws IOException {dataFs.ordinaryDirectory(dataFs.root());return dataFs.root().toRealPath(LinkOption.NOFOLLOW_LINKS);}
     private static void same(BasicFileAttributes before,BasicFileAttributes after){regular(after);if(before.size()!=after.size()||!Objects.equals(key(before),key(after))||!before.lastModifiedTime().equals(after.lastModifiedTime()))throw conflict();}
     private void checkRoot()throws IOException {
         if(rootFs==null)throw conflict();rootFs.ordinaryDirectory(root);
         var attr=attributes(root);if(!Objects.equals(rootKey,attr.fileKey()))throw conflict();
         Path owner=child(".owner"),lock=child(".lock");var ownerAttributes=directRegular(owner);directRegular(lock);
         if(ownerAttributes.size()>1024)throw conflict();
-        var expected=new Owner(dataFs.root().toString(),key(attributes(dataFs.root())),String.valueOf(rootKey));
+        String currentDataPath=canonicalDataRoot().toString();if(!currentDataPath.equals(ownerDataPath))throw conflict();
+        var expected=new Owner(currentDataPath,key(attributes(dataFs.root())),String.valueOf(rootKey));
         if(!mapper.readValue(Files.readAllBytes(owner),Owner.class).equals(expected))throw conflict();
     }
     /** Only a POST may create the cache root or its control files. */
     void ensure()throws IOException {
         if(rootFs!=null){checkRoot();return;}
         parentFs.directory(parentFs.root());
+        Path canonicalData=canonicalDataRoot(),canonicalParent=parentFs.root().toRealPath(LinkOption.NOFOLLOW_LINKS);
+        if(canonicalParent.startsWith(canonicalData))throw conflict();
+        ownerDataPath=canonicalData.toString();root=canonicalParent.resolve("resume-quarantine-v2-"+sha(ownerDataPath));
         if(!QuarantineFs.present(root)){
             Files.createDirectory(root);var fs=new QuarantineFs(root);fs.ordinaryDirectory(root);
             var dataKey=key(attributes(dataFs.root()));var rootFileKey=attributes(root).fileKey();
-            byte[] owner=mapper.writeValueAsBytes(new Owner(dataFs.root().toString(),dataKey,String.valueOf(rootFileKey)));
+            byte[] owner=mapper.writeValueAsBytes(new Owner(ownerDataPath,dataKey,String.valueOf(rootFileKey)));
             if(owner.length>byteLimit)throw limit();
             Files.write(child(".owner"),owner,StandardOpenOption.CREATE_NEW,StandardOpenOption.WRITE);
             Files.write(child(".lock"),new byte[0],StandardOpenOption.CREATE_NEW,StandardOpenOption.WRITE);
