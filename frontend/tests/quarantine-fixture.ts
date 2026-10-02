@@ -1,4 +1,5 @@
 import {spawnSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
 const uuid=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
 export function requireIsolatedQuarantineWorkspace(){
  const container=process.env.RESUME_TEST_APP_CONTAINER,base=new URL(process.env.RESUME_TEST_BASE_URL||'http://127.0.0.1:18765');
@@ -16,3 +17,18 @@ function run(mode:string,id:string,operationId=''){
 export const seedCandidate=(id:string)=>run('clone',id);
 export const inspectFixture=(id:string,operationId='')=>run('inspect',id,operationId);
 export const conflictFixture=(id:string,mode:'create'|'remove')=>run(mode,id);
+/** Read only fingerprints in the same named synthetic workspace; never follows links. */
+export function sourceCanaries(){
+ const container=requireIsolatedQuarantineWorkspace();
+ const script=`const fs=require('fs'),path=require('path'),crypto=require('crypto'),root='/app/data',files={};let count=0,total=0;const visit=p=>{const stat=fs.lstatSync(p);if(stat.isSymbolicLink())throw Error('Canary link rejected');if(stat.isDirectory()){for(const name of fs.readdirSync(p).sort())visit(path.join(p,name));}else{if(!stat.isFile()||++count>10000||(total+=stat.size)>1073741824)throw Error('Canary boundary');files[path.relative(root,p)]=crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');}};for(const name of ['attachments','exports','backups','model-settings']){const p=path.join(root,name);if(fs.existsSync(p))visit(p);}console.log(JSON.stringify({files,sha256:crypto.createHash('sha256').update(JSON.stringify(files)).digest('hex')}));`;
+ const result=spawnSync('docker',['exec','-i',container,'/ms-playwright-driver/node','-'],{input:script,encoding:'utf8'});if(result.status!==0)throw Error(result.stderr||'Canary read failed');
+ const db=container==='resume-ci-source-app-1'?'resume-ci-source-db-1':'resume-quarantine-qa-db-1';
+ const sql=['attachments','resumes','resume_versions','resume_assets','version_assets'].map(table=>`SELECT '${table}',coalesce(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text)::text,'[]') FROM ${table} t`).join(' UNION ALL ');
+ const rows=spawnSync('docker',['exec',db,'psql','-U','local_resume','-d','local_resume','-At','-c',sql],{encoding:'utf8'});if(rows.status!==0)throw Error('Canary database read failed');
+ return {...JSON.parse(result.stdout),databaseSHA256:createHash('sha256').update(rows.stdout).digest('hex')};
+}
+export function purgePayloadInventory(operationId:string){
+ const container=requireIsolatedQuarantineWorkspace();if(!uuid.test(operationId))throw Error('Invalid cleanup fixture identity');
+ const script=`const fs=require('fs'),path=require('path'),root=path.join('/app/data/quarantine',process.argv[2],'payload');let bytes=0,files=0,entries=0;const visit=p=>{const s=fs.lstatSync(p);if(s.isSymbolicLink()||++entries>10000)throw Error('Unsafe payload inspection');if(s.isDirectory()){for(const name of fs.readdirSync(p))visit(path.join(p,name));}else{if(!s.isFile())throw Error('Unknown payload entry');bytes+=s.size;files++;}};const exists=fs.existsSync(root);if(exists)visit(root);console.log(JSON.stringify({exists,bytes,files}));`;
+ const result=spawnSync('docker',['exec','-i',container,'/ms-playwright-driver/node','-',operationId],{input:script,encoding:'utf8'});if(result.status!==0)throw Error(result.stderr||'Payload inspect failed');return JSON.parse(result.stdout);
+}

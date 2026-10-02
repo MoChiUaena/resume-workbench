@@ -18,22 +18,38 @@ import java.util.*;
 public class QuarantineStore {
     private static final LinkOption NOFOLLOW=LinkOption.NOFOLLOW_LINKS;
     private static final long MAX_BYTES=1024L*1024*1024, MAX_JOURNAL=1024*1024;
-    private static final Set<String> STATES=Set.of("preparing","moving","quarantined","restoring","restored","attention");
+    private static final Set<String> STATES=Set.of("preparing","moving","quarantined","restoring","restored","attention","purging","purged");
     public record Item(String kind,String id,long bytes) {}
-    /** digest is the recovery token: once restore starts it remains its bound request digest. */
-    public record Receipt(String id,String state,Instant createdAt,Instant updatedAt,List<Item> items,long bytes,String backupId,String digest,String errorCode) {}
+    /** digest is the recovery token: once restore or purge starts it remains its bound request digest. */
+    public record CleanupInfo(String exportId,String sha256,long bytes) {}
+    public record Receipt(String id,String state,Instant createdAt,Instant updatedAt,List<Item> items,long bytes,String backupId,String digest,String errorCode,CleanupInfo cleanup) {
+        public Receipt(String id,String state,Instant createdAt,Instant updatedAt,List<Item> items,long bytes,String backupId,String digest,String errorCode){this(id,state,createdAt,updatedAt,items,bytes,backupId,digest,errorCode,null);}
+    }
+    record CleanupView(QuarantineFiles.Plan plan,Receipt receipt,List<ExportService.Export> pdfs) {}
+    public record PurgedItem(String kind,String id,Instant createdAt,boolean complete) {}
+    @FunctionalInterface interface PurgeCheck {void check(CleanupView view)throws IOException;}
+    @FunctionalInterface interface Delete {void delete(Path path)throws IOException;}
     public record History(List<Receipt> items,int page,boolean hasMore,int unreadable) {}
     /** complete means every target in this quarantined batch has the expected structure and sizes, not verified content. */
     public record HeldItem(String kind,String id,long bytes,Instant createdAt,boolean complete) {}
-    private record Journal(QuarantineFiles.Plan plan,String state,Instant updatedAt,String backupId,String restoreDigest,String errorCode) {}
+    private record PdfMetadata(String id,String base64) {}
+    private record Purge(String token,String exportId,String archiveSha256,long archiveBytes,List<PdfMetadata> pdfMetadata) {
+        Purge {if(pdfMetadata!=null)pdfMetadata=List.copyOf(pdfMetadata);}
+        CleanupInfo info(){return new CleanupInfo(exportId,archiveSha256,archiveBytes);}
+    }
+    private record Journal(QuarantineFiles.Plan plan,String state,Instant updatedAt,String backupId,String restoreDigest,String errorCode,Purge purge) {
+        Journal(QuarantineFiles.Plan plan,String state,Instant updatedAt,String backupId,String restoreDigest,String errorCode){this(plan,state,updatedAt,backupId,restoreDigest,errorCode,null);}
+    }
     private record Stored(Journal journal,String digest) {}
     private record Unit(String path,List<QuarantineFiles.Entry> files,boolean directory) {}
     @FunctionalInterface interface Move { void move(Path source,Path destination)throws IOException; }
     private final Path root;
+    private final QuarantineFs fs;
     private final ObjectMapper mapper;
     private final Clock clock;
     private final Move move;
     private final QuarantineJournalIo journalIo;
+    private final Delete delete;
 
     @Autowired
     public QuarantineStore(@Value("${resume.data-dir}") String data,ObjectMapper mapper){this(Path.of(data),mapper,Clock.systemUTC());}
@@ -42,8 +58,58 @@ public class QuarantineStore {
         this(data,mapper,clock,move,new QuarantineJournalIo());
     }
     QuarantineStore(Path data,ObjectMapper mapper,Clock clock,Move move,QuarantineJournalIo journalIo){
-        this.root=data.toAbsolutePath().normalize();this.mapper=mapper.copy().disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS).enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
-            .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,DeserializationFeature.FAIL_ON_TRAILING_TOKENS);this.clock=clock;this.move=move;this.journalIo=Objects.requireNonNull(journalIo);
+        this(data,mapper,clock,move,journalIo,Files::delete);
+    }
+    QuarantineStore(Path data,ObjectMapper mapper,Clock clock,Move move,QuarantineJournalIo journalIo,Delete delete){
+        this.fs=new QuarantineFs(data);this.root=fs.root();this.mapper=mapper.copy().disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS).enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
+            .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,DeserializationFeature.FAIL_ON_TRAILING_TOKENS);this.clock=clock;this.move=move;this.journalIo=Objects.requireNonNull(journalIo);this.delete=Objects.requireNonNull(delete);
+    }
+    synchronized CleanupView cleanupView(String id,String expectedDigest)throws IOException {
+        require(sha(expectedDigest));var stored=required(id);var journal=stored.journal();
+        if(!receipt(stored).digest().equals(expectedDigest))throw conflict();
+        if(!Set.of("quarantined","purging","purged").contains(journal.state()))throw conflict();
+        if(journal.state().equals("purged")){ensureAbsent(payload(id));ensureAbsent(discard(id));return new CleanupView(journal.plan(),receipt(stored),owners(journal.plan(),journal.purge()));}
+        checkRemaining(journal.plan(),journal.state().equals("quarantined"));
+        return new CleanupView(journal.plan(),receipt(stored),journal.purge()==null?owners(journal.plan(),capture(journal.plan())):owners(journal.plan(),journal.purge()));
+    }
+    synchronized Receipt purge(String id,String expectedDigest,CleanupInfo proof,PurgeCheck check)throws IOException {
+        validateProof(proof);Objects.requireNonNull(check);var view=cleanupView(id,expectedDigest);var stored=required(id);var journal=stored.journal();
+        if(journal.purge()!=null&&!journal.purge().info().equals(proof))throw conflict();
+        if(journal.state().equals("purged"))return receipt(stored);
+        // Reference evidence comes from the last fully checked view, including sealed PDF owners on retries.
+        check.check(view);cleanupView(id,expectedDigest);
+        if(journal.purge()==null){
+            var sealed=new Purge(expectedDigest,proof.exportId(),proof.sha256(),proof.bytes(),capture(journal.plan()));
+            journal=new Journal(journal.plan(),"purging",clock.instant(),journal.backupId(),null,null,sealed);
+            // Outside the recovery catch: unknown initial publication never triggers a move or delete.
+            write(journal);
+        }
+        boolean finalizing=false;
+        try{
+            checkRemaining(journal.plan(),false);Path payload=payload(id),discard=discard(id);
+            if(present(payload)){safeMove(payload,discard);checkRemaining(journal.plan(),false);}
+            for(var target:journal.plan().items())for(var entry:target.files()){
+                // An external writer can introduce unknown entries or originals after any earlier action.
+                checkRemaining(journal.plan(),false);Path file=discard.resolve(entry.path());
+                if(present(file)){verify(discard,new Unit(entry.path(),List.of(entry),false),false);delete.delete(file);if(present(file))throw conflict();}
+            }
+            deleteEmptyDirectories(journal.plan());ensureAbsent(payload);ensureAbsent(discard);
+            finalizing=true;return receipt(write(transition(journal,"purged",journal.backupId(),null,null)));
+        }catch(ApiException|IOException e){
+            // A completed tombstone may already be published: never replace it with a retry intent.
+            if(finalizing){var observed=required(id);if(observed.journal().state().equals("purged"))throw e;}
+            var failed=write(transition(journal,"purging",journal.backupId(),null,"QUARANTINE_PURGE_FAILED"));
+            if(e instanceof ApiException a)throw a;return receipt(failed);
+        }
+    }
+    public synchronized List<PurgedItem> purgedInventory()throws IOException {
+        var result=new ArrayList<PurgedItem>();
+        for(Path batch:records()){
+            Stored stored;try{stored=read(batch.getFileName().toString());}catch(ApiException|IOException e){continue;}
+            if(stored==null||!stored.journal().state().equals("purged"))continue;var plan=stored.journal().plan();boolean complete=false;
+            try{complete=!present(payload(plan.id()))&&!present(discard(plan.id()));}catch(ApiException|IOException e){/* fail closed */}
+            for(var target:plan.items())result.add(new PurgedItem(target.kind(),target.id(),plan.createdAt(),complete));
+        }return List.copyOf(result);
     }
     public synchronized Receipt existing(String id)throws IOException {var stored=read(id);return stored==null?null:receipt(stored);}
     public synchronized Receipt existing(String id,String requestDigest)throws IOException {
@@ -59,7 +125,7 @@ public class QuarantineStore {
         var requested=keys(plan);
         for(Path batch:records()){
             Stored owned;try{owned=read(batch.getFileName().toString());}catch(ApiException|IOException e){continue;}
-            if(owned!=null&&!owned.journal().state().equals("restored")&&!Collections.disjoint(requested,keys(owned.journal().plan())))throw conflict();
+            if(owned!=null&&!Set.of("restored","purged").contains(owned.journal().state())&&!Collections.disjoint(requested,keys(owned.journal().plan())))throw conflict();
         }
         directory(root);directory(root.resolve("quarantine"));Path batch=path("quarantine/"+plan.id());
         if(present(batch))throw conflict();Files.createDirectory(batch);
@@ -96,6 +162,7 @@ public class QuarantineStore {
     }
     public synchronized Receipt restore(String id,String expectedDigest)throws IOException {
         require(sha(expectedDigest));var stored=required(id);var journal=stored.journal();
+        if(journal.purge()!=null)throw conflict();
         String bound=journal.restoreDigest()==null?stored.digest():journal.restoreDigest();
         if(!bound.equals(expectedDigest))throw conflict();
         if(journal.state().equals("restored"))return receipt(stored);
@@ -127,6 +194,8 @@ public class QuarantineStore {
         for(Path batch:records()){
             Stored stored;try{stored=read(batch.getFileName().toString());}catch(ApiException|IOException e){continue;}if(stored==null)continue;
             var journal=stored.journal();boolean layout=journal.state().equals("quarantined");
+            if(journal.state().equals("purged"))continue;
+            if(journal.state().equals("purging")){purgingInventory(journal,held);continue;}
             try{
                 checkPayload(journal.plan());Path base=payload(journal.plan().id());
                 for(var target:journal.plan().items())for(var entry:target.files())if(regular(base.resolve(entry.path())).size()!=entry.bytes())layout=false;
@@ -159,20 +228,30 @@ public class QuarantineStore {
             ordinaryDirectory(batch);Path file=path("quarantine/"+id+"/journal.json");var attr=regular(file);require(attr.size()>0&&attr.size()<=MAX_JOURNAL);
             byte[] bytes;try(var in=open(file)){bytes=in.readNBytes((int)MAX_JOURNAL+1);}require(bytes.length==attr.size());
             JsonNode envelope=mapper.readTree(bytes);require(envelope!=null&&envelope.isObject()&&fields(envelope).equals(Set.of("version","digest","journal"))
-                &&envelope.get("version").isIntegralNumber()&&envelope.get("version").canConvertToInt()&&envelope.get("version").intValue()==1&&envelope.get("digest").isTextual());
+                &&envelope.get("version").isIntegralNumber()&&envelope.get("version").canConvertToInt()&&Set.of(1,2).contains(envelope.get("version").intValue())&&envelope.get("digest").isTextual());
             String digest=envelope.get("digest").textValue();require(sha(digest)&&digest.equals(hash(mapper.writeValueAsBytes(envelope.get("journal")))));
+            int version=envelope.get("version").intValue();var expected=new HashSet<>(Set.of("plan","state","updatedAt","backupId","restoreDigest","errorCode"));if(version==2)expected.add("purge");require(envelope.get("journal").isObject()&&fields(envelope.get("journal")).equals(expected));
             Journal journal=mapper.treeToValue(envelope.get("journal"),Journal.class);validate(journal.plan());
             require(id.equals(journal.plan().id())&&STATES.contains(journal.state())&&journal.updatedAt()!=null
                 &&(journal.backupId()==null||uuid(journal.backupId()))&&(journal.restoreDigest()==null||sha(journal.restoreDigest()))
-                &&(journal.errorCode()==null||Set.of("QUARANTINE_CONFLICT","QUARANTINE_MOVE_FAILED","QUARANTINE_RESTORE_FAILED").contains(journal.errorCode())));
+                &&(journal.errorCode()==null||Set.of("QUARANTINE_CONFLICT","QUARANTINE_MOVE_FAILED","QUARANTINE_RESTORE_FAILED","QUARANTINE_PURGE_FAILED").contains(journal.errorCode())));
             require(!Set.of("moving","quarantined").contains(journal.state())||journal.backupId()!=null);
             require(!Set.of("restoring","restored").contains(journal.state())||journal.restoreDigest()!=null);
+            boolean cleanup=Set.of("purging","purged").contains(journal.state());require(cleanup==(version==2)&&cleanup==(journal.purge()!=null));
+            if(cleanup){
+                var p=envelope.get("journal").get("purge");require(p!=null&&p.isObject()&&fields(p).equals(Set.of("token","exportId","archiveSha256","archiveBytes","pdfMetadata")));
+                for(String field:List.of("token","exportId","archiveSha256"))require(p.get(field).isTextual());
+                require(p.get("archiveBytes").isIntegralNumber()&&p.get("archiveBytes").canConvertToLong()&&p.get("pdfMetadata").isArray());
+                for(var metadata:p.get("pdfMetadata"))require(metadata.isObject()&&fields(metadata).equals(Set.of("id","base64"))&&metadata.get("id").isTextual()&&metadata.get("base64").isTextual());
+                require(journal.backupId()!=null&&journal.restoreDigest()==null&&sha(journal.purge().token())&&(journal.errorCode()==null||journal.errorCode().equals("QUARANTINE_PURGE_FAILED")));validateProof(journal.purge().info());owners(journal.plan(),journal.purge());
+            }
+            else require(!"QUARANTINE_PURGE_FAILED".equals(journal.errorCode()));
             return new Stored(journal,digest);
         }catch(IOException|RuntimeException e){throw new ApiException("QUARANTINE_UNREADABLE","暂存记录无法核验，请保留文件并检查暂存记录。",409);}
     }
     private Stored write(Journal journal)throws IOException {
-        Path batch=path("quarantine/"+journal.plan().id());ordinaryDirectory(batch);JsonNode tree=mapper.valueToTree(journal);String digest=hash(mapper.writeValueAsBytes(tree));
-        var envelope=mapper.createObjectNode();envelope.put("version",1);envelope.put("digest",digest);envelope.set("journal",tree);byte[] bytes=mapper.writeValueAsBytes(envelope);require(bytes.length<=MAX_JOURNAL);
+        Path batch=path("quarantine/"+journal.plan().id());ordinaryDirectory(batch);JsonNode tree=mapper.valueToTree(journal);if(journal.purge()==null)((com.fasterxml.jackson.databind.node.ObjectNode)tree).remove("purge");String digest=hash(mapper.writeValueAsBytes(tree));
+        var envelope=mapper.createObjectNode();envelope.put("version",journal.purge()==null?1:2);envelope.put("digest",digest);envelope.set("journal",tree);byte[] bytes=mapper.writeValueAsBytes(envelope);require(bytes.length<=MAX_JOURNAL);
         Path destination=batch.resolve("journal.json"),temp=batch.resolve(".journal-"+UUID.randomUUID()+".tmp");checked(destination);if(present(destination))regular(destination);
         try{
             try(var channel=FileChannel.open(temp,StandardOpenOption.CREATE_NEW,StandardOpenOption.WRITE,NOFOLLOW)){
@@ -183,11 +262,11 @@ public class QuarantineStore {
         }finally{Files.deleteIfExists(temp);}
         return new Stored(journal,digest);
     }
-    private Journal transition(Journal journal,String state,String backup,String restore,String error){return new Journal(journal.plan(),state,clock.instant(),backup,restore,error);}
+    private Journal transition(Journal journal,String state,String backup,String restore,String error){return new Journal(journal.plan(),state,clock.instant(),backup,restore,error,journal.purge());}
     private Receipt receipt(Stored stored){
         var journal=stored.journal();var items=journal.plan().items().stream().map(i->new Item(i.kind(),i.id(),i.bytes())).toList();
-        String token=journal.restoreDigest()==null?stored.digest():journal.restoreDigest();
-        return new Receipt(journal.plan().id(),journal.state(),journal.plan().createdAt(),journal.updatedAt(),items,items.stream().mapToLong(Item::bytes).sum(),journal.backupId(),token,journal.errorCode());
+        String token=journal.purge()!=null?journal.purge().token():journal.restoreDigest()==null?stored.digest():journal.restoreDigest();
+        return new Receipt(journal.plan().id(),journal.state(),journal.plan().createdAt(),journal.updatedAt(),items,items.stream().mapToLong(Item::bytes).sum(),journal.backupId(),token,journal.errorCode(),journal.purge()==null?null:journal.purge().info());
     }
     private void rollback(Journal journal,List<Unit> units){
         Path payload=root.resolve("quarantine/"+journal.plan().id()+"/payload");
@@ -195,6 +274,83 @@ public class QuarantineStore {
             Path held=payload.resolve(unit.path()),original=root.resolve(unit.path());checked(held);checked(original);
             if(present(held)&&!present(original)){verify(payload,unit,false);directory(original.getParent());safeMove(held,original);}
         }catch(ApiException|IOException e){/* Leave genuine remaining payload and journal for explicit recovery. */}}
+    }
+    private void validateProof(CleanupInfo proof){require(proof!=null&&uuid(proof.exportId())&&sha(proof.sha256())&&proof.bytes()>0&&proof.bytes()<=MAX_BYTES+1024*1024);}
+    private List<PdfMetadata> capture(QuarantineFiles.Plan plan)throws IOException {
+        var metadata=new ArrayList<PdfMetadata>();Path base=payload(plan.id());
+        for(var target:plan.items())if(target.kind().equals("pdf")){
+            var entry=target.files().stream().filter(e->e.path().endsWith(".json")).findFirst().orElseThrow();require(entry.bytes()<=4096);
+            verify(base,new Unit(entry.path(),List.of(entry),false),false);byte[] bytes;try(var in=open(base.resolve(entry.path()))){bytes=in.readNBytes(4097);}
+            require(bytes.length==entry.bytes()&&hash(bytes).equals(entry.sha256()));metadata.add(new PdfMetadata(target.id(),Base64.getEncoder().encodeToString(bytes)));
+        }
+        owners(plan,metadata);return List.copyOf(metadata);
+    }
+    /** Validate sealed exact bytes against the Plan, including metadata already unlinked. */
+    private List<ExportService.Export> owners(QuarantineFiles.Plan plan,Purge purge)throws IOException {
+        require(purge!=null);return owners(plan,purge.pdfMetadata());
+    }
+    private List<ExportService.Export> owners(QuarantineFiles.Plan plan,List<PdfMetadata> metadata)throws IOException {
+        require(metadata!=null);var planned=new HashMap<String,QuarantineFiles.Target>();
+        for(var target:plan.items())if(target.kind().equals("pdf"))planned.put(target.id(),target);
+        var seen=new HashSet<String>();var result=new ArrayList<ExportService.Export>();
+        for(var sealed:metadata){
+            require(sealed!=null&&planned.containsKey(sealed.id())&&seen.add(sealed.id())&&sealed.base64()!=null&&sealed.base64().length()<=5464);
+            byte[] bytes=Base64.getDecoder().decode(sealed.base64());require(bytes.length>0&&bytes.length<=4096&&Base64.getEncoder().encodeToString(bytes).equals(sealed.base64()));
+            var target=planned.get(sealed.id());var json=target.files().stream().filter(e->e.path().endsWith(".json")).findFirst().orElseThrow();var pdf=target.files().stream().filter(e->e.path().endsWith(".pdf")).findFirst().orElseThrow();
+            require(bytes.length==json.bytes()&&hash(bytes).equals(json.sha256()));var node=mapper.readTree(bytes);
+            require(node!=null&&node.isObject()&&fields(node).containsAll(Set.of("id","snapshotId","digest","sha256","createdAt"))
+                &&Set.of("id","snapshotId","digest","sha256","createdAt","resumeId","versionId","revision").containsAll(fields(node)));
+            for(String field:List.of("id","snapshotId","digest","sha256","createdAt"))require(node.get(field).isTextual());
+            for(String field:List.of("resumeId","versionId"))require(!node.hasNonNull(field)||node.get(field).isTextual());
+            require(!node.hasNonNull("revision")||node.get("revision").isIntegralNumber()&&node.get("revision").canConvertToLong());
+            var owner=mapper.treeToValue(node,ExportService.Export.class);
+            require(owner!=null&&sealed.id().equals(owner.id())&&uuid(owner.snapshotId())&&sha(owner.digest())&&sha(owner.sha256())&&owner.createdAt()!=null&&pdf.bytes()>=5&&pdf.sha256().equals(owner.sha256()));
+            boolean bound=owner.resumeId()!=null||owner.versionId()!=null||owner.revision()!=null;
+            require(!bound||uuid(owner.resumeId())&&uuid(owner.versionId())&&owner.revision()!=null&&owner.revision()>=1);result.add(owner);
+        }
+        require(seen.equals(planned.keySet()));return List.copyOf(result);
+    }
+    private Path discard(String id)throws IOException {require(uuid(id));return path("quarantine/"+id+"/discard");}
+    /** Closed-world structure plus hashes for either the complete payload or remaining planned subset. */
+    private Path checkRemaining(QuarantineFiles.Plan plan,boolean complete)throws IOException {
+        Path payload=payload(plan.id()),discard=discard(plan.id());boolean p=present(payload),d=present(discard);
+        if(p&&d||complete&&(!p||d))throw conflict();for(var unit:units(plan))ensureAbsent(root.resolve(unit.path()));
+        Path base=d?discard:payload;if(!p&&!d)return base;ordinaryDirectory(base);inspectPayload(base,base,allowed(plan),0);
+        for(var target:plan.items())for(var entry:target.files()){
+            Path file=base.resolve(entry.path());checked(file);if(present(file))verify(base,new Unit(entry.path(),List.of(entry),false),false);else if(complete)throw conflict();
+        }return base;
+    }
+    private Set<String> allowed(QuarantineFiles.Plan plan){
+        var result=new HashSet<String>();for(var target:plan.items())for(var entry:target.files()){
+            result.add(entry.path());int index=entry.path().lastIndexOf('/');while(index>0){result.add(entry.path().substring(0,index));index=entry.path().lastIndexOf('/',index-1);}
+        }return result;
+    }
+    private void deleteEmptyDirectories(QuarantineFiles.Plan plan)throws IOException {
+        Path base=discard(plan.id());var directories=new HashSet<String>();
+        for(var target:plan.items())for(var entry:target.files()){
+            int index=entry.path().lastIndexOf('/');while(index>0){directories.add(entry.path().substring(0,index));index=entry.path().lastIndexOf('/',index-1);}
+        }
+        var sorted=directories.stream().sorted(Comparator.comparingInt(String::length).reversed()).toList();
+        for(String relative:sorted)deleteEmptyDirectory(base.resolve(relative),plan);deleteEmptyDirectory(base,plan);
+    }
+    private void deleteEmptyDirectory(Path directory,QuarantineFiles.Plan plan)throws IOException {
+        checkRemaining(plan,false);checked(directory);if(!present(directory))return;ordinaryDirectory(directory);
+        try(var stream=Files.newDirectoryStream(directory)){if(stream.iterator().hasNext())throw conflict();}
+        delete.delete(directory);if(present(directory))throw conflict();
+    }
+    private void purgingInventory(Journal journal,List<HeldItem> held)throws IOException {
+        var plan=journal.plan();var bases=List.of(payload(plan.id()),discard(plan.id()));
+        for(var target:plan.items()){
+            long bytes=0;boolean exists=false;
+            for(Path base:bases)try{
+                checked(base);if(!present(base))continue;ordinaryDirectory(base);
+                if(target.kind().equals("image")){
+                    Path image=base.resolve("attachments/"+target.id());checked(image);if(!present(image))continue;exists=true;ordinaryDirectory(image);
+                    try(var stream=Files.newDirectoryStream(image)){int count=0;for(Path child:stream){if(++count>20000)break;try{bytes=Math.addExact(bytes,regular(child).size());}catch(ApiException|IOException|ArithmeticException e){/* unreadable stays incomplete */}}}
+                }else for(var entry:target.files()){Path file=base.resolve(entry.path());checked(file);if(present(file)){exists=true;bytes=Math.addExact(bytes,regular(file).size());}}
+            }catch(ApiException|IOException|ArithmeticException e){/* Never claim complete during purge. */}
+            if(exists)held.add(new HeldItem(target.kind(),target.id(),bytes,plan.createdAt(),false));
+        }
     }
     private List<Unit> units(QuarantineFiles.Plan plan){
         var result=new ArrayList<Unit>();for(var target:plan.items()){
@@ -235,55 +391,21 @@ public class QuarantineStore {
         // ATOMIC_MOVE is deliberately excluded: its contract can replace an existing destination.
         move.move(source,destination);
     }
-    private void sameStore(Path source,Path destination)throws IOException {
-        checked(source);checked(destination);Path parent=destination.getParent();
-        while(parent!=null&&!present(parent))parent=parent.getParent();
-        if(parent==null||!parent.startsWith(root))throw conflict();ordinaryDirectory(parent);
-        if(!Files.getFileStore(source).equals(Files.getFileStore(parent)))throw conflict();
-    }
+    private void sameStore(Path source,Path destination)throws IOException {fs.sameStore(source,destination);}
     private void ensureAbsent(Path file)throws IOException {checked(file);if(present(file))throw conflict();}
     private Path payload(String id)throws IOException {require(uuid(id));return path("quarantine/"+id+"/payload");}
-    private Path path(String relative)throws IOException {Path value=root.resolve(relative).normalize();checked(value);return value;}
-    private void checked(Path value)throws IOException {
-        Path absolute=value.toAbsolutePath().normalize();if(!absolute.startsWith(root))throw conflict();
-        Path cursor=absolute.getRoot();for(Path part:absolute){cursor=cursor.resolve(part);if(present(cursor)){
-            var attr=Files.readAttributes(cursor,BasicFileAttributes.class,NOFOLLOW);
-            if(attr.isSymbolicLink()||attr.isOther()||!cursor.toRealPath(NOFOLLOW).equals(cursor.toRealPath()))throw conflict();
-            if(!cursor.equals(absolute)&&!attr.isDirectory())throw conflict();
-        }}
-    }
-    private void directory(Path value)throws IOException {
-        checked(value);if(present(value)){ordinaryDirectory(value);return;}
-        if(value.equals(root)){Files.createDirectories(root);ordinaryDirectory(root);return;}
-        Path parent=value.getParent();if(parent==null)throw conflict();directory(parent);Files.createDirectory(value);ordinaryDirectory(value);
-    }
-    private void ordinaryDirectory(Path value)throws IOException {checked(value);var attr=Files.readAttributes(value,BasicFileAttributes.class,NOFOLLOW);if(!attr.isDirectory()||attr.isSymbolicLink()||attr.isOther())throw conflict();}
-    private BasicFileAttributes regular(Path value)throws IOException {checked(value);var attr=Files.readAttributes(value,BasicFileAttributes.class,NOFOLLOW);if(!attr.isRegularFile()||attr.isSymbolicLink()||attr.isOther())throw conflict();return attr;}
-    private static boolean present(Path value){return Files.exists(value,NOFOLLOW);}
-    private static InputStream open(Path value)throws IOException {return Channels.newInputStream(Files.newByteChannel(value,Set.of(StandardOpenOption.READ,NOFOLLOW)));}
+    private Path path(String relative)throws IOException {return fs.path(relative);}
+    private void checked(Path value)throws IOException {fs.checked(value);}
+    private void directory(Path value)throws IOException {fs.directory(value);}
+    private void ordinaryDirectory(Path value)throws IOException {fs.ordinaryDirectory(value);}
+    private BasicFileAttributes regular(Path value)throws IOException {return fs.regular(value);}
+    private static boolean present(Path value){return QuarantineFs.present(value);}
+    private static InputStream open(Path value)throws IOException {return QuarantineFs.open(value);}
     private static Set<String> fields(JsonNode node){var names=new HashSet<String>();node.fieldNames().forEachRemaining(names::add);return names;}
     private static Set<String> keys(QuarantineFiles.Plan plan){var result=new HashSet<String>();for(var target:plan.items())result.add(target.kind()+"/"+target.id());return result;}
-    private static void validate(QuarantineFiles.Plan plan){
-        require(plan!=null&&uuid(plan.id())&&sha(plan.requestDigest())&&sha(plan.previewDigest())&&plan.createdAt()!=null&&plan.items()!=null&&!plan.items().isEmpty()&&plan.items().size()<=100);
-        var targets=new HashSet<String>();long total=0;
-        for(var target:plan.items()){
-            require(target!=null&&target.kind()!=null&&Set.of("image","pdf").contains(target.kind())&&uuid(target.id())&&target.files()!=null&&target.bytes()>0&&target.bytes()<=MAX_BYTES&&targets.add(target.kind()+"/"+target.id()));
-            var paths=new HashSet<String>();long size=0;
-            for(var file:target.files()){
-                require(file!=null&&file.path()!=null&&file.bytes()>0&&file.bytes()<=MAX_BYTES&&sha(file.sha256())&&file.modified()!=null&&paths.add(file.path()));
-                size+=file.bytes();require(size<=MAX_BYTES);
-            }
-            require(size==target.bytes());
-            if(target.kind().equals("pdf"))require(paths.equals(Set.of("exports/"+target.id()+".pdf","exports/"+target.id()+".json")));
-            else{
-                String prefix="attachments/"+target.id()+"/";require(paths.size()==3&&paths.contains(prefix+"metadata.json")&&paths.contains(prefix+"image.png")
-                    &&paths.stream().filter(p->Set.of(prefix+"original.png",prefix+"original.jpeg",prefix+"original.webp").contains(p)).count()==1);
-            }
-            total+=size;require(total<=MAX_BYTES);
-        }
-    }
-    private static boolean uuid(String value){return value!=null&&value.matches("[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}");}
-    private static boolean sha(String value){return value!=null&&value.matches("[0-9a-f]{64}");}
+    private static void validate(QuarantineFiles.Plan plan){QuarantineFiles.validate(plan);}
+    private static boolean uuid(String value){return QuarantineFiles.uuid(value);}
+    private static boolean sha(String value){return QuarantineFiles.sha(value);}
     private static void require(boolean valid){if(!valid)throw new ApiException("QUARANTINE_INVALID","暂存请求或文件清单无效。",422);}
     private static ApiException conflict(){return new ApiException("QUARANTINE_CONFLICT","文件或暂存状态已变化，请刷新后重试；现有文件已保留。",409);}
     private static MessageDigest digest(){try{return MessageDigest.getInstance("SHA-256");}catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}}

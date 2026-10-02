@@ -33,6 +33,31 @@ class StorageInspectorTest {
     }
     StorageInspector.Item item(StorageInspector.Report report,String id){return report.items().stream().filter(i->id.equals(i.id())).findFirst().orElseThrow();}
     Map<String,String> fingerprint()throws Exception {var result=new TreeMap<String,String>();try(var paths=Files.walk(data)){for(Path path:paths.filter(p->Files.isRegularFile(p,LinkOption.NOFOLLOW_LINKS)).toList())result.put(data.relativize(path).toString(),ImageService.sha(Files.readAllBytes(path))+Files.getLastModifiedTime(path));}return result;}
+    @ParameterizedTest @ValueSource(strings={"missing","empty","nonempty","current","historical","unverified","active","incomplete","unknown"})
+    void purgedImagesSuppressOnlyVerifiedUnreferencedAbsentOrTrulyEmptyOriginals(String state)throws Exception {
+        String id=UUID.randomUUID().toString();Path original=data.resolve("attachments/"+id);var catalogs=Map.of(id,new StorageInspector.Catalog("{}",old));
+        if(Set.of("empty","nonempty").contains(state)){Files.createDirectories(original);if(state.equals("nonempty"))Files.writeString(original.resolve("private-canary"),"must survive");}
+        if(state.equals("unknown")){Files.createDirectories(original.getParent());Files.writeString(original,"unexpected-type-canary");}
+        var source=refs(catalogs,state.equals("current")?Set.of(id):Set.of(),state.equals("historical")?Set.of(id):Set.of(),Set.of(),Map.of(),!state.equals("unverified"));
+        var held=state.equals("active")?List.of(new QuarantineStore.HeldItem("image",id,321,old,true)):List.<QuarantineStore.HeldItem>of();
+        var tombstones=List.of(new QuarantineStore.PurgedItem("image",id,old,!state.equals("incomplete")));
+        var before=fingerprint();var report=new StorageInspector(data,mapper,source,clock).snapshot(held,tombstones).report();
+        if(Set.of("missing","empty").contains(state))assertThat(report.items()).singleElement().satisfies(i->{assertThat(i.status()).isEqualTo("purged");assertThat(i.bytes()).isZero();});
+        else{assertThat(report.items()).noneMatch(i->i.status().equals("purged"));if(state.equals("active"))assertThat(report.items()).singleElement().satisfies(i->{assertThat(i.status()).isEqualTo("quarantined");assertThat(i.bytes()).isEqualTo(321);});else assertThat(report.items()).anyMatch(i->i.status().equals("check"));}
+        assertThat(fingerprint()).isEqualTo(before);assertThat(mapper.writeValueAsString(report)).doesNotContain("private-canary","unexpected-type-canary",data.toString());
+    }
+    @Test void tombstonesNeverSuppressNewLiveImageOrPdfWithReusedIdentity()throws Exception {
+        var asset=image(true);String pdf=pdf(null,null,null,true);var tombstones=List.of(new QuarantineStore.PurgedItem("image",asset.id(),old,true),new QuarantineStore.PurgedItem("pdf",pdf,old,true));
+        var before=fingerprint();var snapshot=new StorageInspector(data,mapper,empty(),clock).snapshot(List.of(),tombstones);
+        assertThat(snapshot.report().items()).hasSize(2).allMatch(i->i.status().equals("candidate")&&i.bytes()>0);assertThat(snapshot.candidates()).hasSize(2);assertThat(fingerprint()).isEqualTo(before);
+    }
+    @Test void tombstoneOrderingCountsAndDigestAreStableAndInvalidEntriesStayOut()throws Exception {
+        String image=UUID.randomUUID().toString(),pdf=UUID.randomUUID().toString();
+        var tombstones=List.of(new QuarantineStore.PurgedItem("pdf",pdf,old,true),new QuarantineStore.PurgedItem("image",image,old,true),new QuarantineStore.PurgedItem("image",image,old,true),new QuarantineStore.PurgedItem("other",UUID.randomUUID().toString(),old,true),new QuarantineStore.PurgedItem("image","../bad",old,true));
+        var report=new StorageInspector(data,mapper,empty(),clock).snapshot(List.of(),tombstones).report();var reversed=new ArrayList<>(tombstones);Collections.reverse(reversed);
+        assertThat(report.items()).hasSize(2).allMatch(i->i.status().equals("purged")&&i.bytes()==0);assertThat(report.statuses()).anyMatch(c->c.key().equals("purged")&&c.count()==2&&c.bytes()==0);
+        assertThat(new StorageInspector(data,mapper,empty(),clock).snapshot(List.of(),reversed).report().digest()).isEqualTo(report.digest());
+    }
     @Test void currentHistoricalRecentAndOldOrphanImagesAreSeparatedWithoutChangingFiles()throws Exception {
         var current=image(true);var historical=image(true);var orphan=image(true);var recent=image(false);var boundary=image(true);
         Path boundaryPath=data.resolve("attachments/"+boundary.id());try(var paths=Files.list(boundaryPath)){for(Path path:paths.toList())Files.setLastModifiedTime(path,FileTime.from(now.minus(Duration.ofDays(30))));}Files.setLastModifiedTime(boundaryPath,FileTime.from(now.minus(Duration.ofDays(30))));
