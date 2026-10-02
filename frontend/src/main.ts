@@ -5,4 +5,5 @@ import './site.css';
 import './backup.css';
 import './history.css';
 import './models.css';
+import './job-match.css';
 createApp(App).mount('#app');
