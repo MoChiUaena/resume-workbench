@@ -42,7 +42,7 @@ async function open(page:Page,id:string){
  await page.goto('/?view=editor&resume='+id);
  await expect(page.getByTestId('preview-status')).toContainText('预览已更新');
  await page.getByRole('button',{name:'职位匹配',exact:true}).click();
- return page.getByRole('dialog',{name:'职位匹配'});
+ return page.getByRole('dialog',{name:'职位匹配',exact:true});
 }
 async function ready(page:Page,id:string,jd='具备 Java 项目经验；拥有云平台部署经验；具备缺失技能'){
  const dialog=await open(page,id);
@@ -122,6 +122,7 @@ test('selected module is the exact sent payload; report is read only until revie
   await review.getByLabel('确认建议事实与表达').check();
   await review.getByRole('button',{name:'确认应用建议'}).click();
   await expect(review).toHaveCount(0);
+  await expect(page.getByRole('dialog',{name:'职位匹配',exact:true})).toHaveCount(0);
   const saved=await(await request.get('/api/resumes/'+resume.id)).json();
   expect(saved.document.content.sections.find((section:any)=>section.id===project.id).entries[0].bullets[0]).toBe('人工核对：整理接口文档并记录联调问题，提升 30%。');
   expect((await(await request.get('/api/resumes/'+resume.id+'/versions')).json()).some((version:any)=>version.label.startsWith('AI 应用前自动保留'))).toBe(true);
@@ -230,5 +231,100 @@ test('returning to a changed source or model clears an old report',async({page,r
   await expect(dialog.getByLabel('匹配报告')).toHaveCount(0);
   await expect(dialog.getByTestId('job-payload')).toHaveCount(0);
   await expect(dialog.getByRole('alert')).toContainText('简历或模型配置已改变');
+  await dialog.getByRole('button',{name:'取消并关闭'}).click();
+  const again=await ready(page,resume.id);
+  await again.getByLabel('确认发送岗位和选中模块').check();
+  await again.getByRole('button',{name:'生成匹配分析'}).click();
+  await expect(again.getByLabel('匹配报告')).toBeVisible();
+  const settings=await models(request);
+  await request.put('/api/models/profiles/'+profile.id,{headers,data:{expectedRevision:settings.revision,name:'另一个窗口改了模型',provider:'compatible',baseUrl:'http://127.0.0.1:18770/v1',model:'qa-job-normal',apiKey:'',clearKey:false}});
+  await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+  await expect(again.getByLabel('匹配报告')).toHaveCount(0);
+  await expect(again.getByRole('alert')).toContainText('简历或模型配置已改变');
  }finally{await cleanup(request,resume.id,profile.id);}
+});
+
+test('cancel first review then open second suggestion from the same report without another model call',async({page,request})=>{
+ const profile=await configure(request);
+ const prepared=await preparedResume(request);
+ let source=prepared.resume;
+ try{
+  const project=source.document.content.sections.find((section:any)=>section.id===prepared.project.id);
+  project.entries[0].bullets.push('SECOND-BODY-CANARY 维护另一段事实描述。');
+  source=await(await request.put('/api/resumes/'+source.id,{headers,data:{title:source.title,document:source.document,expectedRevision:source.revision,mutationId:crypto.randomUUID()}})).json();
+  const before=(await fixtureRequests(request)).length;
+  const dialog=await ready(page,source.id);
+  await dialog.getByLabel('确认发送岗位和选中模块').check();
+  await dialog.getByRole('button',{name:'生成匹配分析'}).click();
+  const actions=dialog.getByRole('button',{name:'审核修改'});
+  await expect(actions).toHaveCount(2);
+  expect((await fixtureRequests(request)).length).toBe(before+1);
+  await actions.first().click();
+  const review=page.getByRole('dialog',{name:'审核职位匹配建议'});
+  await expect(review).toBeVisible();
+  await expect(dialog).toBeHidden();
+  await review.getByRole('button',{name:'取消',exact:true}).click();
+  await expect(dialog.getByLabel('匹配报告')).toBeVisible();
+  await expect(actions.first()).toBeFocused();
+  await actions.nth(1).click();
+  await expect(review.getByTestId('ai-edit-suggestion')).toHaveValue(/SECOND-BODY-CANARY/);
+  expect((await fixtureRequests(request)).length).toBe(before+1);
+  await review.getByRole('button',{name:'取消',exact:true}).click();
+  expect(await(await request.get('/api/resumes/'+source.id)).json()).toEqual(source);
+ }finally{await cleanup(request,source.id,profile.id);}
+});
+
+test('idle expiry removes consent and requires a new preview without a provider call',async({page,request})=>{
+ const profile=await configure(request),{resume}=await preparedResume(request);
+ try{
+  await page.route('**/api/ai/job-matches/preview',async route=>{
+   const response=await route.fetch(),result=await response.json();
+   await route.fulfill({response,json:{...result,expiresAt:new Date(Date.now()+600).toISOString()}});
+  });
+  const before=(await fixtureRequests(request)).length;
+  const dialog=await ready(page,resume.id);
+  await dialog.getByLabel('确认发送岗位和选中模块').check();
+  await expect(dialog.getByTestId('job-payload')).toHaveCount(0,{timeout:4000});
+  await expect(dialog.getByRole('alert')).toContainText('过期');
+  await expect(dialog.getByRole('button',{name:'生成匹配分析'})).toHaveCount(0);
+  expect((await fixtureRequests(request)).length).toBe(before);
+ }finally{await cleanup(request,resume.id,profile.id);}
+});
+
+test('an idle expired report removes its review actions',async({page,request})=>{
+ const profile=await configure(request),{resume}=await preparedResume(request);
+ try{
+  await page.route('**/api/ai/job-matches',async route=>{
+   if(route.request().method()!=='POST'){await route.continue();return;}
+   const response=await route.fetch(),result=await response.json();
+   await route.fulfill({response,json:{...result,expiresAt:new Date(Date.now()+700).toISOString()}});
+  });
+  const dialog=await ready(page,resume.id);
+  await dialog.getByLabel('确认发送岗位和选中模块').check();
+  await dialog.getByRole('button',{name:'生成匹配分析'}).click();
+  await expect(dialog.getByLabel('匹配报告')).toBeVisible();
+  await expect(dialog.getByLabel('匹配报告')).toHaveCount(0,{timeout:4000});
+  await expect(dialog.getByRole('alert')).toContainText('报告已过期');
+  await expect(dialog.getByRole('button',{name:'审核修改'})).toHaveCount(0);
+ }finally{await cleanup(request,resume.id,profile.id);}
+});
+
+test('heading-only fixture returns a valid report with no edit suggestion',async({request})=>{
+ const profile=await configure(request),prepared=await preparedResume(request);
+ let source=prepared.resume;
+ try{
+  const project=source.document.content.sections.find((section:any)=>section.id===prepared.project.id);
+  project.entries=project.entries.map((entry:any)=>({...entry,title:'HEADING-ONLY-CANARY',meta:'',bullets:['']}));
+  const saved=await request.put('/api/resumes/'+source.id,{headers,data:{title:source.title,document:source.document,expectedRevision:source.revision,mutationId:crypto.randomUUID()}});
+  expect(saved.ok(),await saved.text()).toBe(true);source=await saved.json();
+  const previewResponse=await request.post('/api/ai/job-matches/preview',{headers,data:{resumeId:source.id,expectedRevision:source.revision,sectionIds:[project.id],jobDescription:'具备项目经验',profileId:profile.id,settingsRevision:(await models(request)).revision}});
+  expect(previewResponse.ok(),await previewResponse.text()).toBe(true);
+  const preview=await previewResponse.json();
+  expect(preview.sources.every((item:any)=>item.paragraph===-1)).toBe(true);
+  const generated=await request.post('/api/ai/job-matches',{headers,data:{previewId:preview.id,confirmSend:true}});
+  expect(generated.ok(),await generated.text()).toBe(true);
+  const report=await generated.json();
+  expect(report.suggestions).toEqual([]);
+  expect(preview.sources[0].text).toContain(report.items[0].evidence[0].quote);
+ }finally{await cleanup(request,source.id,profile.id);}
 });

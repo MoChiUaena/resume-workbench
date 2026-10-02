@@ -27,9 +27,11 @@ export function startQaModelServer(port=18770){
     evidence:index>1?[]:[{sourceId:index===0?first.id:body.id,quote:index===0?quote:partialQuote}],
     advice:index>1?'请根据真实经历补充证据；没有相关经历可保留缺项。':'请核对引用与岗位要求是否真正相关。'
    }));
-   const editable=job.sources.find(source=>source.text===body?.text&&source.id===body?.id)||job.sources.find(source=>source.text!==first?.text);
-   const suggestion=editable&&editable.text.length<=780?{sourceId:editable.id,replacement:editable.text+'（请人工核对表述）'}:null;
-   content=JSON.stringify({items,suggestions:suggestion?[suggestion]:[]});
+   // The production payload intentionally omits local paragraph metadata. Only known synthetic
+   // body markers are eligible; every other source, including headings, stays read-only here.
+   const suggestions=job.sources.filter(source=>/^(?:PROJECT|SECOND)-BODY-CANARY/.test(source.text)&&source.text.length<=780)
+    .slice(0,6).map(source=>({sourceId:source.id,replacement:source.text+'（请人工核对表述）'}));
+   content=JSON.stringify({items,suggestions});
    if(input.model==='qa-job-bad-reference')content=JSON.stringify({items:[{requirement:requirements[0],status:'supported',evidence:[{sourceId:'s999',quote:'fabricated'}],advice:''}],suggestions:[]});
   }else content=input.response_format?JSON.stringify({text:user+'（表述优化）'}):'OK';
   if(input.model==='qa-slow'||input.model==='qa-job-slow')await new Promise(resolve=>setTimeout(resolve,1800));

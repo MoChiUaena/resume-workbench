@@ -42,7 +42,7 @@ const aiSource=ref<Resume>(),aiTarget=ref<ParagraphTarget>(),aiFocus=ref<HTMLEle
 const jobSource=ref<Resume>(),jobFocus=ref<HTMLElement>();
 async function openJobMatch(){await ws.flush();if(current.value){jobFocus.value=document.activeElement instanceof HTMLElement?document.activeElement:undefined;jobSource.value=JSON.parse(JSON.stringify(current.value));}}
 function closeJobMatch(){jobSource.value=undefined;}
-function reviewJobSuggestion(suggestion:Suggestion){if(!jobSource.value)return;aiSource.value=jobSource.value;aiTarget.value={sectionId:suggestion.sectionId,entryId:suggestion.entryId,paragraph:suggestion.paragraph,selectionStart:suggestion.selectionStart,selectionEnd:suggestion.selectionEnd};aiFocus.value=jobFocus.value;aiInitial.value=suggestion;jobSource.value=undefined;}
+function reviewJobSuggestion(suggestion:Suggestion,trigger:HTMLElement){if(!jobSource.value)return;aiSource.value=jobSource.value;aiTarget.value={sectionId:suggestion.sectionId,entryId:suggestion.entryId,paragraph:suggestion.paragraph,selectionStart:suggestion.selectionStart,selectionEnd:suggestion.selectionEnd};aiFocus.value=trigger;aiInitial.value=suggestion;}
 async function jobSettings(){closeJobMatch();await openModels();}
 async function openSuggestion(target:ParagraphTarget){await ws.flush();if(current.value){aiFocus.value=document.activeElement instanceof HTMLElement?document.activeElement:undefined;aiTarget.value=target;aiSource.value=JSON.parse(JSON.stringify(current.value));}}
 function closeSuggestion(){if(!aiApplying.value){aiSource.value=undefined;aiTarget.value=undefined;aiInitial.value=undefined;}}
@@ -158,7 +158,7 @@ onUnmounted(()=>{observer?.disconnect();clearTimeout(previewTimer);ws.dispose();
     <section class="rw-preview-area" ref="previewPane"><div class="rw-preview-heading"><span data-testid="preview-status" role="status">{{previewState}}</span><span>A4 · {{pageCount}} 页</span></div><div class="rw-paper-wrap" :style="{width:794*scale+'px',height:paperHeight*scale+'px'}"><iframe v-if="previewUrl" ref="previewFrame" title="简历实时预览" :src="previewUrl" :style="{width:'794px',height:paperHeight+'px',transform:`scale(${scale})`}"></iframe><div v-else class="rw-preview-empty">正在生成预览…</div></div><p v-if="exported" class="rw-export-result">{{exported.redacted?'脱敏 PDF':'PDF'}} 已生成 · 修订 r{{exported.revision}} <a :href="'/api/exports/'+exported.id+'/pdf'" @click.prevent="action(()=>downloadPdf(exported!.id,exported!.redacted))">重新下载</a></p></section>
    </div></div>
  </div>
- <JobMatch v-if="jobSource" :source="jobSource" :return-focus="jobFocus" @close="closeJobMatch" @settings="action(jobSettings)" @review="reviewJobSuggestion"/>
+ <JobMatch v-if="jobSource" :source="jobSource" :return-focus="jobFocus" :suspended="!!aiInitial" @close="closeJobMatch" @settings="action(jobSettings)" @review="reviewJobSuggestion"/>
  <TextSuggestion v-if="aiSource&&aiTarget" :source="aiSource" :target="aiTarget" :initial-suggestion="aiInitial" :return-focus="aiFocus" @close="closeSuggestion" @settings="action(suggestionSettings)" @applying="aiApplying=$event" @applied="result=>action(()=>suggestionApplied(result))"/>
  <BackupPanel v-if="showBackup" :max-bytes="config.maxBackupBytes" @close="showBackup=false" @restored="action(restoredWorkspace)"/>
  <RedactedPdf v-if="redactedSource" :source="redactedSource" :return-focus="redactedFocus" @close="closeRedactedPdf" @reload="action(reloadAfterRedaction)" @created="result=>action(()=>redactedCreated(result))" @busy="redactedBusy=$event"/>
