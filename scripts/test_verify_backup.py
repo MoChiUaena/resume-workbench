@@ -4,7 +4,9 @@ import importlib.util
 import io
 import json
 from pathlib import Path
+import tempfile
 import unittest
+from unittest.mock import patch
 import zipfile
 
 
@@ -16,7 +18,8 @@ SPEC.loader.exec_module(qa)
 def archive(workspace, files=None):
     files = files or {'attachments/old/image.png': b'original image'}
     entries = {'workspace.json': json.dumps(workspace).encode(), **files}
-    manifest = {'files': [{'path': path, 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
+    manifest = {'format': 'resume-workbench-backup', 'formatVersion': 1,
+                'files': [{'path': path, 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
                           for path, data in entries.items()]}
     stream = io.BytesIO()
     with zipfile.ZipFile(stream, 'w') as output:
@@ -76,6 +79,65 @@ class BackupVerifierContractTest(unittest.TestCase):
         self.assertEqual(qa.isolated_port('http://127.0.0.1:18767'), 18767)
         with self.assertRaisesRegex(AssertionError, '18765'):
             qa.isolated_port('http://127.0.0.1:18765')
+
+    def test_persistence_keeps_baseline_and_stage_c_with_later_records(self):
+        expected = {'baseline-a', 'baseline-b'}
+        qa.assert_source_membership(expected, 'stage-c', expected | {'stage-c', 'webp-one', 'webp-two'})
+        with self.assertRaisesRegex(AssertionError, 'missing'):
+            qa.assert_source_membership(expected, 'stage-c', {'baseline-a', 'stage-c', 'webp-one'})
+        with self.assertRaisesRegex(AssertionError, 'missing'):
+            qa.assert_source_membership(expected, 'stage-c', expected | {'webp-one'})
+
+    def test_persistence_rejects_foreign_or_same_report_endpoint_before_network(self):
+        cases = [
+            ('http://127.0.0.1:18765', 'http://127.0.0.1:18769', '18765'),
+            ('http://127.0.0.1:18767', 'http://127.0.0.1:18765', '18765'),
+            ('http://localhost:18767', 'http://127.0.0.1:18767', 'different'),
+            ('http://127.0.0.1:18771', 'http://127.0.0.1:18769', 'report'),
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            for source, target, message in cases:
+                (output / 'stage-c-backup-verification.json').write_text(
+                    json.dumps({'source': source, 'target': target}), encoding='utf-8')
+                with self.subTest(source=source, target=target), patch.object(qa, 'OUT', output), \
+                     patch.object(qa, 'archive', side_effect=AssertionError('Network reached')):
+                    with self.assertRaisesRegex(AssertionError, message):
+                        qa.persistence()
+
+    def test_canonical_restore_preserves_history_and_pdf_owners_with_duplicate_titles(self):
+        def workspace(prefix):
+            resumes = [
+                {'id': prefix + 'a', 'title': 'same title', 'revision': 2, 'createdAt': '2026-01-01T00:00:00Z',
+                 'document': {'layout': {'photo': {'id': None}, 'logo': {'id': None}}}},
+                {'id': prefix + 'b', 'title': 'same title', 'revision': 2, 'createdAt': '2026-01-02T00:00:00Z',
+                 'document': {'layout': {'photo': {'id': None}, 'logo': {'id': None}}}},
+            ]
+            versions = [
+                {'id': prefix + 'v1', 'resumeId': prefix + 'a', 'label': 'history A',
+                 'document': {'layout': {'photo': {'id': None}, 'logo': {'id': None}}}},
+                {'id': prefix + 'v2', 'resumeId': prefix + 'b', 'label': 'history B',
+                 'document': {'layout': {'photo': {'id': None}, 'logo': {'id': None}}}},
+            ]
+            exports = [
+                {'id': prefix + 'e1', 'resumeId': prefix + 'a', 'versionId': prefix + 'v1', 'sha256': 'pdf-a'},
+                {'id': prefix + 'e2', 'resumeId': prefix + 'b', 'versionId': prefix + 'v2', 'sha256': 'pdf-b'},
+            ]
+            return {'schemaVersion': 1, 'resumes': resumes, 'versions': versions,
+                    'attachments': [], 'exports': exports}
+
+        source = workspace('source-')
+        target = workspace('target-')
+        expected = qa.canonical_zip(archive(source))
+        self.assertEqual(expected, qa.canonical_zip(archive(target)))
+        target['versions'][0]['resumeId'] = 'target-b'
+        self.assertNotEqual(expected, qa.canonical_zip(archive(target)), 'Swapped history owner must differ')
+        target = workspace('target-')
+        target['exports'][0]['versionId'] = 'target-v2'
+        self.assertNotEqual(expected, qa.canonical_zip(archive(target)), 'Swapped PDF version must differ')
+        target = workspace('target-')
+        target['exports'][0]['resumeId'] = 'target-b'
+        self.assertNotEqual(expected, qa.canonical_zip(archive(target)), 'Swapped PDF resume must differ')
 
 
 if __name__ == '__main__':

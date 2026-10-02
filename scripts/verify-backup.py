@@ -67,18 +67,27 @@ def canonical_zip(content):
             assert hashlib.sha256(payload).hexdigest() == item['sha256']
         workspace = json.loads(archive_file.read('workspace.json'))
         ids = {a['id']: a['sha256'] for a in workspace['attachments']}
-        for resume in workspace['resumes'] + workspace['versions']:
-            resume.pop('id')
-            resume.pop('resumeId', None)
-            for slot in ['photo', 'logo']:
-                image = resume['document']['layout'][slot]
-                if image['id']:
-                    image['id'] = ids[image['id']]
+        resume_owners = {}
+        version_owners = {}
+        for group in ['resumes', 'versions']:
+            for resume in workspace[group]:
+                old_id = resume.pop('id')
+                if group == 'versions':
+                    resume['resumeId'] = resume_owners[resume['resumeId']]
+                for slot in ['photo', 'logo']:
+                    image = resume['document']['layout'][slot]
+                    if image['id']:
+                        image['id'] = ids[image['id']]
+                if group == 'resumes':
+                    resume_owners[old_id] = digest(resume)
+                else:
+                    version_owners[old_id] = digest(resume)
         for asset in workspace['attachments']:
             asset.pop('id')
         for export in workspace['exports']:
-            for field in ['id', 'resumeId', 'versionId']:
-                export.pop(field)
+            export.pop('id')
+            export['resumeId'] = resume_owners[export['resumeId']]
+            export['versionId'] = version_owners[export['versionId']]
         for group in ['resumes', 'versions', 'attachments', 'exports']:
             workspace[group].sort(key=digest)
         return workspace
@@ -121,6 +130,11 @@ def assert_baseline_preserved(baseline, content):
         assert current['files'].get(path) == sha, f'Baseline file changed: {path}'
 
 
+def assert_source_membership(baseline_ids, stage_c_id, current_ids):
+    missing = (set(baseline_ids) | {stage_c_id}) - set(current_ids)
+    assert not missing, f'Baseline or Stage C source resume missing: {sorted(missing)}'
+
+
 def assert_restore_counts(counts, restored):
     for group, expected in counts.items():
         assert restored[group] == expected, f'Restored {group} count differs from complete backup'
@@ -140,6 +154,12 @@ def isolated_port(base):
     assert url.port != 18765, 'Port 18765 is the real workspace and cannot be used for backup verification'
     assert not (url.username or url.password or url.path not in ['', '/'] or url.query or url.fragment)
     return url.port
+
+
+def isolated_pair(source, target):
+    source_port, target_port = isolated_port(source), isolated_port(target)
+    assert source_port != target_port, 'Source and target must use different isolated ports'
+    return source_port, target_port
 
 
 def run(source, target):
@@ -226,12 +246,16 @@ def run(source, target):
     print(json.dumps({key: value for key, value in result.items() if key != 'baselineFingerprints'}, ensure_ascii=False, indent=2))
 
 
-def persistence():
+def persistence(source='http://127.0.0.1:18767', target='http://127.0.0.1:18769'):
     report_path = OUT / 'stage-c-backup-verification.json'
     result = json.loads(report_path.read_text(encoding='utf-8'))
+    expected_ports = isolated_pair(source, target)
+    report_ports = isolated_pair(result['source'], result['target'])
+    assert report_ports == expected_ports, 'Persisted report endpoints differ from the selected isolated ports'
     _, source_archive = archive(result['source'])
     assert_baseline_preserved(result['baselineFingerprints'], source_archive)
-    assert {record['id'] for record in call(result['source'], '/api/resumes')} == set(result['baselineFingerprints']['rows']['resumes']) | {result['sourceId']}
+    assert_source_membership(result['baselineFingerprints']['rows']['resumes'], result['sourceId'],
+                             {record['id'] for record in call(result['source'], '/api/resumes')})
     for side in ['source', 'target']:
         current = call(result[side], '/api/resumes/' + result[side + 'Id'])
         assert digest(current) == result[side + 'Digest'], 'Resume changed after container recreation'
@@ -252,9 +276,8 @@ if __name__ == '__main__':
     parser.add_argument('--check-persistence', action='store_true')
     args = parser.parse_args()
     assert args.isolated, 'Run only in explicitly isolated test instances; supply --isolated'
-    source_port, target_port = [isolated_port(base) for base in [args.source, args.target]]
+    isolated_pair(args.source, args.target)
     if args.check_persistence:
-        persistence()
+        persistence(args.source.rstrip('/'), args.target.rstrip('/'))
     else:
-        assert source_port != target_port, 'Source and target must use different isolated ports'
         run(args.source.rstrip('/'), args.target.rstrip('/'))
