@@ -27,10 +27,12 @@ class LocalRequestFilterTest {
         assertThat(chain.getRequest()).isNotNull();
     }
     @Test void readOnlyProviderCallDoesNotHoldTheWorkspaceLease()throws Exception{
-        var gate=new WorkspaceGate();var request=new MockHttpServletRequest("POST","/api/ai/suggestions");request.setServerName("127.0.0.1");request.setServerPort(18765);request.addHeader("X-Local-Resume","1");
-        new LocalRequestFilter(gate).doFilter(request,new MockHttpServletResponse(),(req,res)->{
-            var worker=java.util.concurrent.Executors.newSingleThreadExecutor();try{worker.submit(()->{try(var lease=gate.exclusive()){return true;}}).get(1,java.util.concurrent.TimeUnit.SECONDS);}catch(Exception e){throw new RuntimeException(e);}finally{worker.shutdownNow();}
-        });
+        for(String route:java.util.List.of("/api/ai/suggestions","/api/ai/job-matches")){
+            var gate=new WorkspaceGate();var request=new MockHttpServletRequest("POST",route);request.setServerName("127.0.0.1");request.setServerPort(18765);request.addHeader("X-Local-Resume","1");
+            new LocalRequestFilter(gate).doFilter(request,new MockHttpServletResponse(),(req,res)->{
+                var worker=java.util.concurrent.Executors.newSingleThreadExecutor();try{worker.submit(()->{try(var lease=gate.exclusive()){return true;}}).get(1,java.util.concurrent.TimeUnit.SECONDS);}catch(Exception e){throw new RuntimeException(e);}finally{worker.shutdownNow();}
+            });
+        }
     }
     @Test void storageMutationAcquiresItsOwnExclusiveLeaseWithoutFilterLockUpgrade()throws Exception {
         var gate=new WorkspaceGate();var request=new MockHttpServletRequest("POST","/api/storage/quarantine");request.setServerName("127.0.0.1");request.addHeader("X-Local-Resume","1");

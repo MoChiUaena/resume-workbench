@@ -29,6 +29,17 @@ class ModelGatewayTest {
         var body=mapper.readTree(request.get());assertThat(body.path("messages")).hasSize(2);assertThat(body.path("messages").get(1).path("content").asText()).isEqualTo(source);
         assertThat(request.get()).doesNotContain("secret-test-key","resumeId","photo","email","tools");assertThat(auth.get()).isEqualTo("Bearer secret-test-key");assertThat(path.get()).isEqualTo("/v1/chat/completions");assertThat(calls.get()).isEqualTo(1);
     }
+    @Test void jobMatchUsesOneJsonOnlyCallWithBoundedGenerationAndExactPayload()throws Exception{
+        content="{\"items\":[],\"suggestions\":[]}";
+        String payload="{\"jobDescription\":\"需要 Java\",\"sources\":[{\"id\":\"s1\",\"type\":\"project\",\"text\":\"参与 Java\"}]}";
+        assertThat(new ModelGateway(mapper).matchJob(profile(),"secret-test-key",payload)).isEqualTo(content);
+        var body=mapper.readTree(request.get());
+        assertThat(body.path("messages").get(1).path("content").asText()).isEqualTo(payload);
+        assertThat(body.path("max_tokens").asInt()).isEqualTo(4000);
+        assertThat(body.path("response_format").path("type").asText()).isEqualTo("json_object");
+        assertThat(body.has("tools")).isFalse();
+        assertThat(calls.get()).isEqualTo(1);
+    }
     @Test void rejectedCredentialsAreSanitizedAndNeverRetried(){status=401;assertThatThrownBy(()->new ModelGateway(mapper).rewrite(profile(),"secret-test-key","原文")).isInstanceOfSatisfying(ApiException.class,e->{assertThat(e.code).isEqualTo("MODEL_AUTH_FAILED");assertThat(e.getMessage()).doesNotContain("secret-provider-error-body","secret-test-key");});assertThat(calls.get()).isEqualTo(1);}
     @Test void invalidAndOversizedResponsesPreserveTheCallingContract(){
         content="plain response";assertThatThrownBy(()->new ModelGateway(mapper).rewrite(profile(),"secret-test-key","原文")).isInstanceOf(ApiException.class);

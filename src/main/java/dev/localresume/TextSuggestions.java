@@ -49,10 +49,27 @@ public class TextSuggestions {
             var result=new Suggestion(UUID.randomUUID(),source.id(),source.revision(),input.sectionId(),input.entryId(),input.paragraph(),
                 original,selection.start(),selection.end(),selection.text(),replacement,profile.name(),profile.provider(),profile.model(),
                 profile.baseUrl()+"/chat/completions",clock.instant().plusSeconds(600),addsNumbers(selection.text(),replacement));
-            suggestions.entrySet().removeIf(entry->{boolean expired=!entry.getValue().expiresAt().isAfter(clock.instant());if(expired)appliedTexts.remove(entry.getKey());return expired;});
-            if(suggestions.size()>=32){var oldest=suggestions.values().stream().min(Comparator.comparing(Suggestion::expiresAt)).orElseThrow();suggestions.remove(oldest.id());appliedTexts.remove(oldest.id());}
-            suggestions.put(result.id(),result);return result;
+            store(result);return result;
         }finally{generation.release();}
+    }
+    /** Register a validated job-match candidate with the existing reviewed-apply path; never invokes a model. */
+    public Suggestion registerReviewedCandidate(ResumeService.Resume source,ModelSettings.Profile profile,
+            String sectionId,String entryId,int paragraph,String replacement){
+        if(source==null||profile==null||paragraph<0||replacement==null||replacement.isBlank()||replacement.length()>800
+            ||replacement.codePoints().anyMatch(c->Character.isISOControl(c)&&c!='\t'))
+            throw new ApiException("AI_REVIEW_TEXT_INVALID","建议文字须为非空、单段且不超过 800 字。",422);
+        String original=ResumeService.paragraph(source.document(),sectionId,entryId,paragraph);
+        if(original.isBlank())throw new ApiException("AI_SOURCE_CHANGED","原段落无效，请重新生成。",409);
+        resumes.savedRevision(source.id(),source.revision());
+        var result=new Suggestion(UUID.randomUUID(),source.id(),source.revision(),sectionId,entryId,paragraph,
+            original,0,original.length(),original,replacement,profile.name(),profile.provider(),profile.model(),
+            profile.baseUrl()+"/chat/completions",clock.instant().plusSeconds(900),addsNumbers(original,replacement));
+        store(result);return result;
+    }
+    private synchronized void store(Suggestion result){
+        suggestions.entrySet().removeIf(entry->{boolean expired=!entry.getValue().expiresAt().isAfter(clock.instant());if(expired)appliedTexts.remove(entry.getKey());return expired;});
+        if(suggestions.size()>=32){var oldest=suggestions.values().stream().min(Comparator.comparing(Suggestion::expiresAt)).orElseThrow();suggestions.remove(oldest.id());appliedTexts.remove(oldest.id());}
+        suggestions.put(result.id(),result);
     }
     public ResumeService.Resume apply(UUID id,UUID resumeId,long revision,boolean confirmed){return apply(id,resumeId,revision,confirmed,null);}
     public synchronized ResumeService.Resume apply(UUID id,UUID resumeId,long revision,boolean confirmed,String reviewedText){
