@@ -346,3 +346,118 @@ test('heading-only fixture returns a valid report with no edit suggestion',async
   expect(preview.sources[0].text).toContain(report.items[0].evidence[0].quote);
  }finally{await cleanup(request,source.id,profile.id);}
 });
+
+
+async function expectManualRetry(dialog:ReturnType<Page['getByRole']>){
+ await expect(dialog.getByTestId('job-payload')).toBeVisible();
+ await expect(dialog.getByLabel('确认发送岗位和选中模块')).not.toBeChecked();
+ await expect(dialog.getByRole('button',{name:'重试同一请求',exact:true})).toBeDisabled();
+ await expect(dialog.getByText('已生成且仍在缓存中的报告会直接返回；没有可用缓存时，重试可能再次调用模型并产生费用。',{exact:true})).toBeVisible();
+}
+
+for(const lostReply of ['connection','truncated JSON','invalid error envelope'])test('manual recovery retrieves the cached report after '+lostReply,async({page,request})=>{
+ const profile=await configure(request),{resume}=await preparedResume(request);
+ try{
+  const sent:any[]=[];let originalReport:any;
+  await page.route('**/api/ai/job-matches',async route=>{
+   sent.push(route.request().postDataJSON());
+   if(sent.length!==1){await route.continue();return;}
+   const response=await route.fetch();expect(response.ok()).toBe(true);originalReport=await response.json();
+   if(lostReply==='connection')await route.abort();
+   else if(lostReply==='truncated JSON')await route.fulfill({status:200,contentType:'application/json',body:'{'});
+   else await route.fulfill({status:503,json:{message:'incomplete acknowledgement'}});
+  });
+  const before=(await fixtureRequests(request)).length;
+  const dialog=await ready(page,resume.id),payload=await dialog.getByTestId('job-payload').inputValue();
+  await dialog.getByLabel('确认发送岗位和选中模块').check();
+  await dialog.getByRole('button',{name:'生成匹配分析',exact:true}).click();
+  await expect(dialog.getByRole('alert')).toContainText('NETWORK_ERROR');
+  await expectManualRetry(dialog);
+  expect(await dialog.getByTestId('job-payload').inputValue()).toBe(payload);
+  expect(sent).toHaveLength(1);
+  expect((await fixtureRequests(request)).length).toBe(before+1);
+  await dialog.getByLabel('确认发送岗位和选中模块').check();
+  const reply=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/ai/job-matches'&&response.ok());
+  await dialog.getByRole('button',{name:'重试同一请求',exact:true}).click();
+  const recovered=await(await reply).json();
+  expect(recovered).toEqual(originalReport);expect(sent).toHaveLength(2);expect(sent[1]).toEqual(sent[0]);
+  await expect(dialog.getByLabel('匹配报告')).toBeVisible();
+  await expect(dialog.getByRole('button',{name:'重试同一请求',exact:true})).toHaveCount(0);
+  expect((await fixtureRequests(request)).length).toBe(before+1);
+  expect(await(await request.get('/api/resumes/'+resume.id)).json()).toEqual(resume);
+ }finally{await cleanup(request,resume.id,profile.id);}
+});
+
+test('manual recovery after a request never reached the server sends the same preview only after renewed consent',async({page,request})=>{
+ const profile=await configure(request),{resume}=await preparedResume(request);
+ try{
+  const sent:any[]=[];
+  await page.route('**/api/ai/job-matches',async route=>{sent.push(route.request().postDataJSON());if(sent.length===1)await route.abort();else await route.continue();});
+  const before=(await fixtureRequests(request)).length,dialog=await ready(page,resume.id);
+  await dialog.getByLabel('确认发送岗位和选中模块').check();await dialog.getByRole('button',{name:'生成匹配分析',exact:true}).click();
+  await expect(dialog.getByRole('alert')).toContainText('NETWORK_ERROR');await expectManualRetry(dialog);
+  await page.waitForTimeout(250);expect(sent).toHaveLength(1);expect((await fixtureRequests(request)).length).toBe(before);
+  await dialog.getByLabel('确认发送岗位和选中模块').check();await dialog.getByRole('button',{name:'重试同一请求',exact:true}).click();
+  await expect(dialog.getByLabel('匹配报告')).toBeVisible();expect(sent).toHaveLength(2);expect(sent[1]).toEqual(sent[0]);
+  expect((await fixtureRequests(request)).length).toBe(before+1);
+ }finally{await cleanup(request,resume.id,profile.id);}
+});
+
+test('manual recovery retains a busy preview and does not automatically resend',async({page,request})=>{
+ const profile=await configure(request),{resume}=await preparedResume(request);
+ try{
+  const sent:any[]=[];
+  await page.route('**/api/ai/job-matches',async route=>{sent.push(route.request().postDataJSON());if(sent.length===1)await route.fulfill({status:423,json:{code:'MODEL_BUSY',message:'模型正在处理其他请求。'}});else await route.continue();});
+  const before=(await fixtureRequests(request)).length,dialog=await ready(page,resume.id);
+  await dialog.getByLabel('确认发送岗位和选中模块').check();await dialog.getByRole('button',{name:'生成匹配分析',exact:true}).click();
+  await expect(dialog.getByRole('alert')).toContainText('MODEL_BUSY');await expectManualRetry(dialog);
+  await page.waitForTimeout(250);expect(sent).toHaveLength(1);expect((await fixtureRequests(request)).length).toBe(before);
+  await dialog.getByLabel('确认发送岗位和选中模块').check();await dialog.getByRole('button',{name:'重试同一请求',exact:true}).click();
+  await expect(dialog.getByLabel('匹配报告')).toBeVisible();expect(sent[1]).toEqual(sent[0]);expect((await fixtureRequests(request)).length).toBe(before+1);
+ }finally{await cleanup(request,resume.id,profile.id);}
+});
+
+test('manual recovery still expires and clears the retry and consent',async({page,request})=>{
+ const profile=await configure(request),{resume}=await preparedResume(request);
+ try{
+  await page.route('**/api/ai/job-matches/preview',async route=>{const response=await route.fetch(),value=await response.json();await route.fulfill({response,json:{...value,expiresAt:new Date(Date.now()+3000).toISOString()}});});
+  await page.route('**/api/ai/job-matches',route=>route.abort());
+  const before=(await fixtureRequests(request)).length,dialog=await ready(page,resume.id);
+  await dialog.getByLabel('确认发送岗位和选中模块').check();await dialog.getByRole('button',{name:'生成匹配分析',exact:true}).click();
+  await expect(dialog.getByRole('alert')).toContainText('NETWORK_ERROR');await expectManualRetry(dialog);
+  await dialog.getByLabel('确认发送岗位和选中模块').check();
+  await expect(dialog.getByTestId('job-payload')).toHaveCount(0,{timeout:5000});
+  await expect(dialog.getByRole('alert')).toContainText('预览已过期');await expect(dialog.getByRole('button',{name:'重试同一请求',exact:true})).toHaveCount(0);
+  expect((await fixtureRequests(request)).length).toBe(before);
+ }finally{await cleanup(request,resume.id,profile.id);}
+});
+
+test('manual recovery is discarded when the job input changes or settings are reloaded',async({page,request})=>{
+ const profile=await configure(request),{resume}=await preparedResume(request);
+ try{
+  let sent=0;await page.route('**/api/ai/job-matches',async route=>{sent++;await route.abort();});
+  const dialog=await ready(page,resume.id);
+  for(const action of ['job','settings']){
+   await dialog.getByLabel('确认发送岗位和选中模块').check();await dialog.getByRole('button',{name:'生成匹配分析',exact:true}).click();
+   await expect(dialog.getByRole('alert')).toContainText('NETWORK_ERROR');await expectManualRetry(dialog);
+   if(action==='job')await dialog.getByLabel('岗位要求原文').fill('不同的岗位要求');else await dialog.getByRole('button',{name:'刷新模型配置',exact:true}).click();
+   await expect(dialog.getByTestId('job-payload')).toHaveCount(0);await expect(dialog.getByRole('button',{name:'重试同一请求',exact:true})).toHaveCount(0);
+   if(action==='job'){await dialog.getByRole('button',{name:'预览发送内容',exact:true}).click();await expect(dialog.getByTestId('job-payload')).toBeVisible();}
+  }
+  expect(sent).toBe(2);
+ }finally{await cleanup(request,resume.id,profile.id);}
+});
+
+for(const changed of ['source','model'])test('manual recovery is discarded after returning to a changed '+changed,async({page,request})=>{
+ const profile=await configure(request),{resume}=await preparedResume(request);
+ try{
+  await page.route('**/api/ai/job-matches',route=>route.abort());
+  const before=(await fixtureRequests(request)).length,dialog=await ready(page,resume.id);
+  await dialog.getByLabel('确认发送岗位和选中模块').check();await dialog.getByRole('button',{name:'生成匹配分析',exact:true}).click();
+  await expect(dialog.getByRole('alert')).toContainText('NETWORK_ERROR');await expectManualRetry(dialog);
+  const response=changed==='source'?await request.put('/api/resumes/'+resume.id,{headers,data:{title:'外部更新的合成简历',document:resume.document,expectedRevision:resume.revision,mutationId:crypto.randomUUID()}}):await request.put('/api/models/enabled',{headers,data:{expectedRevision:(await models(request)).revision,enabled:false}});
+  expect(response.ok()).toBe(true);await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+  await expect(dialog.getByRole('alert')).toContainText('简历或模型配置已改变');await expect(dialog.getByTestId('job-payload')).toHaveCount(0);await expect(dialog.getByRole('button',{name:'重试同一请求',exact:true})).toHaveCount(0);
+  expect((await fixtureRequests(request)).length).toBe(before);
+ }finally{await cleanup(request,resume.id,profile.id);}
+});
