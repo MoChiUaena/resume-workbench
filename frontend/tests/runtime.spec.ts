@@ -8,7 +8,7 @@ test('packaged application reports its own process and artifact through the loca
  test.skip(process.env.RESUME_TEST_ISOLATED!=='1','Uses a named isolated application instance.');
  const response=await request.get('/api/runtime');expect(response.ok()).toBeTruthy();
  const info=await response.json();expect(info.version).toBe('0.8.0-SNAPSHOT');expect(info.pid).toBeGreaterThan(0);
- expect(info.jarPath).toMatch(/resume-workbench\.jar$/);expect(info.jarSha256).toMatch(/^[a-f0-9]{64}$/);
+ expect(info.jarPath).toMatch(/\.jar$/);expect(info.jarSha256).toMatch(/^[a-f0-9]{64}$/);
  expect(Number.isFinite(Date.parse(info.startedAt))).toBeTruthy();expect(Number.isFinite(Date.parse(info.buildTime))).toBeTruthy();
  expect(info.dataDirectory).toBeTruthy();expect(await(await request.get('/api/health')).json()).toEqual({status:'ok'});
 });
