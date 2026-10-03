@@ -8,13 +8,14 @@
 - 所有仍属于当前简历的历史版本，包括版本引用的旧照片。
 - 被当前或历史版本引用的上传原图、标准化 PNG 和图片元数据。
 - 关联这些简历与版本的 PDF 和导出元数据。
+- 已保存的职位匹配报告：名称、来源修订、岗位原文、原材料、模型信息、分析与只读建议。
 - 文档 schema 和可迁移的图片限制说明，以及文件清单、大小与 SHA-256。
 
 备份不包含数据库密码、`.env`、宿主机路径、浏览器界面偏好、短期预览、无引用的附件或无关联的导出缓存。没有保存到数据库的页面输入不在备份中；从编辑页打开面板会先等待当前简历保存。ZIP 没有加密，包含全部简历内容，请自行妥善保存。
 
 ## 格式边界
 
-`manifest.json` 的 `format` 为 `resume-workbench-backup`，`formatVersion` 为 1。当前 `documentSchemaVersion` 为 4，恢复支持 schema 2 / 3 / 4。文件只允许这些路径：
+`manifest.json` 的 `format` 为 `resume-workbench-backup`，`formatVersion` 为 1。源码开发版的工作区 schema 为 5，恢复支持 schema 2 / 3 / 4 / 5；简历文档 schema 仍为 4。清单中的历史字段名 `documentSchemaVersion` 记录工作区版本，与 workspace 和 settings 的版本一致。文件只允许这些路径：
 
 ```text
 manifest.json
@@ -25,9 +26,12 @@ attachments/<UUID>/original.{png|jpeg|webp}
 attachments/<UUID>/image.png
 exports/<UUID>.pdf
 exports/<UUID>.json
+job-reports/<UUID>.json
 ```
 
 `settings.json` 记录来源实例的 schema、图片大小和像素限制，作为迁移说明；恢复不会覆盖目标实例的部署设置。目标像素限制更低或格式版本不匹配时，会明确拒绝导入。
+
+schema 5 将报告元数据放在 `workspace.json` 的 `jobReports`，快照分别保存为 `job-reports/<UUID>.json`。旧版程序会拒绝 schema 5，不会静默丢掉报告；新程序恢复旧备份时报告历史为空。恢复校验报告大小、所属简历、修订、原材料引用与校验值，并分配新的简历和报告 ID。报告没有 API Key、发送令牌或可应用的临时建议；已经删除的报告不进入备份。
 
 0.6.0 新增静态 WebP 原图路径和格式校验，文档结构与格式版本保持不变。含 WebP 的 ZIP 需要 0.6.0 或更新版本恢复，旧应用会拒绝不支持的路径；JPEG / PNG 原有备份仍可恢复。WebP 原图、方向、标准化 PNG 和历史引用在恢复时保留，动画或不匹配的容器尺寸会被拒绝。
 
@@ -37,7 +41,7 @@ schema 3 的 `layout.presentation` 包含主题色、语言、对齐、信息展
 
 0.4.0 的脱敏 PDF 不改变文档或备份格式。导出设置仅用于临时渲染；历史版本保存原稿，备份仍包含原始信息与相关 PDF。恢复会原样保留脱敏 PDF 字节并重映射其原稿版本引用，不能把工作区 ZIP 当作脱敏分享包。
 
-默认 ZIP 大小与解压后的文件总大小分别限制为 256 MiB，可用 `RESUME_MAX_BACKUP_BYTES` 调整。单个二进制文件最多 128 MiB，工作区 JSON 16 MiB，设置 64 KiB，其他 JSON 和 manifest 各 1 MiB；最多 10,000 个数据文件、2,000 份简历、10,000 个历史版本。备份与导入均检查限制，避免生成自己无法读取的包。
+默认 ZIP 大小与解压后的文件总大小分别限制为 256 MiB，可用 `RESUME_MAX_BACKUP_BYTES` 调整。单个二进制文件最多 128 MiB，工作区 JSON 16 MiB，设置 64 KiB，报告快照 128 KiB，其他 JSON 和 manifest 各 1 MiB；最多 10,000 个数据文件、2,000 份简历、10,000 个历史版本，每份简历最多 100 份报告。备份与导入均检查限制，避免生成自己无法读取的包。
 
 恢复先在数据目录的临时目录内校验所有条目。路径越界、重复 / 未知文件、清单缺失、损坏文件、校验不一致、过高像素和未来格式版本都会拒绝。
 

@@ -19,6 +19,7 @@ public class JobMatches {
                           String payload,List<Source> sources,Instant expiresAt) {}
     public record Report(UUID id,UUID resumeId,long revision,String profileName,String provider,String model,
                          String destination,Instant expiresAt,List<JobMatchOutput.MatchItem> items,List<TextSuggestions.Suggestion> suggestions) {}
+    public record ArchiveMaterial(Preview preview,Report report) {}
     private final ResumeService resumes;
     private final ModelSettings settings;
     private final ModelGateway gateway;
@@ -27,6 +28,7 @@ public class JobMatches {
     private final Clock clock;
     private final Map<UUID,Preview> previews=new ConcurrentHashMap<>();
     private final Map<UUID,Report> reports=new ConcurrentHashMap<>();
+    private final Map<UUID,ArchiveMaterial> archiveMaterials=new ConcurrentHashMap<>();
     private final Set<UUID> inFlight=ConcurrentHashMap.newKeySet();
     private final Semaphore generation=new Semaphore(2);
     @org.springframework.beans.factory.annotation.Autowired
@@ -106,11 +108,19 @@ public class JobMatches {
             }
             var report=new Report(UUID.randomUUID(),preview.resumeId(),preview.revision(),preview.profileName(),preview.provider(),
                 preview.model(),preview.destination(),clock.instant().plusSeconds(900),parsed.items(),List.copyOf(reviewed));
-            synchronized(reports){prune();evict(reports,32);reports.put(preview.id(),report);}
+            synchronized(reports){prune();evict(reports,32);evict(archiveMaterials,32);reports.put(preview.id(),report);archiveMaterials.put(report.id(),new ArchiveMaterial(preview,report));}
             return report;
         }finally{inFlight.remove(preview.id());generation.release();}
     }
-    private void prune(){Instant now=clock.instant();previews.entrySet().removeIf(e->!e.getValue().expiresAt().isAfter(now));reports.entrySet().removeIf(e->!e.getValue().expiresAt().isAfter(now));}
+    public ArchiveMaterial archive(UUID previewId,UUID reportId,UUID resumeId) {
+        var material=archiveMaterials.get(reportId);
+        var generated=reports.get(previewId);
+        if(material==null&&generated!=null&&!generated.id().equals(reportId))throw new ApiException("JOB_REPORT_SOURCE_INVALID","报告与预览不对应，未保存任何内容。",422);
+        if(material==null||!material.report().expiresAt().isAfter(clock.instant())){archiveMaterials.remove(reportId);throw new ApiException("JOB_REPORT_EXPIRED","生成结果已过期，尚未保存的报告需要重新分析。",410);}
+        if(!material.preview().id().equals(previewId)||!material.report().resumeId().equals(resumeId))throw new ApiException("JOB_REPORT_SOURCE_INVALID","报告与预览或简历不对应，未保存任何内容。",422);
+        return material;
+    }
+    private void prune(){Instant now=clock.instant();previews.entrySet().removeIf(e->!e.getValue().expiresAt().isAfter(now));reports.entrySet().removeIf(e->!e.getValue().expiresAt().isAfter(now));archiveMaterials.entrySet().removeIf(e->!e.getValue().report().expiresAt().isAfter(now));}
     private static <T> void evict(Map<UUID,T> cache,int cap){if(cache.size()>=cap)cache.remove(cache.keySet().iterator().next());}
     private static ApiException invalid(){return new ApiException("JOB_MATCH_INPUT_INVALID","岗位文本或所选模块无效，或内容超过安全上限。",422);}
 }

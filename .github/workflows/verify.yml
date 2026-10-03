@@ -99,6 +99,7 @@ jobs:
           python scripts/verify-backup.py --isolated
           python scripts/verify-automatic-backups.py --isolated
           python scripts/verify-webp.py --isolated
+          python scripts/verify-job-reports.py --isolated
           python scripts/verify-model-settings.py --isolated
           python scripts/verify-pdfs.py --stage-c
           python scripts/verify-layout-pdfs.py
@@ -120,6 +121,7 @@ jobs:
           python scripts/verify-automatic-backups.py --isolated --check-persistence
           python scripts/verify-webp.py --isolated --check-persistence
           python scripts/verify-model-settings.py --isolated --check-persistence
+          python scripts/verify-job-reports.py --isolated --check-persistence
           python scripts/verify-quarantine.py after --isolated --container "$RESUME_TEST_APP_CONTAINER"
       - name: Upload verification evidence
         if: always()

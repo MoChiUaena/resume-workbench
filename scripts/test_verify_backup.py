@@ -139,6 +139,25 @@ class BackupVerifierContractTest(unittest.TestCase):
         target['exports'][0]['resumeId'] = 'target-b'
         self.assertNotEqual(expected, qa.canonical_zip(archive(target)), 'Swapped PDF resume must differ')
 
+    def test_saved_reports_normalize_new_ids_but_preserve_their_owner_and_metadata(self):
+        def bundle(prefix, owner='a', label='saved report'):
+            workspace = {'schemaVersion': 5, 'resumes': [
+                {'id': prefix + item, 'title': item, 'revision': 1,
+                 'document': {'layout': {'photo': {'id': None}, 'logo': {'id': None}}}}
+                for item in ['a', 'b']], 'versions': [], 'attachments': [], 'exports': []}
+            payload = json.dumps({'schemaVersion': 1, 'sourceRevision': 1,
+                                  'jobDescription': 'Java role', 'sources': []}).encode()
+            workspace['jobReports'] = [{'id': prefix + 'report', 'resumeId': prefix + owner,
+                'label': label, 'sourceRevision': 1, 'createdAt': '2026-10-01T00:00:00Z',
+                'sha256': hashlib.sha256(payload).hexdigest()}]
+            return archive(workspace, {'job-reports/' + prefix + 'report.json': payload})
+
+        source, target = bundle('source-'), bundle('target-')
+        self.assertEqual(qa.canonical_zip(source), qa.canonical_zip(target))
+        self.assertNotEqual(qa.canonical_zip(source), qa.canonical_zip(bundle('target-', owner='b')))
+        with self.assertRaisesRegex(AssertionError, 'jobReports'):
+            qa.assert_baseline_preserved(qa.baseline_fingerprints(source), bundle('source-', label='changed'))
+
 
 if __name__ == '__main__':
     unittest.main()
