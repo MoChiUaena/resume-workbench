@@ -111,7 +111,7 @@ test('selected module is the exact sent payload; report is read only until revie
   await dialog.getByRole('button',{name:'生成匹配分析'}).click();
   const match=await(await generated).json();
   expect(match.suggestions.every((suggestion:any)=>suggestion.paragraph>=0&&suggestion.sectionId===project.id)).toBe(true);
-  const report=dialog.getByLabel('匹配报告');
+  const report=dialog.getByLabel('匹配报告',{exact:true});
   await expect(report).toContainText('有依据');
   await expect(report).toContainText('部分依据');
   await expect(report).toContainText('缺少依据');
@@ -168,7 +168,7 @@ test('input changes revoke consent and cancelled slow response cannot show a rep
   await expect(dialog).toHaveCount(0);
   await expect(page.getByRole('button',{name:'职位匹配',exact:true})).toBeFocused();
   await page.waitForTimeout(2200);
-  await expect(page.getByLabel('匹配报告')).toHaveCount(0);
+  await expect(page.getByLabel('匹配报告',{exact:true})).toHaveCount(0);
   expect(await(await request.get('/api/resumes/'+resume.id)).json()).toEqual(resume);
  }finally{await cleanup(request,resume.id,profile.id);}
 });
@@ -180,7 +180,7 @@ test('bad references, provider failure, and stale revisions leave the resume unc
   await dialog.getByLabel('确认发送岗位和选中模块').check();
   await dialog.getByRole('button',{name:'生成匹配分析'}).click();
   await expect(dialog.getByRole('alert')).toContainText('JOB_MATCH_OUTPUT_INVALID');
-  await expect(dialog.getByLabel('匹配报告')).toHaveCount(0);
+  await expect(dialog.getByLabel('匹配报告',{exact:true})).toHaveCount(0);
   let state=await models(request);
   await request.put('/api/models/profiles/'+profile.id,{headers,data:{expectedRevision:state.revision,name:'岗位匹配 fixture',provider:'compatible',baseUrl:'http://127.0.0.1:18770/v1',model:'qa-job-error',apiKey:'',clearKey:false}});
   await dialog.getByRole('button',{name:'刷新模型配置'}).click();
@@ -206,7 +206,7 @@ test('source revision conflict revokes the report and B, dark, and 900px views f
   const dialog=await ready(page,resume.id);
   await dialog.getByLabel('确认发送岗位和选中模块').check();
   await dialog.getByRole('button',{name:'生成匹配分析'}).click();
-  await expect(dialog.getByLabel('匹配报告')).toContainText('有依据');
+  await expect(dialog.getByLabel('匹配报告',{exact:true})).toContainText('有依据');
   await fs.mkdir(path.join(root,'output'),{recursive:true});
   await dialog.getByRole('heading',{name:'匹配报告'}).scrollIntoViewIfNeeded();
   await page.screenshot({path:path.join(root,'output/job-match-b.png'),animations:'disabled'});
@@ -215,7 +215,7 @@ test('source revision conflict revokes the report and B, dark, and 900px views f
   const dark=await ready(page,resume.id);
   await dark.getByLabel('确认发送岗位和选中模块').check();
   await dark.getByRole('button',{name:'生成匹配分析'}).click();
-  await expect(dark.getByLabel('匹配报告')).toContainText('有依据');
+  await expect(dark.getByLabel('匹配报告',{exact:true})).toContainText('有依据');
   await expect.poll(async()=>page.evaluate(()=>document.documentElement.dataset.dark)).toBe('true');
   await dark.getByRole('heading',{name:'匹配报告'}).scrollIntoViewIfNeeded();
   await page.screenshot({path:path.join(root,'output/job-match-dark.png'),animations:'disabled'});
@@ -232,7 +232,7 @@ test('source revision conflict revokes the report and B, dark, and 900px views f
   await stale.getByRole('button',{name:'生成匹配分析'}).click();
   await expect(stale.getByRole('alert')).toContainText('REVISION_CONFLICT');
   await expect(stale.getByTestId('job-payload')).toHaveCount(0);
-  await expect(stale.getByLabel('匹配报告')).toHaveCount(0);
+  await expect(stale.getByLabel('匹配报告',{exact:true})).toHaveCount(0);
  }finally{await cleanup(request,resume.id,profile.id);}
 });
 
@@ -242,22 +242,22 @@ test('returning to a changed source or model clears an old report',async({page,r
   const dialog=await ready(page,resume.id);
   await dialog.getByLabel('确认发送岗位和选中模块').check();
   await dialog.getByRole('button',{name:'生成匹配分析'}).click();
-  await expect(dialog.getByLabel('匹配报告')).toBeVisible();
+  await expect(dialog.getByLabel('匹配报告',{exact:true})).toBeVisible();
   const updated=await request.put('/api/resumes/'+resume.id,{headers,data:{title:'另一窗口更新',document:resume.document,expectedRevision:resume.revision,mutationId:crypto.randomUUID()}});
   expect(updated.ok()).toBe(true);
   await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
-  await expect(dialog.getByLabel('匹配报告')).toHaveCount(0);
+  await expect(dialog.getByLabel('匹配报告',{exact:true})).toHaveCount(0);
   await expect(dialog.getByTestId('job-payload')).toHaveCount(0);
   await expect(dialog.getByRole('alert')).toContainText('简历或模型配置已改变');
   await dialog.getByRole('button',{name:'取消并关闭'}).click();
   const again=await ready(page,resume.id);
   await again.getByLabel('确认发送岗位和选中模块').check();
   await again.getByRole('button',{name:'生成匹配分析'}).click();
-  await expect(again.getByLabel('匹配报告')).toBeVisible();
+  await expect(again.getByLabel('匹配报告',{exact:true})).toBeVisible();
   const settings=await models(request);
   await request.put('/api/models/profiles/'+profile.id,{headers,data:{expectedRevision:settings.revision,name:'另一个窗口改了模型',provider:'compatible',baseUrl:'http://127.0.0.1:18770/v1',model:'qa-job-normal',apiKey:'',clearKey:false}});
   await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
-  await expect(again.getByLabel('匹配报告')).toHaveCount(0);
+  await expect(again.getByLabel('匹配报告',{exact:true})).toHaveCount(0);
   await expect(again.getByRole('alert')).toContainText('简历或模型配置已改变');
  }finally{await cleanup(request,resume.id,profile.id);}
 });
@@ -282,7 +282,7 @@ test('cancel first review then open second suggestion from the same report witho
   await expect(review).toBeVisible();
   await expect(dialog).toBeHidden();
   await review.getByRole('button',{name:'取消',exact:true}).click();
-  await expect(dialog.getByLabel('匹配报告')).toBeVisible();
+  await expect(dialog.getByLabel('匹配报告',{exact:true})).toBeVisible();
   await expect(actions.first()).toBeFocused();
   await actions.nth(1).click();
   await expect(review.getByTestId('ai-edit-suggestion')).toHaveValue(/SECOND-BODY-CANARY/);
@@ -320,8 +320,8 @@ test('an idle expired report removes its review actions',async({page,request})=>
   const dialog=await ready(page,resume.id);
   await dialog.getByLabel('确认发送岗位和选中模块').check();
   await dialog.getByRole('button',{name:'生成匹配分析'}).click();
-  await expect(dialog.getByLabel('匹配报告')).toBeVisible();
-  await expect(dialog.getByLabel('匹配报告')).toHaveCount(0,{timeout:4000});
+  await expect(dialog.getByLabel('匹配报告',{exact:true})).toBeVisible();
+  await expect(dialog.getByLabel('匹配报告',{exact:true})).toHaveCount(0,{timeout:4000});
   await expect(dialog.getByRole('alert')).toContainText('报告已过期');
   await expect(dialog.getByRole('button',{name:'审核修改'})).toHaveCount(0);
  }finally{await cleanup(request,resume.id,profile.id);}
@@ -381,7 +381,7 @@ for(const lostReply of ['connection','truncated JSON','invalid error envelope'])
   await dialog.getByRole('button',{name:'重试同一请求',exact:true}).click();
   const recovered=await(await reply).json();
   expect(recovered).toEqual(originalReport);expect(sent).toHaveLength(2);expect(sent[1]).toEqual(sent[0]);
-  await expect(dialog.getByLabel('匹配报告')).toBeVisible();
+  await expect(dialog.getByLabel('匹配报告',{exact:true})).toBeVisible();
   await expect(dialog.getByRole('button',{name:'重试同一请求',exact:true})).toHaveCount(0);
   expect((await fixtureRequests(request)).length).toBe(before+1);
   expect(await(await request.get('/api/resumes/'+resume.id)).json()).toEqual(resume);
@@ -398,7 +398,7 @@ test('manual recovery after a request never reached the server sends the same pr
   await expect(dialog.getByRole('alert')).toContainText('NETWORK_ERROR');await expectManualRetry(dialog);
   await page.waitForTimeout(250);expect(sent).toHaveLength(1);expect((await fixtureRequests(request)).length).toBe(before);
   await dialog.getByLabel('确认发送岗位和选中模块').check();await dialog.getByRole('button',{name:'重试同一请求',exact:true}).click();
-  await expect(dialog.getByLabel('匹配报告')).toBeVisible();expect(sent).toHaveLength(2);expect(sent[1]).toEqual(sent[0]);
+  await expect(dialog.getByLabel('匹配报告',{exact:true})).toBeVisible();expect(sent).toHaveLength(2);expect(sent[1]).toEqual(sent[0]);
   expect((await fixtureRequests(request)).length).toBe(before+1);
  }finally{await cleanup(request,resume.id,profile.id);}
 });
@@ -413,7 +413,7 @@ test('manual recovery retains a busy preview and does not automatically resend',
   await expect(dialog.getByRole('alert')).toContainText('MODEL_BUSY');await expectManualRetry(dialog);
   await page.waitForTimeout(250);expect(sent).toHaveLength(1);expect((await fixtureRequests(request)).length).toBe(before);
   await dialog.getByLabel('确认发送岗位和选中模块').check();await dialog.getByRole('button',{name:'重试同一请求',exact:true}).click();
-  await expect(dialog.getByLabel('匹配报告')).toBeVisible();expect(sent[1]).toEqual(sent[0]);expect((await fixtureRequests(request)).length).toBe(before+1);
+  await expect(dialog.getByLabel('匹配报告',{exact:true})).toBeVisible();expect(sent[1]).toEqual(sent[0]);expect((await fixtureRequests(request)).length).toBe(before+1);
  }finally{await cleanup(request,resume.id,profile.id);}
 });
 
