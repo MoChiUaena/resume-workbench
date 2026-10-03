@@ -219,3 +219,21 @@ jobs:
               docker compose -p resume-ci-$side -f .tools/ci/$side/compose.yml --env-file .tools/ci/$side/.env down
             fi
           done
+  windows-runtime:
+    name: Windows runtime controls
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Verify process ownership and real Java lifecycle
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./scripts/tests/runtime-control.tests.ps1
+          ./scripts/tests/db-ownership.tests.ps1
+          ./scripts/tests/runtime-lifecycle.tests.ps1 -JavaHome $env:JAVA_HOME
+          ./scripts/tests/runtime-start-failure.tests.ps1 -JavaHome $env:JAVA_HOME
