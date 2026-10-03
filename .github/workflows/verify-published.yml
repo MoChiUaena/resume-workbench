@@ -7,7 +7,7 @@ on:
     inputs:
       image:
         description: Published version to verify anonymously
-        default: ghcr.io/mochiuaena/resume-workbench:0.7.0
+        default: ghcr.io/mochiuaena/resume-workbench:0.8.0
         required: true
 permissions:
   contents: read
@@ -16,15 +16,16 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
-      RESUME_APP_IMAGE: ${{ inputs.image || 'ghcr.io/mochiuaena/resume-workbench:0.7.0' }}
+      RESUME_APP_IMAGE: ${{ inputs.image || 'ghcr.io/mochiuaena/resume-workbench:0.8.0' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Pull the published image without registry credentials
         run: |
           [[ "$RESUME_APP_IMAGE" =~ ^ghcr\.io/mochiuaena/resume-workbench:[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.]+)?$ ]]
-          mkdir -p .tools/anonymous
+          mkdir -p .tools/anonymous output
           docker --config .tools/anonymous pull "$RESUME_APP_IMAGE"
-          docker image inspect "$RESUME_APP_IMAGE" --format '{{json .RepoDigests}}'
+          docker image inspect "$RESUME_APP_IMAGE" > output/published-image-inspection.json
+          python3 scripts/verify-published-image.py --image "$RESUME_APP_IMAGE" --inspection output/published-image-inspection.json
       - name: Start from configuration files in empty directories
         run: |
           for side in source target; do
@@ -36,12 +37,22 @@ jobs:
             printf 'RESUME_DB_PASSWORD=%s\nRESUME_PORT=%s\n' "$password" "$port" > .tools/published/$side/.env
             docker compose -p resume-published-$side -f .tools/published/$side/compose.yml --env-file .tools/published/$side/.env up -d --wait --wait-timeout 120
           done
+      - name: Start isolated protocol fixtures and cut model egress
+        run: |
+          for side in source target; do
+            app=resume-published-$side-app-1
+            expected_keys=$(printf '{"qa-model":"%s-key-canary"}' "$side")
+            docker run -d --name resume-published-$side-model-fixture --env "QA_MODEL_EXPECTED_KEYS=$expected_keys" --network container:$app --mount type=bind,source="$PWD/scripts/qa-model-server.mjs",target=/qa-model-server.mjs,readonly --entrypoint /ms-playwright-driver/node "$RESUME_APP_IMAGE" /qa-model-server.mjs
+            docker run --rm --cap-add NET_ADMIN --network container:$app --entrypoint /bin/sh postgres:16.10-alpine@sha256:029660641a0cfc575b14f336ba448fb8a75fd595d42e1fa316b9fb4378742297 -c 'ip route del default'
+          done
       - name: Verify editable backup restoration and searchable PDF
         run: |
           python3 scripts/verify-backup.py --isolated
           python3 scripts/verify-automatic-backups.py --isolated
           python3 -m pip install pypdf==6.10.0 pillow==12.3.0
           python3 scripts/verify-webp.py --isolated
+          python3 scripts/verify-job-reports.py --isolated
+          python3 scripts/verify-model-settings.py --isolated
           python3 - <<'PY'
           from pypdf import PdfReader
           reader = PdfReader('output/pdf/restored-new-instance.pdf')
@@ -56,6 +67,44 @@ jobs:
           assert all(len(page.images) == 0 for page in redacted.pages)
           print('Published image: editable restoration and two-page Chinese PDF passed.')
           PY
+      - name: Recreate published instances with retained volumes and verify cold reads
+        run: |
+          for side in source target; do
+            docker stop resume-published-$side-model-fixture
+            docker rm resume-published-$side-model-fixture
+            docker compose -p resume-published-$side -f .tools/published/$side/compose.yml --env-file .tools/published/$side/.env down
+            docker compose -p resume-published-$side -f .tools/published/$side/compose.yml --env-file .tools/published/$side/.env up -d --wait --wait-timeout 120
+            app=resume-published-$side-app-1
+            expected_keys=$(printf '{"qa-model":"%s-key-canary"}' "$side")
+            docker run -d --name resume-published-$side-model-fixture --env "QA_MODEL_EXPECTED_KEYS=$expected_keys" --network container:$app --mount type=bind,source="$PWD/scripts/qa-model-server.mjs",target=/qa-model-server.mjs,readonly --entrypoint /ms-playwright-driver/node "$RESUME_APP_IMAGE" /qa-model-server.mjs
+            docker run --rm --cap-add NET_ADMIN --network container:$app --entrypoint /bin/sh postgres:16.10-alpine@sha256:029660641a0cfc575b14f336ba448fb8a75fd595d42e1fa316b9fb4378742297 -c 'ip route del default'
+          done
+          python3 scripts/verify-backup.py --isolated --check-persistence
+          python3 scripts/verify-automatic-backups.py --isolated --check-persistence
+          python3 scripts/verify-webp.py --isolated --check-persistence
+          python3 scripts/verify-model-settings.py --isolated --check-persistence
+          python3 scripts/verify-job-reports.py --isolated --check-persistence
+          python3 - <<'PY'
+          import json, runpy
+          from pathlib import Path
+          helpers = runpy.run_path('scripts/verify-backup.py')
+          path = Path('output/model-settings-verification.json')
+          result = json.loads(path.read_text(encoding='utf-8'))
+          state = result['targetState']
+          profile = next(p for p in state['profiles'] if p['id'] == state['defaultId'])
+          assert profile['provider'] == 'compatible' and profile['baseUrl'] == 'http://127.0.0.1:18770/v1' and profile['model'] == 'qa-model'
+          checked = helpers['call'](result['target'], '/api/models/profiles/' + profile['id'] + '/test', {'expectedRevision': state['revision']})
+          assert checked['connected'], 'Target instance key must remain decryptable after recreation'
+          result['bothInstanceCredentialsDecryptableAfterRecreation'] = True
+          path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
+          image_path = Path('output/published-image-verification.json')
+          image = json.loads(image_path.read_text(encoding='utf-8'))
+          runtimes = {side: helpers['call'](result[side], '/api/runtime') for side in ['source', 'target']}
+          assert all(runtime['version'] == image['applicationVersion'] for runtime in runtimes.values()), 'Running image version disagrees with the published tag'
+          image['runningInstancesMatchImageVersion'] = True
+          image['runtimeJarSha256'] = {side: runtime['jarSha256'] for side, runtime in runtimes.items()}
+          image_path.write_text(json.dumps(image, indent=2), encoding='utf-8')
+          PY
       - name: Upload published-image evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -66,6 +115,9 @@ jobs:
             output/stage-c-backup-verification.json
             output/automatic-backup-verification.json
             output/webp-verification.json
+            output/published-image-verification.json
+            output/job-report-history-verification.json
+            output/model-settings-verification.json
             output/pdf/webp-*.pdf
             output/pdf/restored-new-instance.pdf
             output/pdf/redacted-restored.pdf
@@ -73,6 +125,8 @@ jobs:
         if: always()
         run: |
           for side in source target; do
+            docker stop resume-published-$side-model-fixture || true
+            docker rm resume-published-$side-model-fixture || true
             if [ -f .tools/published/$side/compose.yml ]; then
               docker compose -p resume-published-$side -f .tools/published/$side/compose.yml --env-file .tools/published/$side/.env down
             fi

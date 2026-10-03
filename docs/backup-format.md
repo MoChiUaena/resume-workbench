@@ -15,7 +15,7 @@
 
 ## 格式边界
 
-`manifest.json` 的 `format` 为 `resume-workbench-backup`，`formatVersion` 为 1。源码开发版的工作区 schema 为 5，恢复支持 schema 2 / 3 / 4 / 5；简历文档 schema 仍为 4。清单中的历史字段名 `documentSchemaVersion` 记录工作区版本，与 workspace 和 settings 的版本一致。文件只允许这些路径：
+`manifest.json` 的 `format` 为 `resume-workbench-backup`，`formatVersion` 为 1。0.8.0 的工作区 schema 为 5，恢复支持 schema 2 / 3 / 4 / 5；简历文档 schema 仍为 4。清单中的历史字段名 `documentSchemaVersion` 记录工作区版本，与 workspace 和 settings 的版本一致。文件只允许这些路径：
 
 ```text
 manifest.json

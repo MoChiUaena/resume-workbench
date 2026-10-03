@@ -9,9 +9,10 @@ permissions:
   contents: read
 concurrency:
   group: verify-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 jobs:
   verify:
+    needs: windows-runtime
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     permissions:
@@ -57,6 +58,10 @@ jobs:
         run: chmod +x mvnw && ./mvnw -B -ntp -DargLine="-XX:-EnableDynamicAgentLoading" package
       - name: Verify packaged dependencies and notices
         run: python3 scripts/verify-distribution.py
+      - name: Test deployment and release asset contracts without services
+        run: |
+          python3 -m unittest discover -s scripts -p 'test_*.py' -v
+          node --test scripts/test_qa_model_server.mjs
       - name: Prepare browser and PDF QA
         run: |
           cd frontend
@@ -186,6 +191,23 @@ jobs:
           python scripts/verify-upgrade.py before --isolated --source-schema 4 --source-version 0.6.0 --automatic-enabled
           RESUME_APP_IMAGE=resume-workbench:ci docker compose -p resume-ci-upgrade-six -f .tools/ci/upgrade-six/compose.yml --env-file .tools/ci/upgrade-six/.env up -d --wait --wait-timeout 120
           python scripts/verify-upgrade.py after --isolated --source-schema 4 --source-version 0.6.0
+          docker compose -p resume-ci-upgrade-six -f .tools/ci/upgrade-six/compose.yml --env-file .tools/ci/upgrade-six/.env down
+      - name: Verify published 0.7 upgrade with retained files, models and keys
+        run: |
+          mkdir -p .tools/ci/upgrade-seven
+          cp compose.yml .tools/ci/upgrade-seven/compose.yml
+          printf 'RESUME_PORT=18769\n' > .tools/ci/upgrade-seven/.env
+          docker pull ghcr.io/mochiuaena/resume-workbench:0.7.0
+          RESUME_APP_IMAGE=ghcr.io/mochiuaena/resume-workbench:0.7.0 docker compose -p resume-ci-upgrade-seven -f .tools/ci/upgrade-seven/compose.yml --env-file .tools/ci/upgrade-seven/.env up -d --wait --wait-timeout 120
+          docker run -d --name resume-upgrade-seven-model-fixture --env 'QA_MODEL_EXPECTED_KEYS={"qa-model":"upgrade-fixture-only"}' --network container:resume-ci-upgrade-seven-app-1 --mount type=bind,source="$PWD/scripts/qa-model-server.mjs",target=/qa-model-server.mjs,readonly --entrypoint /ms-playwright-driver/node resume-workbench:ci /qa-model-server.mjs
+          docker run --rm --cap-add NET_ADMIN --network container:resume-ci-upgrade-seven-app-1 --entrypoint /bin/sh postgres:16.10-alpine@sha256:029660641a0cfc575b14f336ba448fb8a75fd595d42e1fa316b9fb4378742297 -c 'ip route del default'
+          python scripts/verify-upgrade.py before --isolated --source-schema 4 --source-version 0.7.0 --automatic-enabled --model-enabled --future-backup output/stage-c-ui-backup.zip
+          docker stop resume-upgrade-seven-model-fixture
+          docker rm resume-upgrade-seven-model-fixture
+          RESUME_APP_IMAGE=resume-workbench:ci docker compose -p resume-ci-upgrade-seven -f .tools/ci/upgrade-seven/compose.yml --env-file .tools/ci/upgrade-seven/.env up -d --wait --wait-timeout 120
+          docker run -d --name resume-upgrade-seven-model-fixture --env 'QA_MODEL_EXPECTED_KEYS={"qa-model":"upgrade-fixture-only"}' --network container:resume-ci-upgrade-seven-app-1 --mount type=bind,source="$PWD/scripts/qa-model-server.mjs",target=/qa-model-server.mjs,readonly --entrypoint /ms-playwright-driver/node resume-workbench:ci /qa-model-server.mjs
+          docker run --rm --cap-add NET_ADMIN --network container:resume-ci-upgrade-seven-app-1 --entrypoint /bin/sh postgres:16.10-alpine@sha256:029660641a0cfc575b14f336ba448fb8a75fd595d42e1fa316b9fb4378742297 -c 'ip route del default'
+          python scripts/verify-upgrade.py after --isolated --source-schema 4 --source-version 0.7.0
       - name: Upload upgrade evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -195,6 +217,37 @@ jobs:
           path: |
             output/upgrade-verification*.json
             output/pdf/release-upgraded*.pdf
+      - name: Build assets whose metadata matches the release tag
+        if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.]+)?$ ]]
+          python scripts/build-release-assets.py --expected-version "$version" --output-dir .tools/release-tag-assets
+          cat .tools/release-tag-assets/SHA256SUMS.txt >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload assets from the verified release tag
+        if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-tag-assets
+          retention-days: 14
+          if-no-files-found: error
+          include-hidden-files: true
+          path: .tools/release-tag-assets/
+      - name: Confirm the public version image does not already exist
+        if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          image="ghcr.io/${GITHUB_REPOSITORY,,}:$version"
+          python scripts/guard-registry-publication.py --image "$image"
+          cat output/registry-publication-gate.json >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload confirmed registry absence evidence
+        if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: registry-publication-gate
+          retention-days: 14
+          if-no-files-found: error
+          path: output/registry-publication-gate.json
       - name: Log in to container registry for tagged release
         if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -216,7 +269,9 @@ jobs:
         run: |
           docker stop resume-model-fixture || true
           docker rm resume-model-fixture || true
-          for side in source target upgrade upgrade-three upgrade-four upgrade-five upgrade-six; do
+          docker stop resume-upgrade-seven-model-fixture || true
+          docker rm resume-upgrade-seven-model-fixture || true
+          for side in source target upgrade upgrade-three upgrade-four upgrade-five upgrade-six upgrade-seven; do
             if [ -f .tools/ci/$side/compose.yml ]; then
               docker compose -p resume-ci-$side -f .tools/ci/$side/compose.yml --env-file .tools/ci/$side/.env down
             fi

@@ -1,27 +1,22 @@
-# 验证与发布流程
+# 稳定版本的部署与发布
 
-GitHub Actions 在 `main`、PR 和手动运行时检查前端逻辑测试与构建、Java 测试、可执行 JAR / 许可证清单、Docker 镜像、浏览器流程、离线使用、全新实例备份恢复、中文 PDF 和容器重建持久化。具体测试数以对应提交的 Actions 日志为准。自动备份检查覆盖调度、去重、历史恢复、跨实例策略边界和重建保留；脱敏检查覆盖四模板、图片字节移除、原稿保留、过期预览和下载重试；空间检查覆盖引用关系、文件校验、分页清单和读取前后数据保留；暂存恢复检查覆盖移前备份、日志写入／落盘／替换故障、同请求重试、冲突保留和容器重建后的逐文件字节核对。测试只在合成数据的独立 PostgreSQL schema / Compose 项目执行。
+当前稳定版本为 0.8.0，镜像为 `ghcr.io/mochiuaena/resume-workbench:0.8.0`，运行平台为 Linux amd64。普通用户的安装、停止、重启和升级命令见 [README](../README.md)。
 
-永久清理的持久化检查使用浏览器测试生成的 `output/purge-persistence.json`。浏览器先在命名隔离实例上创建并清理合成文件，验证文件 ZIP 的完整下载、解压和人工确认。随后 `python scripts/verify-purge.py before --isolated --container resume-ci-source-app-1` 冻结已清理回执、恢复令牌、ZIP、原始文件及暂存目录不存在、无关文件、文档和模型指纹。保留数据卷重建容器后运行同一命令的 `after` 阶段；它核对新容器中的回执和指纹，并对已完成批次显式重试原请求体，确认无需新下载票据且不产生数据变更。脚本只接受命名隔离容器与本机 18767 端口，不负责创建测试文件或首次清理。CI 将证据写入 `output/purge-verification.json`，与其他验证 JSON 一起上传。
+日常修改通过功能分支和 PR 同步 `main`，累积到完整里程碑再统一发布。已有版本标签和镜像不覆盖重用。
 
-日常迭代通过功能分支、PR、CI 和合并同步 GitHub，变更集中记录在 CHANGELOG 的 Unreleased 区域。小功能完成后不自动创建版本标签或 Release，也不把 Compose 默认镜像改成尚未发布的版本。累积到较完整的里程碑，再统一确定版本、更新部署配置和发布镜像。
+## 交付一个新版本
 
-推送 `v<版本>` 标签会运行同一套检查。全部通过后，将**刚测试的同一份镜像**推送到 `ghcr.io/mochiuaena/resume-workbench:<版本>`；失败不会发布。工作流使用仓库自带 `GITHUB_TOKEN` 的 packages 写入权限，不需要用户提供 Token。Action 与基础镜像均固定到 commit / digest。
+1. 在发布分支统一 POM、前端 package / lockfile、依赖清单、Compose、`.env.example` 和使用说明中的版本。
+2. 完成 PR 的前后端、Docker、浏览器、中文 PDF、备份恢复及升级验证。
+3. 给通过验证的提交创建 `v<版本>` 标签。标签工作流会重新验证，并在全部通过后推送刚测试的同一份镜像。
+4. 从匹配的标签手动运行 `Verify published image`，指定新镜像，确认匿名拉取、全新目录安装、可编辑备份恢复、报告历史、容器重建和 PDF。
+5. 在空目录生成发布包：`python scripts/build-release-assets.py --output-dir output/release`。配置 ZIP 包含 `compose.yml` 和 `.env.example`；另附依赖声明、演示和 SHA256SUMS。
+6. 公开镜像通过后发布 Release，再把同一份已验证代码合入 `main`，使默认配置指向已经可用的镜像。Release 记录镜像 digest 与验证链接。
 
-首个候选版本为 `v0.1.0-rc.1`，正式首版为 `v0.1.0`，当前版本为 `v0.7.0`，容器平台为 Linux amd64。发布前更新 POM、前端 package / lockfile、依赖清单的 applicationVersion、Compose、.env.example、README 和 published-image 工作流默认版本。可执行文件固定为 target/resume-workbench.jar，避免每次发布修改启动路径。已发布版本不复用标签覆盖；需要修改时使用新版本。
+## 从旧版升级
 
-发布前检查：
+先下载完整工作区 ZIP，保留原 `.env`、数据库密码和数据卷，再更新镜像版本。0.7.0 升级后保留正文、版式、修订、版本、图片、PDF、自动备份策略以及当前实例的模型配置和密钥，并自动增加报告历史表。
 
-1. 分支中没有 `.env`、真实简历、备份 ZIP 或其他项目文件，CI 有实际通过记录。
-2. README、`.env.example` 与 Compose 默认镜像版本一致，许可证和第三方声明完整。
-3. 在 GitHub 新建版本标签 / Release，附上该提交的部署配置 ZIP、演示与依赖声明；配置 ZIP 内为 `compose.yml` 和 `.env.example`，避免 GitHub 对隐藏文件的重命名。候选 Release 标为 prerelease，正式版本不标。
-4. 标签触发的验证与镜像推送成功后，确认 GHCR 包可以匿名拉取。首次发布的包可能默认为 private，需要在 GitHub Packages 设置中改为 public；工作流成功并不等于已验证公开拉取。
-5. 在新目录下载配置，使用已发布镜像启动两个服务，验证健康检查和 PDF。之后在 Release 记录实际镜像 digest 与 Actions 链接。
+0.8.0 的工作区备份格式为 schema 5，简历文档仍为 schema 4；新程序可恢复旧 schema 2–4 备份，旧程序不能恢复 schema 5。需要回到旧程序时，使用升级前的备份在独立实例恢复。工作区 ZIP 不包含模型密钥，换设备恢复后应重新配置模型。
 
-通过 `Verify published image` 手动工作流指定该版本镜像，使用空 Docker 凭据匿名拉取，在两个全新目录启动并执行恢复、普通 / 脱敏 PDF。应从匹配的版本标签运行该工作流，避免用新版接口检查不支持该功能的旧镜像。升级回归须使用独立实例，分别运行 rc.1、v0.2.0、v0.4.0、v0.5.0 与 v0.6.0 创建 schema 2 / 3 / 4 文档与备份，再以保留卷的方式换新版，核验正文 / 样式 / 修订 / 文件完整性和再次导出；另须确认 v0.2.0 拒绝新版 schema 4 备份。
-
-依赖更新时重新解析 runtime dependency:list、运行 generate-notices.py，检查所有许可声明并保留上游文本；运行 verify-distribution.py 逐个核对打包 JAR。字体、上游许可与用户提供的示例图片继续分别声明，不把第三方资源改为项目 MIT。
-
-普通用户只下载发布配置与镜像即可启动。源码构建仍可用 `docker compose up -d --build --wait`，无需宿主机 Node/JDK/Maven。
-
-发布版本升级时保留 `.env` 和两个数据卷，先下载完整备份。数据库迁移自动执行；备份恢复以新增记录为默认行为。不要在升级说明中安排删除用户数据卷。
+验收使用合成数据和隔离服务；真实简历、`.env`、备份及模型密钥不进入发布包。第三方资源继续遵守各自许可证，见 [第三方声明](../THIRD_PARTY_NOTICES.md)。
