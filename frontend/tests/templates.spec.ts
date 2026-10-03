@@ -9,7 +9,19 @@ test.afterEach(async({request})=>{for(const id of owned){const response=await re
 async function ready(page:Page){await expect(page.getByLabel('简历名称',{exact:true})).toBeEnabled();await expect(page.getByTestId('save-status')).toHaveText('已保存到本机');await expect(page.getByTestId('preview-status')).toContainText('预览已更新');}
 async function safePages(page:Page){
  const frame=page.frameLocator('iframe');
- expect(await frame.locator('#pages .sheet').evaluateAll(sheets=>sheets.every(s=>s.querySelector('.page-content')!.getBoundingClientRect().bottom<Math.min(s.querySelector('.page-footer')!.getBoundingClientRect().top-8,s.getBoundingClientRect().bottom-parseFloat(getComputedStyle(s).paddingBottom))))).toBeTruthy();
+ await expect.poll(async()=>{
+  try{
+   return await frame.locator('#pages .sheet').evaluateAll(sheets=>{
+    const layout=window as Window&{__resumeReady?:boolean;__resumePages?:number;__resumeError?:string};
+    if(document.readyState!=='complete'||layout.__resumeReady!==true||layout.__resumeError||sheets.length===0||layout.__resumePages!==sheets.length)return false;
+    return sheets.every(s=>s.querySelector('.page-content')!.getBoundingClientRect().bottom<Math.min(s.querySelector('.page-footer')!.getBoundingClientRect().top-8,s.getBoundingClientRect().bottom-parseFloat(getComputedStyle(s).paddingBottom)));
+   });
+  }catch(cause){
+   // A new preview src can replace the iframe while its previous document is being inspected.
+   if(cause instanceof Error&&cause.message.includes('Execution context was destroyed, most likely because of a navigation'))return false;
+   throw cause;
+  }
+ }).toBe(true);
 }
 
 for(const template of templates)test(`${template.id} template preserves content/images, exports one/two pages and survives history`,async({page,request})=>{

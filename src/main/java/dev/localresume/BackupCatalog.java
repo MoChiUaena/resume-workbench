@@ -52,7 +52,7 @@ final class BackupCatalog {
         try(var archive=new ZipFile(zip.toFile())){
             if(archive.size()>BackupArchive.MAX_FILES+1)throw new IOException("Too many archive entries");
             var manifest=mapper.readValue(read(archive,"manifest.json",1048576),BackupArchive.Manifest.class);
-            if(!BackupArchive.FORMAT.equals(manifest.format())||manifest.formatVersion()!=1||manifest.createdAt()==null||!ResumeDocument.supportsSchema(manifest.documentSchemaVersion()))throw new IOException("Unsupported archive");
+            if(!BackupArchive.FORMAT.equals(manifest.format())||manifest.formatVersion()!=1||manifest.createdAt()==null||!BackupData.supportsSchema(manifest.documentSchemaVersion()))throw new IOException("Unsupported archive");
             var workspace=mapper.readTree(read(archive,"workspace.json",16777216));
             for(String field:List.of("resumes","versions","attachments","exports"))if(!workspace.path(field).isArray())throw new IOException("Invalid archive summary");
             return new Item(new BackupService.Created(id,Files.size(zip),workspace.path("resumes").size(),workspace.path("versions").size(),workspace.path("attachments").size(),workspace.path("exports").size(),manifest.createdAt()),"legacy",false);

@@ -92,7 +92,7 @@ async function duplicateResume(item:Summary){
   cache[copy.id]=copy;await ws.reloadList();
 }
 async function deleteResume(item:Summary){
-  if(!window.confirm(`删除「${item.title}」及其历史版本？图片文件会保留。`))return;
+  if(!window.confirm(`删除「${item.title}」、历史版本及已保存的职位匹配报告？图片文件会保留。`))return;
   const saved=await record(item.id);
   await api(`/api/resumes/${item.id}`,{expectedRevision:saved.revision},'DELETE');
   delete cache[item.id];await ws.reloadList();

@@ -47,6 +47,17 @@ class JobMatchesExpiryTest {
         assertThat(expired).isEqualTo(1);assertThat(created).isEqualTo(32);
         verify(f.gateway(),times(32)).matchJob(any(),any(),any());
     }
+    @Test void archiveUsesReportExpiryAndDoesNotRequireTheShorterLivedPreviewCache(){
+        var f=fixture();var p=preview(f);now=now.plusSeconds(800);
+        when(f.gateway().matchJob(any(),any(),any())).thenReturn(MISSING);
+        var report=f.matches().generate(new JobMatches.Generate(p.id(),true));
+        now=now.plusSeconds(101);preview(f); // prune the expired preview, retaining the report's archive material
+        assertThat(f.matches().archive(p.id(),report.id(),f.source().id()).report()).isEqualTo(report);
+        now=now.plusSeconds(800);
+        assertThatThrownBy(()->f.matches().archive(p.id(),report.id(),f.source().id()))
+            .isInstanceOfSatisfying(ApiException.class,e->assertThat(e.code).isEqualTo("JOB_REPORT_EXPIRED"));
+        verify(f.gateway(),times(1)).matchJob(any(),any(),any());
+    }
     @Test void thirdConcurrentGenerationIsRejectedWhileTwoCallsAreInFlight()throws Exception{
         var f=fixture();var a=preview(f);var b=preview(f);var c=preview(f);
         var entered=new CountDownLatch(2);var release=new CountDownLatch(1);

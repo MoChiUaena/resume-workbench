@@ -20,6 +20,7 @@ public class BackupService {
     public record Created(String id, long bytes, int resumes, int versions, int attachments, int exports, Instant createdAt) {}
     public record Restored(int resumes, int versions, int attachments, int exports, List<UUID> resumeIds) {}
     public record AutomaticResult(Created backup,String fingerprint,String outcome) {}
+    private record Snapshot(BackupData workspace,Map<UUID,byte[]> reports) {}
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
     private final Validator validator;
@@ -48,7 +49,8 @@ public class BackupService {
     public AutomaticResult automatic(String previousFingerprint) { return create("automatic",previousFingerprint); }
     private AutomaticResult create(String kind,String previousFingerprint) {
         try (var lease=gate.exclusive()) {
-            BackupData snapshot=tx.execute(status->snapshot());
+            Snapshot bundle=Objects.requireNonNull(tx.execute(status->snapshot()));
+            BackupData snapshot=bundle.workspace();
             String fingerprint=ImageService.sha(mapper.writeValueAsBytes(snapshot));
             if(kind.equals("automatic")&&fingerprint.equals(previousFingerprint))return new AutomaticResult(null,fingerprint,"unchanged");
             if(kind.equals("automatic")&&previousFingerprint==null&&snapshot.resumes().isEmpty())return new AutomaticResult(null,fingerprint,"empty");
@@ -57,7 +59,8 @@ public class BackupService {
             Path temp=directory.resolve(id+".tmp"), destination=directory.resolve(id+".zip");
             var files=new LinkedHashMap<String,BackupArchive.Source>();
             files.put("workspace.json",BackupArchive.Source.json(mapper.writeValueAsBytes(snapshot)));
-            files.put("settings.json",BackupArchive.Source.json(mapper.writeValueAsBytes(new BackupData.Settings(ResumeDocument.SCHEMA_VERSION,maxUploadBytes,maxPixels))));
+            files.put("settings.json",BackupArchive.Source.json(mapper.writeValueAsBytes(new BackupData.Settings(BackupData.SCHEMA_VERSION,maxUploadBytes,maxPixels))));
+            for(var report:snapshot.jobReports())files.put("job-reports/"+report.id()+".json",BackupArchive.Source.json(bundle.reports().get(report.id())));
             for(var asset:snapshot.attachments()) {
                 String prefix="attachments/"+asset.id()+"/";
                 files.put(prefix+"metadata.json",BackupArchive.Source.json(mapper.writeValueAsBytes(asset)));
@@ -91,7 +94,7 @@ public class BackupService {
         try(var input=Files.newInputStream(download(id))){return restore(input);}
         catch(IOException e){throw new ApiException("BACKUP_NOT_FOUND","本机备份无法读取，请选择其他备份。",404);}
     }
-    private BackupData snapshot() {
+    private Snapshot snapshot() {
         var resumes=jdbc.query("SELECT * FROM resumes ORDER BY id",(rs,n)->new BackupData.SavedResume(rs.getObject("id",UUID.class),rs.getString("title"),parse(rs.getString("document"),ResumeDocument.class),rs.getLong("revision"),rs.getTimestamp("created_at").toInstant(),rs.getTimestamp("updated_at").toInstant()));
         var versions=jdbc.query("SELECT * FROM resume_versions ORDER BY id",(rs,n)->new BackupData.SavedVersion(rs.getObject("id",UUID.class),rs.getObject("resume_id",UUID.class),rs.getString("title"),rs.getString("label"),parse(rs.getString("document"),ResumeDocument.class),rs.getLong("source_revision"),rs.getTimestamp("created_at").toInstant()));
         if(resumes.size()>2000 || versions.size()>10000) throw BackupArchive.invalid("工作区记录数量超限，请拆分工作区后备份。");
@@ -123,7 +126,20 @@ public class BackupService {
             } catch(IOException e) { throw BackupArchive.invalid("导出文件读取失败，备份未完成。"); }
         }
         exports.sort(Comparator.comparing(ExportService.Export::id));
-        return new BackupData(ResumeDocument.SCHEMA_VERSION,List.copyOf(resumes),List.copyOf(versions),List.copyOf(assets),List.copyOf(exports));
+        var reportFiles=new LinkedHashMap<UUID,byte[]>();
+        var reports=jdbc.query("SELECT id,resume_id,label,source_revision,created_at,snapshot FROM job_reports WHERE deleted_at IS NULL ORDER BY id",(rs,n)->{
+            UUID id=rs.getObject("id",UUID.class);
+            byte[] bytes;
+            try {
+                var snapshot=databaseReportSnapshot(rs.getString("snapshot").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                if(snapshot.sourceRevision()!=rs.getLong("source_revision"))throw BackupArchive.invalid("报告修订信息不一致。");
+                bytes=mapper.writer().without(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT).writeValueAsBytes(snapshot);
+            }catch(IOException e){throw BackupArchive.invalid("报告无法读取，备份未完成。");}
+            reportFiles.put(id,bytes);
+            return new BackupData.SavedJobReport(id,rs.getObject("resume_id",UUID.class),rs.getString("label"),rs.getLong("source_revision"),rs.getTimestamp("created_at").toInstant(),ImageService.sha(bytes));
+        });
+        validateReportMetadata(reports,resumes);
+        return new Snapshot(new BackupData(BackupData.SCHEMA_VERSION,List.copyOf(resumes),List.copyOf(versions),List.copyOf(assets),List.copyOf(exports),List.copyOf(reports)),Map.copyOf(reportFiles));
     }
     private Path attachmentPath(ImageService.Asset asset,String filename) { requireUuid(asset.id()); return data.resolve("attachments").resolve(asset.id()).resolve(filename); }
     public Restored restore(InputStream input) {
@@ -141,7 +157,8 @@ public class BackupService {
         }
     }
     private void validate(BackupData backup,BackupArchive.Staged staged) throws IOException {
-        if(backup==null || !ResumeDocument.supportsSchema(backup.schemaVersion()) || backup.resumes()==null || backup.versions()==null || backup.attachments()==null || backup.exports()==null
+        if(backup==null || !BackupData.supportsSchema(backup.schemaVersion()) || backup.resumes()==null || backup.versions()==null || backup.attachments()==null || backup.exports()==null || backup.jobReports()==null
+            || (backup.schemaVersion()<BackupData.SCHEMA_VERSION&&!backup.jobReports().isEmpty())
             || backup.resumes().size()>2000 || backup.versions().size()>10000) throw BackupArchive.invalid("工作区数据无效或数量超限。");
         var resumeIds=new HashSet<UUID>();var versionIds=new HashSet<UUID>();var assetIds=new HashSet<String>();
         var versionOwners=new HashMap<UUID,BackupData.SavedVersion>();
@@ -176,6 +193,14 @@ public class BackupService {
             var meta=mapper.readValue(staged.file("exports/"+export.id()+".json").toFile(),ExportService.Export.class);
             if(!meta.equals(export)||!hash(staged.file("exports/"+export.id()+".pdf")).equals(export.sha256()))throw BackupArchive.invalid("PDF 校验失败。");
         }
+        validateReportMetadata(backup.jobReports(),backup.resumes());
+        for(var report:backup.jobReports()) {
+            String name="job-reports/"+report.id()+".json";required.add(name);
+            Path path=staged.file(name);
+            if(!Files.isRegularFile(path)||!hash(path).equals(report.sha256()))throw BackupArchive.invalid("报告文件缺失或校验失败。");
+            var snapshot=reportSnapshot(Files.readAllBytes(path));
+            if(snapshot.sourceRevision()!=report.sourceRevision())throw BackupArchive.invalid("报告修订信息不一致。");
+        }
         var actual=new TreeSet<String>();staged.manifest().files().forEach(file->actual.add(file.path()));
         if(!required.equals(actual))throw BackupArchive.invalid("备份清单含多余或缺失文件。");
         var settings=mapper.readValue(staged.file("settings.json").toFile(),BackupData.Settings.class);
@@ -202,6 +227,11 @@ public class BackupService {
                 jdbc.update("INSERT INTO resume_versions(id,resume_id,title,label,document,source_revision,created_at) VALUES (?,?,?,?,?::jsonb,?,?)",id,resumes.get(old.resumeId()),old.title(),old.label(),mapper.writeValueAsString(doc),old.sourceRevision(),Timestamp.from(old.createdAt()));
                 refs("version_assets","version_id",id,doc);
             }
+            for(var old:backup.jobReports()) {
+                var snapshot=reportSnapshot(Files.readAllBytes(staged.file("job-reports/"+old.id()+".json")));
+                jdbc.update("INSERT INTO job_reports(id,resume_id,preview_id,label,source_revision,created_at,snapshot) VALUES (?,?,?,?,?,?,?::jsonb)",
+                    UUID.randomUUID(),resumes.get(old.resumeId()),UUID.randomUUID(),old.label(),old.sourceRevision(),Timestamp.from(old.createdAt()),mapper.writeValueAsString(snapshot));
+            }
             Path exports=data.resolve("exports");Files.createDirectories(exports);
             for(var old:backup.exports()) {
                 String id=UUID.randomUUID().toString();Path pdf=exports.resolve(id+".pdf"),json=exports.resolve(id+".json");
@@ -221,6 +251,24 @@ public class BackupService {
     private static void collect(Set<String> ids,ResumeDocument doc) {for(var slot:List.of(doc.layout().photo(),doc.layout().logo()))if(slot.id()!=null)ids.add(slot.id());}
     private void validateDocument(ResumeDocument doc) {if(doc==null||!validator.validate(doc).isEmpty())throw BackupArchive.invalid("简历内容或版式参数无效。");try{if(mapper.writeValueAsString(doc).length()>200000)throw BackupArchive.invalid("单份简历内容过大。");}catch(IOException e){throw BackupArchive.invalid("简历内容无效。");}}
     private void validateTitle(String title) {if(title==null||title.isBlank()||title.length()>120)throw BackupArchive.invalid("标题或版本名称无效。");}
+    private static void validateReportMetadata(List<BackupData.SavedJobReport> reports,List<BackupData.SavedResume> resumes) {
+        if(reports.size()>BackupArchive.MAX_FILES)throw BackupArchive.invalid("报告数量超限。");
+        var revisions=new HashMap<UUID,Long>();resumes.forEach(r->revisions.put(r.id(),r.revision()));
+        var ids=new HashSet<UUID>();var counts=new HashMap<UUID,Integer>();
+        for(var report:reports) {
+            if(report==null||report.id()==null||!ids.add(report.id())||report.resumeId()==null||!revisions.containsKey(report.resumeId())
+                ||report.sourceRevision()<1||report.sourceRevision()>revisions.get(report.resumeId())||report.createdAt()==null
+                ||report.label()==null||report.label().isBlank()||report.label().length()>120||report.label().codePoints().anyMatch(Character::isISOControl)
+                ||report.sha256()==null||!report.sha256().matches("[0-9a-f]{64}")||counts.merge(report.resumeId(),1,Integer::sum)>100)
+                throw BackupArchive.invalid("报告记录或所属简历关系无效。");
+        }
+    }
+    private JobReportSnapshot reportSnapshot(byte[] bytes) {
+        try{return JobReportSnapshot.parse(mapper,bytes);}catch(ApiException e){throw BackupArchive.invalid("报告内容或原材料引用无效。");}
+    }
+    private JobReportSnapshot databaseReportSnapshot(byte[] bytes) {
+        try{return JobReportSnapshot.parseDatabase(mapper,bytes);}catch(ApiException e){throw BackupArchive.invalid("报告内容或原材料引用无效。");}
+    }
     private void validateAsset(ImageService.Asset asset) {if(asset==null)throw BackupArchive.invalid("图片元数据无效。");requireUuid(asset.id());if(!Set.of("PNG","JPEG","WEBP").contains(asset.format())||asset.bytes()<1||asset.bytes()>BackupArchive.MAX_ENTRY||asset.sha256()==null||!asset.sha256().matches("[0-9a-f]{64}")||asset.normalizedSha256()==null||!asset.normalizedSha256().matches("[0-9a-f]{64}"))throw BackupArchive.invalid("图片元数据无效。");for(var size:List.of(new int[]{asset.width(),asset.height()},new int[]{asset.sourceWidth(),asset.sourceHeight()}))if(size[0]<1||size[1]<1||size[0]>12000||size[1]>12000||(long)size[0]*size[1]>maxPixels)throw BackupArchive.invalid("图片尺寸超限。");}
     private static void requireUuid(String id) {if(id==null||!id.matches("[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}"))throw BackupArchive.invalid("文件 ID 无效。");}
     private <T>T parse(String json,Class<T> type) {try{return mapper.readValue(json,type);}catch(IOException e){throw BackupArchive.invalid("工作区数据无法解析。");}}

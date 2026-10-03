@@ -88,6 +88,14 @@ def canonical_zip(content):
             export.pop('id')
             export['resumeId'] = resume_owners[export['resumeId']]
             export['versionId'] = version_owners[export['versionId']]
+        for report in workspace.get('jobReports', []):
+            identifier = report.pop('id')
+            report['resumeId'] = resume_owners[report['resumeId']]
+            payload = archive_file.read('job-reports/' + identifier + '.json')
+            assert hashlib.sha256(payload).hexdigest() == report['sha256']
+            report['snapshot'] = json.loads(payload)
+        if 'jobReports' in workspace:
+            workspace['jobReports'].sort(key=digest)
         for group in ['resumes', 'versions', 'attachments', 'exports']:
             workspace[group].sort(key=digest)
         return workspace
@@ -114,8 +122,8 @@ def backup_counts(workspace):
 def baseline_fingerprints(content):
     workspace, files = backup_inventory(content)
     return {
-        'rows': {group: {row['id']: digest(row) for row in workspace[group]}
-                 for group in ['resumes', 'versions', 'attachments', 'exports']},
+        'rows': {group: {row['id']: digest(row) for row in workspace.get(group, [])}
+                 for group in ['resumes', 'versions', 'attachments', 'exports', 'jobReports']},
         'files': {path: sha for path, sha in files.items()
                   if path not in ['workspace.json', 'settings.json']},
     }

@@ -49,7 +49,7 @@ public final class BackupArchive {
                     throw invalid("本地文件与元数据校验值不一致，请保留原文件并检查数据目录。");
                 entries.add(new FileEntry(name, size, hash)); out.closeEntry();
             }
-            var manifest = new Manifest(FORMAT, VERSION, ResumeDocument.SCHEMA_VERSION, Instant.now(), List.copyOf(entries));
+            var manifest = new Manifest(FORMAT, VERSION, BackupData.SCHEMA_VERSION, Instant.now(), List.copyOf(entries));
             byte[] manifestBytes = mapper.writeValueAsBytes(manifest);
             if (manifestBytes.length > 1048576) throw invalid("备份清单过大，请拆分工作区。");
             out.putNextEntry(new ZipEntry("manifest.json"));
@@ -100,7 +100,7 @@ public final class BackupArchive {
                 }
                 zip.closeEntry();
             }
-            if (manifest == null || !FORMAT.equals(manifest.format()) || manifest.formatVersion() != VERSION || !ResumeDocument.supportsSchema(manifest.documentSchemaVersion()))
+            if (manifest == null || !FORMAT.equals(manifest.format()) || manifest.formatVersion() != VERSION || !BackupData.supportsSchema(manifest.documentSchemaVersion()))
                 throw new ApiException("BACKUP_VERSION_UNSUPPORTED", "备份格式或版本不受支持，请使用匹配的应用版本。", 422);
             if (manifest.files() == null || manifest.files().size() != actual.size()) throw invalid("备份清单与文件数量不一致。");
             var unique = new HashSet<String>();
@@ -120,7 +120,8 @@ public final class BackupArchive {
     static void validatePath(String name) {
         boolean allowed = name != null && (name.equals("workspace.json") || name.equals("settings.json")
             || name.matches("attachments/" + UUID_PATTERN + "/(?:image\\.png|metadata\\.json|original\\.(?:jpeg|png|webp))")
-            || name.matches("exports/" + UUID_PATTERN + "\\.(?:pdf|json)"));
+            || name.matches("exports/" + UUID_PATTERN + "\\.(?:pdf|json)")
+            || name.matches("job-reports/" + UUID_PATTERN + "\\.json"));
         if (!allowed) throw invalid("备份包含不允许的文件路径。");
     }
     static long copy(InputStream in, OutputStream out, MessageDigest digest, long limit) throws IOException {
@@ -133,7 +134,7 @@ public final class BackupArchive {
         return total;
     }
     private long entryLimit(String name,long written) {
-        long kind=name.equals("workspace.json")?16777216L:name.equals("settings.json")?65536L:name.endsWith(".json")?1048576L:MAX_ENTRY;
+        long kind=name.equals("workspace.json")?16777216L:name.equals("settings.json")?65536L:name.startsWith("job-reports/")?JobReportSnapshot.MAX_BYTES:name.endsWith(".json")?1048576L:MAX_ENTRY;
         return Math.min(kind,maxBytes-written);
     }
     static MessageDigest digest() { try { return MessageDigest.getInstance("SHA-256"); } catch (Exception e) { throw new IllegalStateException(e); } }
