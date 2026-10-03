@@ -1,4 +1,5 @@
 import {test,expect} from '@playwright/test';
+import fs from 'node:fs/promises';
 const details={version:'0.8.0-SNAPSHOT',buildTime:'2026-10-03T00:00:00Z',pid:23456,startedAt:'2026-10-03T02:00:00Z',instanceId:'bce32e31-f72e-4ca2-879f-1b6b707de6a7',javaVersion:'21.0.12',jarPath:'C:\\fixture\\target\\resume-workbench.jar',jarSha256:'a'.repeat(64),dataDirectory:'C:\\fixture\\data',logsDirectory:'C:\\fixture\\.tools\\runtime\\logs',port:18765};
 test.beforeEach(async({page})=>{
  await page.route('**/api/resumes',route=>route.fulfill({json:[]}));
@@ -6,8 +7,11 @@ test.beforeEach(async({page})=>{
 });
 test('packaged application reports its own process and artifact through the local runtime endpoint',async({request})=>{
  test.skip(process.env.RESUME_TEST_ISOLATED!=='1','Uses a named isolated application instance.');
+ const pom=await fs.readFile(new URL('../../pom.xml',import.meta.url),'utf8');
+ const declaredVersion=pom.replace(/<parent>[\s\S]*?<\/parent>/,'').match(/<version>\s*([^<]+?)\s*<\/version>/)?.[1];
+ expect(declaredVersion,'POM must declare the packaged application version').toBeTruthy();
  const response=await request.get('/api/runtime');expect(response.ok()).toBeTruthy();
- const info=await response.json();expect(info.version).toBe('0.8.0-SNAPSHOT');expect(info.pid).toBeGreaterThan(0);
+ const info=await response.json();expect(info.version).toBe(declaredVersion);expect(info.pid).toBeGreaterThan(0);
  expect(info.jarPath).toMatch(/\.jar$/);expect(info.jarSha256).toMatch(/^[a-f0-9]{64}$/);
  expect(Number.isFinite(Date.parse(info.startedAt))).toBeTruthy();expect(Number.isFinite(Date.parse(info.buildTime))).toBeTruthy();
  expect(info.dataDirectory).toBeTruthy();expect(await(await request.get('/api/health')).json()).toEqual({status:'ok'});

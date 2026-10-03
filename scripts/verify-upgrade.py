@@ -12,7 +12,8 @@ qa=importlib.util.module_from_spec(spec);spec.loader.exec_module(qa)
 STATE=ROOT/'output/upgrade-before.json'
 SUFFIX='schema-2'
 
-def before(base, source_schema=2, future_backup=None, automatic_enabled=False, webp_backup=None):
+def before(base, source_schema=2, future_backup=None, automatic_enabled=False, webp_backup=None,
+           source_version=None, model_enabled=False):
     assert qa.call(base,'/api/resumes')==[], 'Old instance must be empty and isolated'
     resume=qa.call(base,'/api/resumes',{'title':'版本升级 · 奶龙合成简历','sample':'one'})
     assert resume['document']['schemaVersion']==source_schema, 'Must start with the actual old schema'
@@ -25,10 +26,27 @@ def before(base, source_schema=2, future_backup=None, automatic_enabled=False, w
     exported=qa.call(base,'/api/resumes/'+resume['id']+'/export',{'expectedRevision':resume['revision']})
     assets={slot:qa.call(base,'/api/assets/'+resume['document']['layout'][slot]['id']) for slot in ['photo','logo']}
     meta,backup=qa.archive(base)
+    model_state=None;backup_schema=None
+    if model_enabled:
+        assert source_version=='0.7.0' and source_schema==4, 'Model upgrade fixture is for the published 0.7 schema-4 source'
+        workspace,_=qa.backup_inventory(backup)
+        backup_schema=workspace['schemaVersion']
+        assert backup_schema==4, 'Published 0.7 must produce an actual schema-4 backup'
+        models=qa.call(base,'/api/models')
+        assert models['profiles']==[], 'Old model settings must be empty and synthetic'
+        model_state=qa.call(base,'/api/models/profiles',{'expectedRevision':models['revision'],
+            'name':'升级前模型持久化 fixture','provider':'compatible','baseUrl':'http://127.0.0.1:18770/v1',
+            'model':'qa-model','apiKey':'upgrade-fixture-only','clearKey':False})
+        model_state=qa.call(base,'/api/models/enabled',{'expectedRevision':model_state['revision'],'enabled':True},'PUT')
+        assert model_state['enabled'] and model_state['profiles'][0]['hasApiKey']
+        assert 'upgrade-fixture-only' not in json.dumps(model_state), 'Credentials leaked through public model settings'
     ROOT.joinpath('output').mkdir(exist_ok=True)
     (ROOT/f'output/upgrade-{SUFFIX}.zip').write_bytes(backup)
     rejected=False
     if future_backup:
+        if model_enabled:
+            future_workspace,_=qa.backup_inventory(future_backup.read_bytes())
+            assert future_workspace['schemaVersion']==5, '0.7 must reject an actual schema-5 backup'
         previous=qa.call(base,'/api/resumes')
         try:qa.upload(base,'/api/backups/restore','future.zip',future_backup.read_bytes())
         except HTTPError as error:
@@ -51,15 +69,26 @@ def before(base, source_schema=2, future_backup=None, automatic_enabled=False, w
         policy=status['state']
         automatic_hash=hashlib.sha256(qa.call(base,'/api/backups/'+policy['lastBackup']['id']+'/download',raw=True)).hexdigest()
     data={'base':base,'sourceSchema':source_schema,'futureBackupRejected':rejected,'webpBackupRejected':webp_rejected,'automaticState':policy,'automaticArchiveSha256':automatic_hash,'backupKind':'manual' if automatic_enabled else 'legacy','backupId':meta['id'],'resume':resume,'assets':assets,'export':exported,'versions':qa.call(base,'/api/resumes/'+resume['id']+'/versions')}
+    data.update(sourceVersion=source_version,modelState=model_state,backupSchema=backup_schema,
+                backupSha256=hashlib.sha256(backup).hexdigest())
     STATE.write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding='utf8')
     print(f'Old schema {source_schema} resume, images, versions, PDF and complete backup prepared.')
 
 def after(base):
     data=json.loads(STATE.read_text(encoding='utf8'));old=data['resume'];assert data['base']==base
     source_schema=data['sourceSchema']
+    model_state=data.get('modelState')
+    if model_state:
+        assert qa.call(base,'/api/models')==model_state, 'Instance model settings changed during upgrade'
+        profile=next(item for item in model_state['profiles'] if item['id']==model_state['defaultId'])
+        assert profile['provider']=='compatible' and profile['baseUrl']=='http://127.0.0.1:18770/v1' and profile['model']=='qa-model', 'Only the synthetic model fixture may be contacted'
+        tested=qa.call(base,'/api/models/profiles/'+profile['id']+'/test',{'expectedRevision':model_state['revision']})
+        assert tested['connected'], 'Stored model key must remain decryptable after upgrade'
     current=qa.call(base,'/api/resumes/'+old['id'])
     history=qa.call(base,'/api/backups')['items']
     assert any(item['backup']['id']==data['backupId'] and item['kind']==data.get('backupKind','legacy') for item in history), 'Pre-upgrade ZIP must remain available'
+    if data.get('backupSha256'):
+        assert hashlib.sha256(qa.call(base,'/api/backups/'+data['backupId']+'/download',raw=True)).hexdigest()==data['backupSha256'], 'Pre-upgrade archive bytes changed'
     automatic=qa.call(base,'/api/backups/automatic')['state']
     if data.get('automaticState'):
         assert automatic==data['automaticState'], 'Existing automatic backup policy changed'
@@ -78,6 +107,11 @@ def after(base):
     assert hashlib.sha256(pdf).hexdigest()==data['export']['sha256']
     restored=qa.upload(base,'/api/backups/restore','old.zip',(ROOT/f'output/upgrade-{SUFFIX}.zip').read_bytes())
     imported=qa.call(base,'/api/resumes/'+restored['resumeIds'][0]);assert imported['document']['content']==old['document']['content']
+    for resume_id in [old['id'],imported['id']]:
+        reports=qa.call(base,'/api/resumes/'+resume_id+'/job-reports')
+        assert reports['total']==0 and reports['items']==[], 'Old schema restore must expose empty report history'
+    if model_state:
+        assert qa.call(base,'/api/models')==model_state, 'Old backup restore changed instance model settings'
     imported['document']['layout']['presentation']['accentColor']='#c65c19'
     imported['document']['layout']['presentation']['marginTopMm']=22
     imported['document']['layout']['template']='rail'
@@ -92,16 +126,18 @@ def after(base):
     assert qa.call(base,'/api/resumes/'+imported['id'])==imported
     assert qa.call(base,'/api/resumes/'+old['id'])==current
     report={'upgrade':f'schema {source_schema} -> 4','sameVolumes':True,'oldContentRevisionDatesPreserved':True,'oldImagesVersionsPdfPreserved':True,'oldBackupRestored':True,'oldBackupVisibleInHistory':True,'automaticBackupsRemainDisabled':not automatic['enabled'],'automaticPolicyPreserved':True,'newTemplatesEditableAndExportable':True,'redactedExportLeavesSourceUnchanged':True,'oldAppRejectedFutureBackup':data['futureBackupRejected'],'oldAppRejectedWebpBackup':data.get('webpBackupRejected',False)}
+    report.update(sourceVersion=data.get('sourceVersion'),oldSchemaRestoreExposesReportHistory=True,
+                  instanceModelSettingsPreserved=bool(model_state),storedModelKeyDecryptable=bool(model_state))
     (ROOT/f'output/upgrade-verification-{SUFFIX}.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf8')
     print(json.dumps(report,ensure_ascii=False,indent=2))
 
 if __name__=='__main__':
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('step',choices=['before','after']);parser.add_argument('--base',default='http://127.0.0.1:18769');parser.add_argument('--isolated',action='store_true');parser.add_argument('--source-schema',type=int,choices=[2,3,4],default=2);parser.add_argument('--future-backup',type=Path);parser.add_argument('--source-version');parser.add_argument('--automatic-enabled',action='store_true');parser.add_argument('--unsupported-webp-backup',type=Path);args=parser.parse_args()
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('step',choices=['before','after']);parser.add_argument('--base',default='http://127.0.0.1:18769');parser.add_argument('--isolated',action='store_true');parser.add_argument('--source-schema',type=int,choices=[2,3,4],default=2);parser.add_argument('--future-backup',type=Path);parser.add_argument('--source-version');parser.add_argument('--automatic-enabled',action='store_true');parser.add_argument('--model-enabled',action='store_true');parser.add_argument('--unsupported-webp-backup',type=Path);args=parser.parse_args()
     target=urlparse(args.base);assert args.isolated and target.hostname in ['127.0.0.1','localhost'] and target.port and target.port!=18765
     if args.source_version:
         import re
         assert re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+',args.source_version)
     SUFFIX=f'schema-{args.source_schema}'+('-'+args.source_version if args.source_version else '')
     STATE=ROOT/f'output/upgrade-before-{SUFFIX}.json'
-    if args.step=='before':before(args.base.rstrip('/'),args.source_schema,args.future_backup,args.automatic_enabled,args.unsupported_webp_backup)
+    if args.step=='before':before(args.base.rstrip('/'),args.source_schema,args.future_backup,args.automatic_enabled,args.unsupported_webp_backup,args.source_version,args.model_enabled)
     else:after(args.base.rstrip('/'))

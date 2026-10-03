@@ -4,6 +4,12 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 export function startQaModelServer(port=18770){
+ let expectedKeys;
+ try{
+  expectedKeys=JSON.parse(process.env.QA_MODEL_EXPECTED_KEYS||'{}');
+  if(!expectedKeys||Array.isArray(expectedKeys)||typeof expectedKeys!=='object'||
+     Object.values(expectedKeys).some(key=>typeof key!=='string'||!key))throw new Error();
+ }catch{throw new Error('QA_MODEL_EXPECTED_KEYS must be a JSON object mapping models to nonempty synthetic keys');}
  const requests=[];
  const server=http.createServer(async(req,res)=>{
   if(req.url==='/health'){res.writeHead(200,{'Content-Type':'application/json'});res.end('{"ok":true}');return;}
@@ -11,6 +17,9 @@ export function startQaModelServer(port=18770){
   if(req.method!=='POST'||req.url!=='/v1/chat/completions'){res.writeHead(404);res.end();return;}
   let raw='';for await(const chunk of req){raw+=chunk;if(raw.length>65536){res.writeHead(413);res.end();return;}}
   let input;try{input=JSON.parse(raw);}catch{res.writeHead(400);res.end();return;}
+  if(Object.hasOwn(expectedKeys,input.model)&&req.headers.authorization!=='Bearer '+expectedKeys[input.model]){
+   res.writeHead(401,{'Content-Type':'application/json'});res.end('{"error":{"message":"fixture authentication rejected"}}');return;
+  }
   requests.push({model:input.model,messages:input.messages,tools:input.tools??null});
   if(input.model==='qa-error'||input.model==='qa-job-error'){res.writeHead(401,{'Content-Type':'application/json'});res.end('{"error":{"message":"fixture rejection"}}');return;}
   const user=input.messages.find(message=>message.role==='user')?.content||'';
