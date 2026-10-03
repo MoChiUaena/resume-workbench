@@ -10,6 +10,7 @@ import RedactedPdf from './RedactedPdf.vue';
 import ModelSettingsPage from './ModelSettingsPage.vue';
 import TextSuggestion from './TextSuggestion.vue';
 import JobMatch from './JobMatch.vue';
+import RuntimeStatus from './RuntimeStatus.vue';
 import type {ParagraphTarget,Suggestion} from './modelApi';
 import {downloadPdf} from './downloadPdf';
 import { api, type Asset, type Resume, type Section, type Summary, type Version, type VersionDetail } from './api';
@@ -33,7 +34,7 @@ const selected=ref('basic'), newType=ref<Section['type']>('project');
 const names:Record<Section['type'],string>={education:'教育背景',experience:'工作 / 实习经历',project:'项目经历',skills:'专业技能',custom:'自定义文本'};
 const selectedSection=computed(()=>doc.value?.content.sections.find(section=>section.id===selected.value));
 const config=ref({maxUploadBytes:5242880,maxBackupBytes:268435456}), assets=reactive<{photo?:Asset;logo?:Asset}>({});
-const showBackup=ref(false);
+const showBackup=ref(false),showRuntime=ref(false);
 async function openBackup(){await ws.flush();showBackup.value=true;}
 async function restoredWorkspace(){view.value='list';routeList();await ws.reloadList();await hydrateCards();}
 const versions=ref<Version[]>([]),versionLabel=ref(''),exported=ref<{id:string;revision:number;redacted?:boolean}>();
@@ -110,7 +111,7 @@ async function restoreCompared(){if(!compared.value)return;await restore(compare
 function closeComparison(){if(!busy.value)compared.value=undefined;}
 async function preserveDraftCopy(){await ws.preserveAsCopy();if(current.value)routeEditor(current.value.id);selected.value='basic';}
 function historyKeys(event:KeyboardEvent){
- if(event.defaultPrevented||event.isComposing||event.altKey||!(event.ctrlKey||event.metaKey)||view.value!=='editor'||busy.value||showBackup.value||compared.value||redactedSource.value||aiSource.value||jobSource.value)return;
+ if(event.defaultPrevented||event.isComposing||event.altKey||!(event.ctrlKey||event.metaKey)||view.value!=='editor'||busy.value||showBackup.value||showRuntime.value||compared.value||redactedSource.value||aiSource.value||jobSource.value)return;
  const key=event.key.toLowerCase();if(key!=='z'&&key!=='y')return;
  const target=event.target instanceof HTMLElement?event.target:undefined;
  const editing=target?.closest('input,textarea,[contenteditable=true]');
@@ -133,8 +134,15 @@ onMounted(async()=>{window.addEventListener('keydown',historyKeys);window.addEve
 onUnmounted(()=>{observer?.disconnect();clearTimeout(previewTimer);ws.dispose();window.removeEventListener('keydown',historyKeys);window.removeEventListener('message',layoutMessage);window.removeEventListener('beforeunload',ws.beforeUnload);window.removeEventListener('popstate',popstate);});
 </script>
 <template>
- <div class="rw-app" :inert="showBackup||!!compared||!!redactedSource||!!aiSource||!!jobSource" @input.capture="ws.editInput" @change.capture="ws.editInput" @click.capture="ws.breakUndoGroup" @focusout.capture="ws.breakUndoGroup">
-  <header class="rw-header"><div class="rw-header-inner"><button class="rw-brand" @click="view!=='list'?action(()=>backToList()):undefined"><span class="rw-mark">简</span><span>简历工作台<small>RESUME WORKBENCH</small></span></button><nav><button :class="{active:view==='list'}" @click="view!=='list'?action(()=>backToList()):undefined">我的简历</button><span v-if="view==='editor'" class="active">简历编辑</span></nav><button class="model-open" :class="{active:view===String('models')}" :disabled="busy" @click="action(openModels)">模型设置</button><button class="backup-open" :disabled="busy" @click="action(openBackup)">备份与恢复</button><div class="rw-local">● 数据保存在本机</div><AppearanceControls v-model:theme="uiTheme" v-model:dark="darkMode"/></div></header>
+ <div class="rw-app" :inert="showBackup||showRuntime||!!compared||!!redactedSource||!!aiSource||!!jobSource" @input.capture="ws.editInput" @change.capture="ws.editInput" @click.capture="ws.breakUndoGroup" @focusout.capture="ws.breakUndoGroup">
+  <header class="rw-header"><div class="rw-header-inner">
+   <button class="rw-brand" @click="view!=='list'?action(()=>backToList()):undefined"><span class="rw-mark">简</span><span>简历工作台<small>RESUME WORKBENCH</small></span></button>
+   <nav><button :class="{active:view==='list'}" @click="view!=='list'?action(()=>backToList()):undefined">我的简历</button><span v-if="view==='editor'" class="active">简历编辑</span></nav>
+   <button class="model-open" :class="{active:view===String('models')}" :disabled="busy" @click="action(openModels)">模型设置</button>
+   <button class="backup-open" :disabled="busy" @click="showRuntime=true">运行信息</button>
+   <button class="backup-open" :disabled="busy" @click="action(openBackup)">备份与恢复</button>
+   <div class="rw-local">● 数据保存在本机</div><AppearanceControls v-model:theme="uiTheme" v-model:dark="darkMode"/>
+  </div></header>
   <p v-if="problem" class="rw-error" role="alert">{{problem}} <button @click="problem=''">收起</button></p>
 
   <main v-if="view==='list'" class="rw-list-page"><div class="rw-list-heading"><div><span class="rw-overline">简历管理</span><h1>我的简历 <small>{{String(resumes.length).padStart(2,'0')}}</small></h1><p>从已有版本继续编辑，或为新岗位复制一份。</p></div><button class="rw-primary" :disabled="busy" @click="action(()=>createResume('blank'))">＋ 新建简历</button></div>
@@ -161,6 +169,7 @@ onUnmounted(()=>{observer?.disconnect();clearTimeout(previewTimer);ws.dispose();
  <JobMatch v-if="jobSource" :source="jobSource" :return-focus="jobFocus" :suspended="!!aiInitial" @close="closeJobMatch" @settings="action(jobSettings)" @review="reviewJobSuggestion"/>
  <TextSuggestion v-if="aiSource&&aiTarget" :source="aiSource" :target="aiTarget" :initial-suggestion="aiInitial" :return-focus="aiFocus" @close="closeSuggestion" @settings="action(suggestionSettings)" @applying="aiApplying=$event" @applied="result=>action(()=>suggestionApplied(result))"/>
  <BackupPanel v-if="showBackup" :max-bytes="config.maxBackupBytes" @close="showBackup=false" @restored="action(restoredWorkspace)"/>
+ <RuntimeStatus v-if="showRuntime" @close="showRuntime=false"/>
  <RedactedPdf v-if="redactedSource" :source="redactedSource" :return-focus="redactedFocus" @close="closeRedactedPdf" @reload="action(reloadAfterRedaction)" @created="result=>action(()=>redactedCreated(result))" @busy="redactedBusy=$event"/>
  <VersionCompare v-if="compared&&doc&&current" :version="compared" :title="title" :document="doc" :revision="current.revision" :dirty="dirty" :busy="busy" :error="problem" :return-focus="comparisonFocus" @close="closeComparison" @restore="action(restoreCompared)"/>
 </template>

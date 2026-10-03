@@ -45,6 +45,30 @@
 
 首次下载镜像需要联网。端口被占用时，可修改 `.env` 中的 `RESUME_PORT`。当前版本面向单人本机使用，没有账号认证。
 
+### Windows 源码运行（开发版）
+
+准备 PowerShell 7.2 或更新版本、JDK 21、Node.js 24 和 Docker Desktop，在项目目录运行。将下面的 JDK 路径换成本机目录：
+
+```powershell
+pwsh -File .\scripts\workbench.ps1 -Action start -Build -JavaHome "C:\Java\jdk-21"
+```
+
+首次构建会准备前端、Java 和 PDF 浏览器资源，随后在后台启动。日常管理使用同一个入口：
+
+```powershell
+pwsh -File .\scripts\workbench.ps1 -Action status
+pwsh -File .\scripts\workbench.ps1 -Action stop
+pwsh -File .\scripts\workbench.ps1 -Action start -JavaHome "C:\Java\jdk-21"
+pwsh -File .\scripts\workbench.ps1 -Action restart -JavaHome "C:\Java\jdk-21"
+pwsh -File .\scripts\workbench.ps1 -Action logs
+```
+
+更新源码后用 `-Action restart -Build` 重新构建并切换版本。停止前确认页面显示「已保存到本机」；停止只结束经身份核验的本项目 Java 进程，保留数据库、数据和日志。端口被其他程序占用、运行记录损坏或进程身份改变时会拒绝停止。关闭启动终端后，后台应用继续运行。
+
+运行记录在 `.tools/runtime/state.json`，每次启动的日志在 `.tools/runtime/logs`。`status -Json` 返回机器可读信息；`logs` 列出日志目录。自定义应用端口可加 `-Port`；使用已经准备好的外部数据库时可加 `-SkipDatabase`。
+
+再次启动或重启会沿用记录中的 JDK、端口和数据目录；需要更改时明确传入对应参数。开发数据库会核验容器和持久化卷的目录归属，拒绝接管另一份源码目录的数据。
+
 ## 怎么使用
 
 1. **选择简历**：在「我的简历」中新建空白简历或示例，也可以复制已有简历后修改。
