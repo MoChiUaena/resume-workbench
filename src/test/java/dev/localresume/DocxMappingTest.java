@@ -42,4 +42,22 @@ class DocxMappingTest {
         assertThat(text(result.document())).contains(" ".repeat(50)+"其他能力");
         try(var validator=Validation.buildDefaultValidatorFactory()){assertThat(validator.getValidator().validate(result.document())).isEmpty();}
     }
+    @Test void pdfGenericResumeTitleDoesNotHideAFollowingPlausibleName() {
+        var result=new DocxMapping().map(List.of(block("个人简历"),block("奶龙"),block("教育背景"),block("示例大学")),List.of(),"PDF");
+        assertThat(result.document().content().name()).isEqualTo("奶龙");
+        assertThat(result.document().content().sections()).anyMatch(s->s.type().equals("education"));
+        assertThat(result.warnings()).extracting(DocxReader.Warning::code).contains("PDF_NAME_INFERRED");
+    }
+    @Test void pdfSectionHeadingIsNeverInferredAsName() {
+        var result=new DocxMapping().map(List.of(block("教育背景"),block("示例大学")),List.of(),"PDF");
+        assertThat(result.document().content().name()).isEqualTo("姓名");
+        assertThat(result.document().content().sections().getFirst().type()).isEqualTo("education");
+        assertThat(result.warnings()).extracting(DocxReader.Warning::code).doesNotContain("PDF_NAME_INFERRED");
+    }
+    @Test void pdfNameInferenceDoesNotClaimAnExplicitLabelWasFound() {
+        var result=new DocxMapping().map(List.of(block("奶龙"),block("简介内容")),List.of(),"PDF");
+        assertThat(result.document().content().name()).isEqualTo("奶龙");
+        assertThat(result.warnings()).extracting(DocxReader.Warning::code)
+            .contains("PDF_NAME_INFERRED").doesNotContain("PDF_FIELDS_INFERRED");
+    }
 }

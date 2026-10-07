@@ -31,7 +31,7 @@ class BackupServiceTest {
     final Path data=Path.of("target/backup-test-files").toAbsolutePath();
     @BeforeEach void prepare()throws Exception{
         assertThat(jdbc.queryForObject("SELECT current_schema()",String.class)).isEqualTo("backup_test");
-        jdbc.execute("TRUNCATE docx_imports,job_reports,version_assets,resume_assets,resume_versions,resumes,attachments");
+        jdbc.execute("TRUNCATE document_imports,job_reports,version_assets,resume_assets,resume_versions,resumes,attachments");
         BackupArchive.removeTree(data);
     }
     private ResumeDocument withImages()throws Exception{

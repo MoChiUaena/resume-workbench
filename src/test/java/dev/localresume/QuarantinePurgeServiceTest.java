@@ -38,7 +38,7 @@ class QuarantinePurgeServiceTest {
     QuarantineStore.Receipt held; QuarantineFiles.Plan plan; final Map<String,byte[]> contents=new TreeMap<>();
     @BeforeEach void seed()throws Exception {
         assertThat(jdbc.queryForObject("SELECT current_schema()",String.class)).isEqualTo("purge_service_test");
-        jdbc.execute("TRUNCATE docx_imports,job_reports,version_assets,resume_assets,resume_versions,resumes,attachments");
+        jdbc.execute("TRUNCATE document_imports,job_reports,version_assets,resume_assets,resume_versions,resumes,attachments");
         data=workspace.resolve("data");cache=workspace.resolve("cache");Files.createDirectories(cache);
         gate=new WorkspaceGate();store=new QuarantineStore(data,mapper,clock);archive=new QuarantineArchive(data,cache,mapper,clock);
         preview=new StoragePreviewService(jdbc,mapper,gate,transactions,data.toString(),store,clock);
