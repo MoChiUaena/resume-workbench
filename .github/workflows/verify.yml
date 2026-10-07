@@ -106,6 +106,7 @@ jobs:
           python scripts/verify-webp.py --isolated
           python scripts/verify-job-reports.py --isolated
           python scripts/verify-model-settings.py --isolated
+          python scripts/verify-docx-import.py --isolated
           python scripts/verify-pdfs.py --stage-c
           python scripts/verify-layout-pdfs.py
           python scripts/verify-template-pdfs.py
@@ -127,6 +128,7 @@ jobs:
           python scripts/verify-webp.py --isolated --check-persistence
           python scripts/verify-model-settings.py --isolated --check-persistence
           python scripts/verify-job-reports.py --isolated --check-persistence
+          python scripts/verify-docx-import.py --isolated --check-persistence
           python scripts/verify-quarantine.py after --isolated --container "$RESUME_TEST_APP_CONTAINER"
       - name: Upload verification evidence
         if: always()
@@ -137,6 +139,7 @@ jobs:
           path: |
             target/surefire-reports/
             output/e2e-results.json
+            output/docx-import*.png
             output/*verification*.json
             output/stage-b-network.json
             src/main/resources/META-INF/third-party/inventory.json
@@ -208,6 +211,26 @@ jobs:
           docker run -d --name resume-upgrade-seven-model-fixture --env 'QA_MODEL_EXPECTED_KEYS={"qa-model":"upgrade-fixture-only"}' --network container:resume-ci-upgrade-seven-app-1 --mount type=bind,source="$PWD/scripts/qa-model-server.mjs",target=/qa-model-server.mjs,readonly --entrypoint /ms-playwright-driver/node resume-workbench:ci /qa-model-server.mjs
           docker run --rm --cap-add NET_ADMIN --network container:resume-ci-upgrade-seven-app-1 --entrypoint /bin/sh postgres:16.10-alpine@sha256:029660641a0cfc575b14f336ba448fb8a75fd595d42e1fa316b9fb4378742297 -c 'ip route del default'
           python scripts/verify-upgrade.py after --isolated --source-schema 4 --source-version 0.7.0
+          docker stop resume-upgrade-seven-model-fixture
+          docker rm resume-upgrade-seven-model-fixture
+          docker compose -p resume-ci-upgrade-seven -f .tools/ci/upgrade-seven/compose.yml --env-file .tools/ci/upgrade-seven/.env down
+      - name: Verify published 0.8 upgrade and new Word import without changing existing data
+        run: |
+          mkdir -p .tools/ci/upgrade-eight
+          cp compose.yml .tools/ci/upgrade-eight/compose.yml
+          printf 'RESUME_PORT=18769\n' > .tools/ci/upgrade-eight/.env
+          docker pull ghcr.io/mochiuaena/resume-workbench:0.8.0
+          RESUME_APP_IMAGE=ghcr.io/mochiuaena/resume-workbench:0.8.0 docker compose -p resume-ci-upgrade-eight -f .tools/ci/upgrade-eight/compose.yml --env-file .tools/ci/upgrade-eight/.env up -d --wait --wait-timeout 120
+          docker run -d --name resume-upgrade-eight-model-fixture --env 'QA_MODEL_EXPECTED_KEYS={"qa-model":"upgrade-fixture-only"}' --network container:resume-ci-upgrade-eight-app-1 --mount type=bind,source="$PWD/scripts/qa-model-server.mjs",target=/qa-model-server.mjs,readonly --entrypoint /ms-playwright-driver/node resume-workbench:ci /qa-model-server.mjs
+          docker run --rm --cap-add NET_ADMIN --network container:resume-ci-upgrade-eight-app-1 --entrypoint /bin/sh postgres:16.10-alpine@sha256:029660641a0cfc575b14f336ba448fb8a75fd595d42e1fa316b9fb4378742297 -c 'ip route del default'
+          python scripts/verify-upgrade.py before --isolated --source-schema 4 --source-version 0.8.0 --automatic-enabled --model-enabled
+          docker stop resume-upgrade-eight-model-fixture
+          docker rm resume-upgrade-eight-model-fixture
+          RESUME_APP_IMAGE=resume-workbench:ci docker compose -p resume-ci-upgrade-eight -f .tools/ci/upgrade-eight/compose.yml --env-file .tools/ci/upgrade-eight/.env up -d --wait --wait-timeout 120
+          docker run -d --name resume-upgrade-eight-model-fixture --env 'QA_MODEL_EXPECTED_KEYS={"qa-model":"upgrade-fixture-only"}' --network container:resume-ci-upgrade-eight-app-1 --mount type=bind,source="$PWD/scripts/qa-model-server.mjs",target=/qa-model-server.mjs,readonly --entrypoint /ms-playwright-driver/node resume-workbench:ci /qa-model-server.mjs
+          docker run --rm --cap-add NET_ADMIN --network container:resume-ci-upgrade-eight-app-1 --entrypoint /bin/sh postgres:16.10-alpine@sha256:029660641a0cfc575b14f336ba448fb8a75fd595d42e1fa316b9fb4378742297 -c 'ip route del default'
+          python scripts/verify-upgrade.py after --isolated --source-schema 4 --source-version 0.8.0
+          python scripts/verify-docx-import.py --isolated --after-upgrade --source http://127.0.0.1:18769
       - name: Upload upgrade evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -216,6 +239,7 @@ jobs:
           retention-days: 14
           path: |
             output/upgrade-verification*.json
+            output/docx-upgrade-verification.json
             output/pdf/release-upgraded*.pdf
       - name: Build assets whose metadata matches the release tag
         if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
@@ -271,7 +295,9 @@ jobs:
           docker rm resume-model-fixture || true
           docker stop resume-upgrade-seven-model-fixture || true
           docker rm resume-upgrade-seven-model-fixture || true
-          for side in source target upgrade upgrade-three upgrade-four upgrade-five upgrade-six upgrade-seven; do
+          docker stop resume-upgrade-eight-model-fixture || true
+          docker rm resume-upgrade-eight-model-fixture || true
+          for side in source target upgrade upgrade-three upgrade-four upgrade-five upgrade-six upgrade-seven upgrade-eight; do
             if [ -f .tools/ci/$side/compose.yml ]; then
               docker compose -p resume-ci-$side -f .tools/ci/$side/compose.yml --env-file .tools/ci/$side/.env down
             fi

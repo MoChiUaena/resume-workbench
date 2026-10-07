@@ -28,10 +28,11 @@ def before(base, source_schema=2, future_backup=None, automatic_enabled=False, w
     meta,backup=qa.archive(base)
     model_state=None;backup_schema=None
     if model_enabled:
-        assert source_version=='0.7.0' and source_schema==4, 'Model upgrade fixture is for the published 0.7 schema-4 source'
+        assert source_version in ['0.7.0','0.8.0'] and source_schema==4, 'Model upgrade fixture requires a published 0.7/0.8 schema-4 source'
         workspace,_=qa.backup_inventory(backup)
         backup_schema=workspace['schemaVersion']
-        assert backup_schema==4, 'Published 0.7 must produce an actual schema-4 backup'
+        expected_backup_schema=4 if source_version=='0.7.0' else 5
+        assert backup_schema==expected_backup_schema, 'Published source must produce its actual backup schema'
         models=qa.call(base,'/api/models')
         assert models['profiles']==[], 'Old model settings must be empty and synthetic'
         model_state=qa.call(base,'/api/models/profiles',{'expectedRevision':models['revision'],
@@ -46,7 +47,7 @@ def before(base, source_schema=2, future_backup=None, automatic_enabled=False, w
     if future_backup:
         if model_enabled:
             future_workspace,_=qa.backup_inventory(future_backup.read_bytes())
-            assert future_workspace['schemaVersion']==5, '0.7 must reject an actual schema-5 backup'
+            assert future_workspace['schemaVersion']>backup_schema, 'Future backup must actually be newer than the published source'
         previous=qa.call(base,'/api/resumes')
         try:qa.upload(base,'/api/backups/restore','future.zip',future_backup.read_bytes())
         except HTTPError as error:
