@@ -147,12 +147,18 @@ class UpgradeVerifierContractTest(unittest.TestCase):
             self.run_after(transport)
 
     def test_before_records_synthetic_models_and_schema_four_archive(self):
+        self.check_model_source('0.7.0', 4)
+
+    def test_before_records_published_eight_models_and_schema_five_archive(self):
+        self.check_model_source('0.8.0', 5)
+
+    def check_model_source(self, source_version, backup_schema):
         transport = UpgradeTransport()
         profile = copy.deepcopy(MODELS)
         initial = {'revision': 0, 'enabled': False, 'defaultId': None, 'profiles': [],
                    'readable': True, 'presets': copy.deepcopy(MODELS['presets'])}
         content = io.BytesIO()
-        workspace = json.dumps({'schemaVersion': 4}).encode()
+        workspace = json.dumps({'schemaVersion': backup_schema}).encode()
         manifest = {'files': [{'path': 'workspace.json', 'bytes': len(workspace),
                                'sha256': hashlib.sha256(workspace).hexdigest()}]}
         with zipfile.ZipFile(content, 'w') as bundle:
@@ -186,13 +192,13 @@ class UpgradeVerifierContractTest(unittest.TestCase):
                  patch.object(qa.qa, 'archive', return_value=({'id': 'backup-old'}, content.getvalue())):
                 try:
                     with contextlib.redirect_stdout(io.StringIO()):
-                        qa.before(BASE, 4, source_version='0.7.0', model_enabled=True)
+                        qa.before(BASE, 4, source_version=source_version, model_enabled=True)
                 except TypeError as error:
                     self.fail('Missing 0.7 model preparation contract: ' + str(error))
             recorded = json.loads(state.read_text(encoding='utf-8'))
         self.assertEqual(recorded['modelState'], MODELS)
-        self.assertEqual(recorded['sourceVersion'], '0.7.0')
-        self.assertEqual(recorded['backupSchema'], 4)
+        self.assertEqual(recorded['sourceVersion'], source_version)
+        self.assertEqual(recorded['backupSchema'], backup_schema)
         self.assertEqual(requests, [{'expectedRevision': 0, 'name': '升级前模型持久化 fixture',
             'provider': 'compatible', 'baseUrl': 'http://127.0.0.1:18770/v1', 'model': 'qa-model',
             'apiKey': 'upgrade-fixture-only', 'clearKey': False}])

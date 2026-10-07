@@ -15,7 +15,10 @@ public class ApiErrors {
     @ExceptionHandler(ApiException.class)
     ResponseEntity<?> known(ApiException e) { return error(e.status, e.code, e.getMessage()); }
     @ExceptionHandler(MaxUploadSizeExceededException.class)
-    ResponseEntity<?> size() { return error(413, "FILE_TOO_LARGE", "图片超过上传限制，请压缩后重试。"); }
+    ResponseEntity<?> size(jakarta.servlet.http.HttpServletRequest request) {
+        if(request.getRequestURI().equals("/api/imports/docx/preview"))return error(413,"DOCX_TOO_LARGE","Word 文件须不超过 5 MiB，请拆分或压缩后重试。");
+        return error(413, "FILE_TOO_LARGE", "图片超过上传限制，请压缩后重试。");
+    }
     @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class, IllegalArgumentException.class})
     ResponseEntity<?> invalid(Exception e) { return error(400, "INVALID_INPUT", "参数无效，请检查文字长度、图片尺寸和布局选项。"); }
     @ExceptionHandler(Exception.class)
