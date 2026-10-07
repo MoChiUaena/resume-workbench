@@ -1,6 +1,7 @@
 import {api,ApiFailure,type Resume,type ResumeDocument} from './api.ts';
 
 export type DocxPreview={format:'docx';fileName:string;title:string;document:ResumeDocument;sourceText:string;warnings:{code:string;message:string}[];statistics:{paragraphs:number;tables:number;images:number}};
+export type PdfPreview={format:'pdf';fileName:string;title:string;document:ResumeDocument;sourceText:string;warnings:{code:string;message:string}[];statistics:{paragraphs:number;pages:number;images:number}};
 export type DocxCreateAttempt=Readonly<{mutationId:string;title:string;document:ResumeDocument}>;
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const object=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v);
@@ -38,8 +39,14 @@ export function isDocxCreateReceipt(value:unknown,attempt:DocxCreateAttempt):val
  if(typeof r.id!=='string'||!uuid.test(r.id)||!string(r.title,120,true)||!integer(r.revision,1,Number.MAX_SAFE_INTEGER)||!(r.lastMutationId===null||typeof r.lastMutationId==='string'&&uuid.test(r.lastMutationId))||typeof r.updatedAt!=='string'||r.updatedAt.length>40||!/^\d{4}-\d{2}-\d{2}T.*Z$/.test(r.updatedAt)||!Number.isFinite(Date.parse(r.updatedAt))||!validDocument(r.document))return false;
  return Number(r.revision)>1||(r.title===attempt.title&&canonical(r.document)===canonical(attempt.document));
 }
-const knownBusinessErrors=new Set(['DOCX_UNSUPPORTED','DOCX_INVALID','DOCX_TOO_LARGE','DOCX_CONTENT_TOO_LARGE','DOCX_EMPTY','DOCX_IMPORT_CONFLICT','DOCX_IMPORT_DELETED','INVALID_INPUT']);
-export function isDocxCreateUncertain(code:string|undefined){return !code||!knownBusinessErrors.has(code);}
+const knownBusinessErrors:Record<'docx'|'pdf',Record<string,number>>={
+ docx:{DOCX_UNSUPPORTED:422,DOCX_INVALID:422,DOCX_TOO_LARGE:413,DOCX_CONTENT_TOO_LARGE:413,DOCX_EMPTY:422,DOCX_IMPORT_CONFLICT:409,DOCX_IMPORT_DELETED:410,INVALID_INPUT:400},
+ pdf:{PDF_INVALID:422,PDF_ENCRYPTED:422,PDF_NO_TEXT:422,PDF_TOO_LARGE:413,PDF_CONTENT_TOO_LARGE:413,PDF_IMPORT_CONFLICT:409,PDF_IMPORT_DELETED:410,INVALID_INPUT:400}
+};
+export function isDocxCreateUncertain(code:string|undefined,status?:number){return !code||knownBusinessErrors.docx[code]!==status;}
+export function isPdfCreateUncertain(code:string|undefined,status?:number){return !code||knownBusinessErrors.pdf[code]!==status;}
+export const createPdfImportAttempt=createDocxImportAttempt;
+export const isPdfCreateReceipt=isDocxCreateReceipt;
 export async function previewDocx(file:File):Promise<DocxPreview>{
  const body=new FormData();body.append('file',file);
  const result=await api<unknown>('/api/imports/docx/preview',body);
@@ -49,5 +56,16 @@ export async function previewDocx(file:File):Promise<DocxPreview>{
 export async function createDocxImport(attempt:DocxCreateAttempt):Promise<Resume>{
  const response=await api<unknown>('/api/imports/docx/create',attempt);
  if(!isDocxCreateReceipt(response,attempt))throw new ApiFailure('NETWORK_ERROR','创建回执无法确认，请使用同一请求重试创建。');
+ return response.resume;
+}
+export async function previewPdf(file:File):Promise<PdfPreview>{
+ const body=new FormData();body.append('file',file);
+ const result=await api<unknown>('/api/imports/pdf/preview',body);
+ if(!object(result)||result.format!=='pdf'||!string(result.fileName,120,true)||!string(result.title,120,true)||!validDocument(result.document)||typeof result.sourceText!=='string'||result.sourceText.length>40000||!Array.isArray(result.warnings)||!result.warnings.every(w=>object(w)&&string(w.code,80,true)&&string(w.message,1024,true))||!object(result.statistics)||!integer(result.statistics.paragraphs,0,600)||!integer(result.statistics.pages,1,20)||!integer(result.statistics.images,0,512))throw new ApiFailure('NETWORK_ERROR','PDF 预览响应无法确认，请重新选择文件。');
+ return result as PdfPreview;
+}
+export async function createPdfImport(attempt:DocxCreateAttempt):Promise<Resume>{
+ const response=await api<unknown>('/api/imports/pdf/create',attempt);
+ if(!isPdfCreateReceipt(response,attempt))throw new ApiFailure('NETWORK_ERROR','创建回执无法确认，请使用同一请求重试创建。');
  return response.resume;
 }

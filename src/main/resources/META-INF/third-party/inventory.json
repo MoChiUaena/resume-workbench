@@ -765,6 +765,60 @@
       ]
     },
     {
+      "coordinate": "org.apache.pdfbox:fontbox:3.0.7",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "8149d9897ab504f7a3f3797d552cd8925ef58149b4de3fb470eb46d747e68f86",
+      "licenses": [
+        {
+          "name": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "http://pdfbox.apache.org/",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/apache/pdfbox/fontbox/3.0.7/fontbox-3.0.7-sources.jar",
+      "upstreamTexts": [
+        "texts/java-fontbox-3.0.7/META-INF-LICENSE.txt",
+        "texts/java-fontbox-3.0.7/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "org.apache.pdfbox:pdfbox-io:3.0.7",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "b9a838291978069086efbcd1f62b81b9e4a6016e61dd2c68104ee9f4c2ff997b",
+      "licenses": [
+        {
+          "name": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://www.apache.org/",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/apache/pdfbox/pdfbox-io/3.0.7/pdfbox-io-3.0.7-sources.jar",
+      "upstreamTexts": [
+        "texts/java-pdfbox-io-3.0.7/META-INF-LICENSE.txt",
+        "texts/java-pdfbox-io-3.0.7/META-INF-NOTICE.txt"
+      ]
+    },
+    {
+      "coordinate": "org.apache.pdfbox:pdfbox:3.0.7",
+      "scope": "compile",
+      "packaged": true,
+      "sha256": "7cefa717622330951b4343abf1e5d36bccb11f4ba245d78aaa73251d08fec623",
+      "licenses": [
+        {
+          "name": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "projectUrl": "https://www.apache.org/",
+      "sourceArchive": "https://repo.maven.apache.org/maven2/org/apache/pdfbox/pdfbox/3.0.7/pdfbox-3.0.7-sources.jar",
+      "upstreamTexts": [
+        "texts/java-pdfbox-3.0.7/META-INF-LICENSE.txt",
+        "texts/java-pdfbox-3.0.7/META-INF-NOTICE.txt"
+      ]
+    },
+    {
       "coordinate": "org.apache.tomcat.embed:tomcat-embed-core:10.1.55",
       "scope": "compile",
       "packaged": true,

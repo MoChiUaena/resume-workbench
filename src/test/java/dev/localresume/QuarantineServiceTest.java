@@ -33,7 +33,7 @@ class QuarantineServiceTest {
     BackupService backups; QuarantineService service; ResumeService resumes; LocalFileStorage files;
     @BeforeEach void setup(){
         assertThat(jdbc.queryForObject("SELECT current_schema()",String.class)).isEqualTo("quarantine_service_test");
-        jdbc.execute("TRUNCATE docx_imports,job_reports,version_assets,resume_assets,resume_versions,resumes,attachments");
+        jdbc.execute("TRUNCATE document_imports,job_reports,version_assets,resume_assets,resume_versions,resumes,attachments");
         gate=new WorkspaceGate();files=new LocalFileStorage(data.toString(),mapper);
         resumes=new ResumeService(jdbc,mapper,new AssetCatalog(jdbc,mapper,files));
         store=new QuarantineStore(data,mapper,clock);

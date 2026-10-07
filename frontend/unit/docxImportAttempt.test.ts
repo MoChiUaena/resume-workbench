@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {reactive} from 'vue';
-import {createDocxImportAttempt,isDocxCreateReceipt,isDocxCreateUncertain} from '../src/docxImportApi.ts';
+import {createDocxImportAttempt,isDocxCreateReceipt,isDocxCreateUncertain,createPdfImportAttempt,isPdfCreateReceipt,isPdfCreateUncertain,previewPdf,createPdfImport} from '../src/docxImportApi.ts';
 
 const mutationId='11111111-1111-4111-8111-111111111111';
 const resumeId='22222222-2222-4222-8222-222222222222';
@@ -50,6 +50,38 @@ test('edited retry accepts complete current state, including replacement photo, 
 });
 
 test('only known business failures release an uncertain create',()=>{
- for(const code of ['NETWORK_ERROR','INTERNAL_ERROR','DATABASE_UNAVAILABLE',undefined,'DOCX_INVALID'])assert.equal(isDocxCreateUncertain(code),code!=='DOCX_INVALID');
- for(const code of ['DOCX_IMPORT_CONFLICT','DOCX_IMPORT_DELETED','DOCX_CONTENT_TOO_LARGE','INVALID_INPUT'])assert.equal(isDocxCreateUncertain(code),false);
+ for(const code of ['NETWORK_ERROR','INTERNAL_ERROR','DATABASE_UNAVAILABLE',undefined])assert.equal(isDocxCreateUncertain(code,500),true);
+ for(const [code,status] of [['DOCX_INVALID',422],['DOCX_IMPORT_CONFLICT',409],['DOCX_IMPORT_DELETED',410],['DOCX_CONTENT_TOO_LARGE',413],['INVALID_INPUT',400]] as const)assert.equal(isDocxCreateUncertain(code,status),false);
+});
+
+test('PDF attempt freezes reviewed edits and validates fresh and edited receipts',()=>{
+ const source=reactive(document());source.content.name='奶龙修订';
+ const attempt=createPdfImportAttempt(' PDF 导入 ',source,mutationId);
+ source.content.name='再次修改';
+ assert.equal(attempt.title,'PDF 导入');assert.equal(attempt.document.content.name,'奶龙修订');
+ assert.equal(Object.isFrozen(attempt.document.content),true);
+ assert.equal(isPdfCreateReceipt({mutationId,resume:resume(attempt)},attempt),true);
+ assert.equal(isPdfCreateReceipt({mutationId,resume:{...resume(attempt),title:'错误标题'}},attempt),false);
+ assert.equal(isPdfCreateReceipt({mutationId,resume:{...resume(attempt),revision:2,title:'后续编辑'}},attempt),true);
+});
+
+test('PDF and Word release only matching status and business-code pairs',()=>{
+ for(const [code,status] of [['INVALID_INPUT',503],['PDF_NO_TEXT',503],['PDF_IMPORT_DELETED',409],['PDF_INVALID',500]] as const)assert.equal(isPdfCreateUncertain(code,status),true);
+ for(const [code,status] of [['INVALID_INPUT',400],['PDF_NO_TEXT',422],['PDF_IMPORT_CONFLICT',409],['PDF_IMPORT_DELETED',410],['PDF_TOO_LARGE',413],['PDF_CONTENT_TOO_LARGE',413],['PDF_ENCRYPTED',422]] as const)assert.equal(isPdfCreateUncertain(code,status),false);
+ assert.equal(isDocxCreateUncertain('INVALID_INPUT',503),true);
+ assert.equal(isDocxCreateUncertain('INVALID_INPUT',400),false);
+ assert.equal(isDocxCreateUncertain('DOCX_IMPORT_DELETED',410),false);
+});
+
+test('PDF preview validates page shape and PDF create preserves the frozen request',async()=>{
+ const originalFetch=globalThis.fetch;const calls:{url:string;body:unknown}[]=[];let attempt!:ReturnType<typeof createPdfImportAttempt>;
+ const expected={format:'pdf',fileName:'奶龙.pdf',title:'奶龙',document:document(),sourceText:'奶龙\n教育背景',warnings:[{code:'PDF_READING_ORDER',message:'请核对阅读顺序'}],statistics:{paragraphs:2,pages:2,images:0}};
+ try{
+  globalThis.fetch=async(input,init)=>{calls.push({url:String(input),body:init?.body});return Response.json(calls.length===1?expected:calls.length===2?{...expected,statistics:{...expected.statistics,pages:0}}:{mutationId,resume:resume(attempt)});};
+  const file=new File(['%PDF-1.7'],'奶龙.pdf',{type:'application/pdf'});
+  const preview=await previewPdf(file);assert.equal(preview.statistics.pages,2);assert.equal(calls[0].url,'/api/imports/pdf/preview');assert.ok(calls[0].body instanceof FormData);
+  await assert.rejects(previewPdf(file),/PDF 预览响应/);
+  attempt=createPdfImportAttempt('奶龙',preview.document,mutationId);const created=await createPdfImport(attempt);
+  assert.equal(created.id,resumeId);assert.equal(calls[2].url,'/api/imports/pdf/create');assert.equal(calls[2].body,JSON.stringify(attempt));
+ }finally{globalThis.fetch=originalFetch;}
 });

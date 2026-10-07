@@ -17,6 +17,7 @@ public class ApiErrors {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     ResponseEntity<?> size(jakarta.servlet.http.HttpServletRequest request) {
         if(request.getRequestURI().equals("/api/imports/docx/preview"))return error(413,"DOCX_TOO_LARGE","Word 文件须不超过 5 MiB，请拆分或压缩后重试。");
+        if(request.getRequestURI().equals("/api/imports/pdf/preview"))return error(413,"PDF_TOO_LARGE","PDF 文件须不超过 5 MiB，请拆分或压缩后重试。");
         return error(413, "FILE_TOO_LARGE", "图片超过上传限制，请压缩后重试。");
     }
     @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class, IllegalArgumentException.class})
