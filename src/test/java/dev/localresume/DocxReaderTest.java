@@ -5,6 +5,24 @@ import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 
 class DocxReaderTest {
+    @Test void readsOnlyTheSelectedTextBoxRepresentation() {
+        String mc="http://schemas.openxmlformats.org/markup-compatibility/2006";
+        String wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape";
+        String alternate="<mc:AlternateContent xmlns:mc=\""+mc+"\" xmlns:wps=\""+wps+"\">"
+            +"<mc:Choice Requires=\"wps\"><w:drawing><wps:wsp><wps:txbx><w:txbxContent>"
+            +DocxFixtures.paragraph("现代文本框")
+            +"</w:txbxContent></wps:txbx></wps:wsp></w:drawing></mc:Choice>"
+            +"<mc:Fallback><w:pict><w:txbxContent>"+DocxFixtures.paragraph("旧版备用文本")
+            +"</w:txbxContent></w:pict></mc:Fallback></mc:AlternateContent>";
+        var result=new DocxReader().read(DocxFixtures.document(DocxFixtures.paragraph("奶龙")+"<w:p><w:r>"+alternate+"</w:r></w:p>"));
+        assertThat(result.sourceText()).isEqualTo("奶龙\n现代文本框");
+        assertThat(result.blocks()).extracting(DocxReader.Block::text).containsExactly("奶龙","现代文本框");
+        String unknown="<mc:AlternateContent xmlns:mc=\""+mc+"\" xmlns:future=\"urn:future-format\">"
+            +"<mc:Choice Requires=\"future\">"+DocxFixtures.paragraph("不可识别的格式")+"</mc:Choice>"
+            +"<mc:Fallback>"+DocxFixtures.paragraph("可读取的备用文本")+"</mc:Fallback></mc:AlternateContent>";
+        var fallback=new DocxReader().read(DocxFixtures.document(unknown));
+        assertThat(fallback.sourceText()).isEqualTo("可读取的备用文本");
+    }
     @Test void preservesRunsTablesTextboxesAndAcceptedRevisionText() {
         var result=new DocxReader().read(DocxFixtures.document(DocxFixtures.paragraph("奶龙")+
             "<w:p><w:hyperlink><w:r><w:t>Java</w:t></w:r></w:hyperlink><w:del><w:r><w:delText>删除</w:delText></w:r></w:del><w:ins><w:r><w:t>保留</w:t></w:r></w:ins><w:r><w:instrText>秘密指令</w:instrText></w:r></w:p>"+

@@ -15,6 +15,9 @@ public class DocxReader {
     private static final int MAX_EXPANDED=32*1024*1024, MAX_XML=4*1024*1024;
     private static final String W="http://schemas.openxmlformats.org/wordprocessingml/2006/main";
     private static final String STRICT_W="http://purl.oclc.org/ooxml/wordprocessingml/main";
+    private static final String MC="http://schemas.openxmlformats.org/markup-compatibility/2006";
+    private static final Set<String> TEXT_CHOICE_NAMESPACES=Set.of(W,STRICT_W,
+        "http://schemas.microsoft.com/office/word/2010/wordprocessingShape");
     private static final String CT="http://schemas.openxmlformats.org/package/2006/content-types";
     private static final String REL="http://schemas.openxmlformats.org/package/2006/relationships";
     private static final String MAIN="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml";
@@ -125,6 +128,14 @@ public class DocxReader {
         if(count!=1)throw unsupported();
     }
     private static boolean word(XMLStreamReader r) {return W.equals(r.getNamespaceURI())||STRICT_W.equals(r.getNamespaceURI());}
+    private static boolean choiceWithReadableText(XMLStreamReader r) {
+        String required=r.getAttributeValue(null,"Requires");
+        if(required==null||required.isBlank())return false;
+        for(String prefix:required.trim().split("\\s+"))
+            if(!TEXT_CHOICE_NAMESPACES.contains(r.getNamespaceURI(prefix)))return false;
+        return true;
+    }
+    private static final class Alternative {boolean selected;}
     private static final class Extraction {
         final List<Block> blocks=new ArrayList<>();final StringBuilder text=new StringBuilder();int units,tables,imageReferences;boolean heading,objects;
         void flush(boolean unclassified) {
@@ -137,11 +148,25 @@ public class DocxReader {
         void append(String value) {units+=value.length();if(units>40000)throw contentTooLarge();text.append(value);}
         void parse(byte[] bytes,String root,boolean unclassified)throws XMLStreamException {
             var r=reader(bytes);int depth=0,skip=0,paragraph=0;boolean visibleText=false;
+            var alternatives=new ArrayDeque<Alternative>();
             try {while(r.hasNext()) {
                 depth=next(r,depth);
                 if(r.isStartElement()) {
                     if(depth==1&&(!word(r)||!root.equals(r.getLocalName())))throw unsupported();
                     if(skip>0){skip++;continue;}
+                    if(MC.equals(r.getNamespaceURI())) {
+                        switch(r.getLocalName()) {
+                            case "AlternateContent" -> {alternatives.push(new Alternative());continue;}
+                            case "Choice","Fallback" -> {
+                                if(alternatives.isEmpty())throw invalid();
+                                var alternative=alternatives.peek();
+                                boolean selected=!alternative.selected&&(r.getLocalName().equals("Fallback")||choiceWithReadableText(r));
+                                if(selected)alternative.selected=true;else skip=1;
+                                continue;
+                            }
+                            default -> {}
+                        }
+                    }
                     if(("imagedata".equals(r.getLocalName())&&"urn:schemas-microsoft-com:vml".equals(r.getNamespaceURI()))
                         ||("blip".equals(r.getLocalName())&&("http://schemas.openxmlformats.org/drawingml/2006/main".equals(r.getNamespaceURI())||"http://purl.oclc.org/ooxml/drawingml/main".equals(r.getNamespaceURI()))))imageReferences++;
                     if(!word(r))continue;
@@ -158,6 +183,10 @@ public class DocxReader {
                     }
                 } else if(r.isEndElement()) {
                     if(skip>0){skip--;continue;}
+                    if(MC.equals(r.getNamespaceURI())&&r.getLocalName().equals("AlternateContent")) {
+                        if(alternatives.isEmpty()||!alternatives.pop().selected)throw unsupported();
+                        continue;
+                    }
                     if(!word(r))continue;
                     if(r.getLocalName().equals("t"))visibleText=false;
                     if(r.getLocalName().equals("p")){flush(unclassified);paragraph--;heading=false;}
