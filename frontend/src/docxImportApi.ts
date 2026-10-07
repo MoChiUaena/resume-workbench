@@ -30,7 +30,7 @@ function deepFreeze<T>(value:T):T{if(value&&typeof value==='object'){Object.free
 function canonical(value:unknown):string{if(Array.isArray(value))return '['+value.map(canonical).join(',')+']';if(object(value))return '{'+Object.keys(value).sort().map(key=>JSON.stringify(key)+':'+canonical(value[key])).join(',')+'}';return JSON.stringify(value);}
 export function createDocxImportAttempt(title:string,document:ResumeDocument,mutationId:string):DocxCreateAttempt{
  const cleanTitle=title.trim();if(!uuid.test(mutationId)||!string(cleanTitle,120,true)||!validDocument(document)||document.layout.photo.id!==null||document.layout.logo.id!==null)throw new RangeError('请检查导入名称及简历内容后重试。');
- return deepFreeze({mutationId,title:cleanTitle,document:structuredClone(document)});
+ return deepFreeze({mutationId,title:cleanTitle,document:JSON.parse(JSON.stringify(document)) as ResumeDocument});
 }
 export function isDocxCreateReceipt(value:unknown,attempt:DocxCreateAttempt):value is {mutationId:string;resume:Resume}{
  if(!object(value)||value.mutationId!==attempt.mutationId||!object(value.resume))return false;

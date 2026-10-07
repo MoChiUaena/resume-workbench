@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {reactive} from 'vue';
 import {createDocxImportAttempt,isDocxCreateReceipt,isDocxCreateUncertain} from '../src/docxImportApi.ts';
 
 const mutationId='11111111-1111-4111-8111-111111111111';
@@ -14,6 +15,15 @@ test('create attempt freezes a deep copy of the exact reviewed request',()=>{
  assert.equal(attempt.title,'导入简历');assert.equal(attempt.document.content.name,'奶龙');assert.equal(attempt.document.content.sections[0].entries[0].bullets[0],'软件工程');
  assert.equal(Object.isFrozen(attempt.document.content.sections[0].entries[0].bullets),true);
  assert.throws(()=>{attempt.document.content.name='篡改';},TypeError);
+});
+
+test('create attempt snapshots the Vue reactive review without keeping its proxy',()=>{
+ const source=reactive(document());
+ source.content.name='奶龙修订';
+ const attempt=createDocxImportAttempt('导入简历',source,mutationId);
+ source.content.name='随后又修改';
+ assert.equal(attempt.document.content.name,'奶龙修订');
+ assert.equal(Object.isFrozen(attempt.document.content),true);
 });
 
 test('mapped DOCX paragraphs may have an empty entry heading',()=>{
