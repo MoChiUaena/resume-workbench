@@ -9,6 +9,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.SingleConnectionDataSource;
+import org.flywaydb.core.Flyway;
+import org.flywaydb.core.api.MigrationVersion;
+import javax.sql.DataSource;
+import jakarta.validation.Validator;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.transaction.annotation.*;
@@ -27,6 +32,8 @@ class DocxImportsIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
+    @Autowired DataSource dataSource;
+    @Autowired Validator validator;
     void isolated(){assertThat(jdbc.queryForObject("SELECT current_schema()",String.class)).isEqualTo("resume_test");}
     @Test void migratedV3DocxReceiptKeepsItsOriginalTokenAndFingerprint()throws Exception {
         isolated();
@@ -39,6 +46,40 @@ class DocxImportsIntegrationTest {
         jdbc.update("INSERT INTO document_imports(mutation_id,request_sha256,resume_id) VALUES (?,?,?)",request.mutationId(),fingerprint,original.id());
         assertThat(imports.create(request).resume().id()).isEqualTo(original.id());
         assertThat(resumes.versions(original.id())).hasSize(1);
+    }
+    @Test @Transactional(propagation=Propagation.NOT_SUPPORTED)
+    void v4MigrationPreservesAnActualV3ReceiptAndItsRetry()throws Exception {
+        isolated();
+        String schema="resume_test_v3_"+UUID.randomUUID().toString().replace("-","");
+        jdbc.execute("CREATE SCHEMA "+schema);
+        try(var connection=dataSource.getConnection()) {
+            connection.setSchema(schema);
+            var isolatedSource=new SingleConnectionDataSource(connection,true);
+            var isolatedJdbc=new JdbcTemplate(isolatedSource);
+            var v3=Flyway.configure().dataSource(isolatedSource).schemas(schema).defaultSchema(schema)
+                .target(MigrationVersion.fromVersion("3")).load();
+            v3.migrate();
+            assertThat(isolatedJdbc.queryForObject("SELECT current_schema()",String.class)).isEqualTo(schema);
+            var request=new DocxImportController.Create(UUID.randomUUID(),"V3 导入",ResumeDocument.sample("blank"));
+            UUID resumeId=UUID.randomUUID();String document=mapper.writeValueAsString(request.document());
+            isolatedJdbc.update("INSERT INTO resumes(id,title,document) VALUES (?,?,?::jsonb)",resumeId,request.title(),document);
+            isolatedJdbc.update("INSERT INTO resume_versions(id,resume_id,title,label,document,source_revision) VALUES (?,?,?,?,?::jsonb,1)",
+                UUID.randomUUID(),resumeId,request.title(),"初始版本",document);
+            String payload=mapper.writeValueAsString(List.of(request.title(),mapper.readTree(document)));
+            String fingerprint=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(payload.getBytes(StandardCharsets.UTF_8)));
+            isolatedJdbc.update("INSERT INTO docx_imports(mutation_id,request_sha256,resume_id) VALUES (?,?,?)",request.mutationId(),fingerprint,resumeId);
+            Flyway.configure().dataSource(isolatedSource).schemas(schema).defaultSchema(schema)
+                .target(MigrationVersion.fromVersion("4")).load().migrate();
+            assertThat(isolatedJdbc.queryForObject("SELECT to_regclass(?) IS NULL",Boolean.class,schema+".docx_imports")).isTrue();
+            assertThat(isolatedJdbc.queryForObject("SELECT count(*) FROM document_imports WHERE mutation_id=?",Integer.class,request.mutationId())).isEqualTo(1);
+            var legacyResumes=new ResumeService(isolatedJdbc,mapper,null);
+            var receipts=new DocumentImportReceipts(isolatedJdbc,legacyResumes,mapper,validator);
+            assertThat(receipts.create(request.mutationId(),request.title(),request.document(),DocumentImportReceipts.Format.DOCX).resume().id())
+                .isEqualTo(resumeId);
+            assertThat(isolatedJdbc.queryForObject("SELECT count(*) FROM resume_versions WHERE resume_id=?",Integer.class,resumeId)).isEqualTo(1);
+        } finally {
+            jdbc.execute("DROP SCHEMA IF EXISTS "+schema+" CASCADE");
+        }
     }
     @Test void previewWritesNothingAndControllerCreatesOneInitialVersion()throws Exception {
         isolated();int before=resumes.list().size();

@@ -75,6 +75,19 @@ class PdfReaderTest {
         var result=new PdfReader().read(generated(1,"x".repeat(40000)));
         assertThat(result.sourceText()).hasSize(40000);
     }
+    @Test void preservesLfOnlyBetweenLinesAtTheExactTextLimit() throws Exception {
+        try(var doc=new PDDocument();var bytes=new ByteArrayOutputStream()) {
+            var page=new PDPage();doc.addPage(page);
+            try(var stream=new PDPageContentStream(doc,page)) {
+                stream.beginText();stream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA),10);
+                stream.newLineAtOffset(40,700);stream.showText("x".repeat(39998));
+                stream.newLineAtOffset(0,-14);stream.showText("y");stream.endText();
+            }
+            doc.save(bytes);
+            var result=new PdfReader().read(bytes.toByteArray());
+            assertThat(result.sourceText()).isEqualTo("x".repeat(39998)+"\ny").doesNotContain("\r").hasSize(40000);
+        }
+    }
     @Test void retainsPageBoundaryWhenAnEarlierPageHasNoText() throws Exception {
         try(var doc=new PDDocument();var bytes=new ByteArrayOutputStream()) {
             doc.addPage(new PDPage());
@@ -127,6 +140,28 @@ class PdfReaderTest {
             }
             doc.save(bytes);
             assertThat(new PdfReader().read(bytes.toByteArray()).sourceText()).isEqualTo("visible text");
+        }
+    }
+    @Test void preservesBothColumnsAsEditableTextWhileWarningAboutReadingOrder() throws Exception {
+        try(var doc=new PDDocument();var bytes=new ByteArrayOutputStream()) {
+            var page=new PDPage();doc.addPage(page);
+            try(var stream=new PDPageContentStream(doc,page)) {
+                stream.beginText();stream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA),10);
+                stream.newLineAtOffset(40,700);stream.showText("LeftAlpha1");
+                stream.newLineAtOffset(0,-18);stream.showText("LeftGamma2");
+                stream.newLineAtOffset(260,18);stream.showText("RightBeta3");
+                stream.newLineAtOffset(0,-18);stream.showText("RightDelta4");stream.endText();
+            }
+            doc.save(bytes);
+            var source=new PdfReader().read(bytes.toByteArray());
+            var mapped=new DocxMapping().map(source.blocks(),source.warnings(),"PDF");
+            String editable=String.join(" ",mapped.document().content().sections().stream()
+                .flatMap(s->s.entries().stream()).flatMap(e->e.bullets().stream()).toList());
+            for(String word:java.util.List.of("LeftAlpha1","LeftGamma2","RightBeta3","RightDelta4")) {
+                assertThat(source.sourceText()).contains(word);
+                assertThat(editable).contains(word);
+            }
+            assertThat(mapped.warnings()).extracting(DocxReader.Warning::code).contains("PDF_READING_ORDER");
         }
     }
 }
