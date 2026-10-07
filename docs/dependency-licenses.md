@@ -1,6 +1,6 @@
 # 依赖许可证清单
 
-解析结果：92 个 Maven 运行期依赖（其中 84 个实际 JAR 随应用分发）、75 个 npm 锁定包，未识别声明为 0。
+解析结果：95 个 Maven 运行期依赖（其中 87 个实际 JAR 随应用分发）、75 个 npm 锁定包，未识别声明为 0。
 
 依据已解析 POM（含父 POM）和 npm lockfile 的上游声明。原始 JAR 的 LICENSE / NOTICE 保留在各依赖内，并提取随应用分发；npm 已安装包的许可证文本同样附带。完整清单、SHA-256 / integrity 和文本位于应用 JAR 的 `META-INF/third-party/`。
 
@@ -53,6 +53,9 @@
 | org.antlr:antlr4-runtime:4.13.1 | BSD-3-Clause |
 | org.apache.logging.log4j:log4j-api:2.24.3 | Apache-2.0 |
 | org.apache.logging.log4j:log4j-to-slf4j:2.24.3 | Apache-2.0 |
+| org.apache.pdfbox:fontbox:3.0.7 | Apache-2.0 |
+| org.apache.pdfbox:pdfbox-io:3.0.7 | Apache-2.0 |
+| org.apache.pdfbox:pdfbox:3.0.7 | Apache-2.0 |
 | org.apache.tomcat.embed:tomcat-embed-core:10.1.55 | Apache License, Version 2.0 |
 | org.apache.tomcat.embed:tomcat-embed-el:10.1.55 | Apache License, Version 2.0 |
 | org.apache.tomcat.embed:tomcat-embed-websocket:10.1.55 | Apache License, Version 2.0 |

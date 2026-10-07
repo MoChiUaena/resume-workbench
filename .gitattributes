@@ -6,3 +6,4 @@ mvnw text eol=lf
 *.jpg binary
 *.ttf binary
 *.pdf binary
+src/main/resources/META-INF/third-party/texts/** whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab

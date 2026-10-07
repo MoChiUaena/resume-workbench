@@ -25,15 +25,16 @@
 | Spring Boot / Spring Framework | 3.5.16 / BOM 管理 | Apache-2.0 |
 | Playwright Java / Playwright Test | 1.63.0 | Apache-2.0 |
 | metadata-extractor | 2.21.0 | Apache-2.0 |
+| Apache PDFBox / FontBox / PDFBox IO | 3.0.7 | Apache-2.0 |
 | Thymeleaf | Spring Boot BOM 管理 | Apache-2.0 |
 | Vue | 3.5.43 | MIT |
 | Vite | 8.3.1 | MIT |
 | TypeScript | 5.9.3 | Apache-2.0 |
 | Maven Wrapper | 3.3.4 | Apache-2.0（脚本保留声明） |
 
-Chromium 由 Playwright 官方安装器准备，保留浏览器分发物中的许可证和 third-party notices；它不进入源码仓库。fonttools、Pillow、pypdf 与 Poppler 只用于开发准备或 QA，不是应用运行依赖。
+Chromium 由 Playwright 官方安装器准备，保留浏览器分发物中的许可证和 third-party notices；它不进入源码仓库。fonttools、Pillow、pypdf、ReportLab 与 Poppler 只用于开发准备或 QA，不是应用运行依赖。
 
-`0.9.0-SNAPSHOT` 的[完整依赖清单](docs/dependency-licenses.md)覆盖 92 个已解析 Maven 运行期依赖（84 个实际分发 JAR）和 75 个 npm 锁定包。POM 父级许可、npm SPDX 声明、依赖 SHA-256 / integrity、上游 LICENSE / NOTICE 与可获取的源码版权头保存在应用 JAR 的 `META-INF/third-party/`；`verify-distribution.py` 检查实际分发 JAR 与清单的完整性。未安装的平台可选 npm 包记录锁定声明，不作为运行期分发物。
+`0.9.0-SNAPSHOT` 的[完整依赖清单](docs/dependency-licenses.md)覆盖 95 个已解析 Maven 运行期依赖（87 个实际分发 JAR）和 75 个 npm 锁定包。POM 父级许可、npm SPDX 声明、依赖 SHA-256 / integrity、上游 LICENSE / NOTICE 与可获取的源码版权头保存在应用 JAR 的 `META-INF/third-party/`；`verify-distribution.py` 检查实际分发 JAR 与清单的完整性。未安装的平台可选 npm 包记录锁定声明，不作为运行期分发物。
 
 项目 MIT 不替代第三方许可证。Logback 的 EPL-2.0 / LGPL-2.1-only 双许可及 Jakarta 的 EPL / GPL + Classpath Exception 声明完整保留；库的官方源码归档位置列在清单中。Adobe XMP 按上游 POM 的 BSD-3-Clause 声明分发，并附 [Adobe SDK 的上游 BSD 许可](https://github.com/adobe/XMP-Toolkit-SDK/blob/main/LICENSE)。JDK、基础系统、Chromium、Playwright 自身分发条款保留在镜像原有的 legal / copyright / license 目录，不将它们改为本项目 MIT。
 
@@ -46,6 +47,10 @@ Chromium 由 Playwright 官方安装器准备，保留浏览器分发物中的�
 ## WebP 解码
 
 静态 WebP 使用 TwelveMonkeys ImageIO 3.15.2，按上游 BSD 三条款许可证分发。包含 imageio-webp、imageio-core、imageio-metadata、common-lang、common-io 和 common-image；完整上游条款和各 JAR 散列随 `META-INF/third-party/` 分发，来源见依赖许可证清单。项目没有修改这些依赖，也不需要额外的原生 WebP 库。
+
+## 本地 PDF 文字读取
+
+源码版使用 Apache PDFBox 3.0.7 在本机提取 PDF 中可选择的文字，不执行 OCR。PDFBox、FontBox 和 PDFBox IO 的上游 Apache-2.0 条款及 JAR 校验值会随应用的第三方声明和完整依赖清单保留。合成 PDF 验收文件由 `scripts/generate-pdf-fixtures.py` 使用项目已授权字体生成，不包含真实个人信息。
 
 ## 可选文字模型接入
 

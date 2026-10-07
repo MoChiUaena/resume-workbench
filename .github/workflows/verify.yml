@@ -60,13 +60,14 @@ jobs:
         run: python3 scripts/verify-distribution.py
       - name: Test deployment and release asset contracts without services
         run: |
+          python3 -m pip install pypdf==6.10.0 pillow==12.3.0 reportlab==4.4.9
+          python3 scripts/generate-pdf-fixtures.py --check
           python3 -m unittest discover -s scripts -p 'test_*.py' -v
           node --test scripts/test_qa_model_server.mjs
       - name: Prepare browser and PDF QA
         run: |
           cd frontend
           npx playwright install --with-deps chromium
-          python -m pip install pypdf==6.10.0 pillow==12.3.0
           sudo apt-get update -qq
           sudo apt-get install -y poppler-utils
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
@@ -107,6 +108,7 @@ jobs:
           python scripts/verify-job-reports.py --isolated
           python scripts/verify-model-settings.py --isolated
           python scripts/verify-docx-import.py --isolated
+          python scripts/verify-pdf-import.py --isolated
           python scripts/verify-pdfs.py --stage-c
           python scripts/verify-layout-pdfs.py
           python scripts/verify-template-pdfs.py
@@ -129,6 +131,7 @@ jobs:
           python scripts/verify-model-settings.py --isolated --check-persistence
           python scripts/verify-job-reports.py --isolated --check-persistence
           python scripts/verify-docx-import.py --isolated --check-persistence
+          python scripts/verify-pdf-import.py --isolated --check-persistence
           python scripts/verify-quarantine.py after --isolated --container "$RESUME_TEST_APP_CONTAINER"
       - name: Upload verification evidence
         if: always()
@@ -140,6 +143,7 @@ jobs:
             target/surefire-reports/
             output/e2e-results.json
             output/docx-import*.png
+            output/pdf-import*.png
             output/*verification*.json
             output/stage-b-network.json
             src/main/resources/META-INF/third-party/inventory.json
@@ -231,6 +235,7 @@ jobs:
           docker run --rm --cap-add NET_ADMIN --network container:resume-ci-upgrade-eight-app-1 --entrypoint /bin/sh postgres:16.10-alpine@sha256:029660641a0cfc575b14f336ba448fb8a75fd595d42e1fa316b9fb4378742297 -c 'ip route del default'
           python scripts/verify-upgrade.py after --isolated --source-schema 4 --source-version 0.8.0
           python scripts/verify-docx-import.py --isolated --after-upgrade --source http://127.0.0.1:18769
+          python scripts/verify-pdf-import.py --isolated --after-upgrade --source http://127.0.0.1:18769
       - name: Upload upgrade evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -240,6 +245,7 @@ jobs:
           path: |
             output/upgrade-verification*.json
             output/docx-upgrade-verification.json
+            output/pdf-upgrade-verification.json
             output/pdf/release-upgraded*.pdf
       - name: Build assets whose metadata matches the release tag
         if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
