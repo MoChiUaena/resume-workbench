@@ -2,7 +2,7 @@ import type {TemplateId} from './resumeTemplates';
 export type Slot = { id: string | null; visible: boolean; widthMm: number; heightMm: number; fit: 'cover' | 'contain'; quarterTurns: number; zoom: number; positionX: number; positionY: number };
 export type Asset = { id: string; format: string; bytes: number; sourceWidth: number; sourceHeight: number; width: number; height: number; exifOrientation: number };
 export type Draft = { schemaVersion: number; sample: 'one' | 'two'; name: string; headline: string; email: string; phone: string; location: string; swapImages: boolean; photo: Slot; logo: Slot };
-export class ApiFailure extends Error { public code:string; constructor(code: string, message: string) { super(`${message}（${code}）`); this.code=code; } }
+export class ApiFailure extends Error { public code:string; public status?:number; constructor(code: string, message: string, status?:number) { super(`${message}（${code}）`); this.code=code; this.status=status; } }
 export type Entry = { id: string; title: string; meta: string; bulleted: boolean; bullets: string[] };
 export type Section = { id: string; type: 'education' | 'experience' | 'project' | 'skills' | 'custom'; title: string; visible: boolean; pageBreakBefore: boolean; entries: Entry[] };
 export type Presentation = { language:'zh'|'en'; accentColor:string; alignment:'left'|'center'|'justify'; contactStyle:'labels'|'icons'|'plain'; headingStyle:'template'|'line'|'bar'|'plain'; marginHorizontalMm:number; marginTopMm:number; marginBottomMm:number; entryGapMm:number; paragraphGapMm:number };
@@ -21,7 +21,7 @@ export async function api<T>(url: string, body?: object | FormData, method?: str
   let response: Response;
   const jobGeneration=url==='/api/ai/job-matches';
   const jobHistory=/^\/api\/resumes\/[0-9a-f-]{36}\/job-reports(?:\/[0-9a-f-]{36})?(?:\?[^#]*)?$/.test(url);
-  const docxCreate=url==='/api/imports/docx/create';
+  const docxCreate=url==='/api/imports/docx/create'||url==='/api/imports/pdf/create';
   const requestMethod=method||(body?'POST':'GET');
   const mutation=!['GET','HEAD','OPTIONS'].includes(requestMethod.toUpperCase());
   const headers:Record<string,string>=mutation?{'X-Local-Resume':'1'}:{};
@@ -35,7 +35,7 @@ export async function api<T>(url: string, body?: object | FormData, method?: str
     if(docxCreate&&!errorEnvelope(e))throw new ApiFailure('NETWORK_ERROR','创建错误回执无法确认，请使用同一请求重试创建。');
     if(jobHistory&&!errorEnvelope(e))throw new ApiFailure('NETWORK_ERROR',mutation?'报告操作错误回执无法确认，请保持窗口并重试同一请求。':'历史报告响应无法确认，请重新读取。');
     if(url.startsWith('/api/storage/')&&!errorEnvelope(e))throw new ApiFailure('NETWORK_ERROR',body?'文件操作错误回执无法确认，请保持页面并用同一请求重试。':'空间检查错误响应无法确认，请检查本地服务后重试。');
-    throw new ApiFailure(e.code,e.message);
+    throw new ApiFailure(e.code,e.message,response.status);
   }
   try { return await response.json(); }
   catch(cause) { if(jobGeneration)throw new ApiFailure('NETWORK_ERROR','生成回执无法读取，请保留预览，重新核对并确认后重试同一请求。');if(docxCreate)throw new ApiFailure('NETWORK_ERROR','创建回执无法读取，请使用同一请求重试创建。');if(jobHistory)throw new ApiFailure('NETWORK_ERROR',mutation?'报告操作回执无法读取，请保持窗口并重试同一请求。':'历史报告响应无法读取，请重新读取。');if(url.startsWith('/api/storage/'))throw new ApiFailure('NETWORK_ERROR',body?'文件操作回执无法读取，请保持页面并用同一请求重试。':'空间检查响应无法读取，请检查本地服务后重试。');throw cause; }
