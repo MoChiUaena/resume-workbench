@@ -56,7 +56,7 @@ public class PdfReader {
     private static void append(StringBuilder text,String part){if(text.length()+part.length()>MAX_TEXT)throw contentTooLarge();text.append(part);}
     private static final class LimitedStripper extends PDFTextStripper {
         private int glyphUnits;
-        LimitedStripper() throws IOException {setSortByPosition(true);}
+        LimitedStripper() throws IOException {setSortByPosition(true);setPageEnd("");}
         @Override protected void processTextPosition(TextPosition position) {
             glyphUnits+=position.getUnicode().length();
             if(glyphUnits>MAX_TEXT)throw contentTooLarge();

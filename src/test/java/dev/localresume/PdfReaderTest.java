@@ -71,6 +71,10 @@ class PdfReaderTest {
         rejects(generated(21,"page"),"PDF_TOO_LARGE");
         rejects(generated(1,"x".repeat(40001)),"PDF_CONTENT_TOO_LARGE");
     }
+    @Test void acceptsExactlyFortyThousandUnitsWithoutCountingPdfboxPageEnd() throws Exception {
+        var result=new PdfReader().read(generated(1,"x".repeat(40000)));
+        assertThat(result.sourceText()).hasSize(40000);
+    }
     @Test void retainsPageBoundaryWhenAnEarlierPageHasNoText() throws Exception {
         try(var doc=new PDDocument();var bytes=new ByteArrayOutputStream()) {
             doc.addPage(new PDPage());
