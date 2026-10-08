@@ -128,9 +128,6 @@ def build_release_assets(root=ROOT, output_dir=None, *, expected_version=None):
         'dependency-notices.zip': _archive_bytes(notices),
         'resume-workbench-demo.gif': _read_public_file(root, 'docs/demo.gif'),
     }
-    video = 'output/demo/resume-workbench-demo.webm'
-    if (root / video).exists():
-        artifacts['resume-workbench-demo.webm'] = _read_public_file(root, video)
     checksums = ''.join(hashlib.sha256(content).hexdigest() + '  ' + name + '\n'
                         for name, content in sorted(artifacts.items()))
 
