@@ -70,7 +70,7 @@ class ReleaseAssetsTest(unittest.TestCase):
         result = self.run_builder('--output-dir', str(self.output))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertTrue(self.output.is_dir(), 'Requested output directory must be used')
-        self.assertEqual({p.name for p in self.output.iterdir()} - {'resume-workbench-demo.webm'}, ASSETS)
+        self.assertEqual({p.name for p in self.output.iterdir()}, ASSETS)
         return result
 
     def test_import_does_not_create_release_directory(self):
@@ -111,14 +111,14 @@ class ReleaseAssetsTest(unittest.TestCase):
         for digest, name in entries:
             self.assertEqual(digest, hashlib.sha256((self.output / name).read_bytes()).hexdigest(), name)
 
-    def test_optional_public_video_is_copied_and_hashed(self):
+    def test_ignored_local_video_is_never_packaged(self):
         self.write('output/demo/resume-workbench-demo.webm', b'synthetic public video')
         self.write('output/demo/private-notes.txt', 'PRIVATE_VIDEO_DIRECTORY_CANARY')
         self.build()
-        self.assertEqual({p.name for p in self.output.iterdir()}, ASSETS | {'resume-workbench-demo.webm'})
-        self.assertEqual((self.output / 'resume-workbench-demo.webm').read_bytes(), b'synthetic public video')
-        expected = hashlib.sha256(b'synthetic public video').hexdigest() + '  resume-workbench-demo.webm'
-        self.assertIn(expected, (self.output / 'SHA256SUMS.txt').read_text().splitlines())
+        self.assertEqual({p.name for p in self.output.iterdir()}, ASSETS)
+        for asset in self.output.iterdir():
+            self.assertNotIn(b'synthetic public video', asset.read_bytes())
+            self.assertNotIn(b'PRIVATE_VIDEO_DIRECTORY_CANARY', asset.read_bytes())
 
     def test_version_is_derived_from_project_pom_not_parent_or_hardcoded_release(self):
         self.fixture('1.2.3')
