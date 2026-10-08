@@ -5,29 +5,48 @@ import java.util.regex.Pattern;
 
 public class DocxMapping {
     public record Result(ResumeDocument document,List<DocxReader.Warning> warnings) {}
-    private static final Pattern FIELD=Pattern.compile("^(姓名|name|求职方向|求职意向|headline|邮箱|email|e-mail|电话|手机|phone|城市|地点|location)\\s*[:：]\\s*(.+)$",Pattern.CASE_INSENSITIVE);
+    private static final Pattern FIELD=Pattern.compile("^(姓名|name|求职方向|求职意向|headline|邮箱|email|e-mail|电话|手机号码|手机号|手机|phone|城市|地点|location)\\s*[:：]\\s*(.+)$",Pattern.CASE_INSENSITIVE);
+    private static final Pattern PDF_EMAIL=Pattern.compile("(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}(?![A-Za-z0-9.-])");
+    private static final Pattern PDF_MOBILE=Pattern.compile("(?<!\\d)1[3-9]\\d{9}(?!\\d)");
     public Result map(DocxReader.Result source) {
         return map(source.blocks(),source.warnings(),"DOCX");
     }
     public Result map(List<DocxReader.Block> blocks,List<DocxReader.Warning> sourceWarnings,String prefix) {
         var fields=new HashMap<String,String>();var sections=new ArrayList<SectionBuilder>();var warnings=new ArrayList<>(sourceWarnings);
-        SectionBuilder current=null;boolean split=false,unclassified=false,explicitField=false;
+        SectionBuilder current=null;boolean split=false,unclassified=false,explicitField=false,headerOpen=true;
         boolean first=true;
-        for(var block:blocks) {
+        for(int index=0;index<blocks.size();index++) {
+            var block=blocks.get(index);
             String raw=block.text(),trimmed=raw.strip();var match=FIELD.matcher(trimmed);
             if(first&&prefix.equals("PDF")&&!block.unclassified()&&!match.matches()&&plausibleName(trimmed)) {
                 fields.put("name",trimmed);warnings.add(new DocxReader.Warning("PDF_NAME_INFERRED","已根据首行推测姓名，请在创建前核对。"));first=false;continue;
             }
             if(!prefix.equals("PDF")||!genericResumeTitle(trimmed))first=false;
-            if(!block.unclassified()&&match.matches()) {
-                String field=switch(match.group(1).toLowerCase(Locale.ROOT)){case "姓名","name"->"name";case "求职方向","求职意向","headline"->"headline";case "邮箱","email","e-mail"->"email";case "电话","手机","phone"->"phone";default->"location";};
+            if(prefix.equals("PDF")&&headerOpen&&index<5&&!block.unclassified()
+                &&!fields.containsKey("email")&&!fields.containsKey("phone")) {
+                var emailMatch=PDF_EMAIL.matcher(raw);var phoneMatch=PDF_MOBILE.matcher(raw);
+                String email=emailMatch.find()?emailMatch.group():null,phone=phoneMatch.find()?phoneMatch.group():null;
+                if(email!=null&&phone!=null&&!emailMatch.find()&&!phoneMatch.find()) {
+                    String meaningful=raw.replace(email," ").replace(phone," ")
+                        .replaceAll("(?i)(?:电子邮箱|邮箱|联系电话|手机号码|手机号|手机|电话|e-?mail|phone|tel)","")
+                        .replaceAll("[\\p{P}\\p{S}\\s]+","").strip();
+                    if(meaningful.isEmpty()) {
+                        fields.put("email",email);fields.put("phone",phone);
+                        warnings.add(new DocxReader.Warning("PDF_CONTACTS_INFERRED","已从同一行推测邮箱和手机号，请在创建前核对。"));
+                        continue;
+                    }
+                }
+            }
+            if(!block.unclassified()&&match.matches()&&(!prefix.equals("PDF")||headerOpen)) {
+                String field=switch(match.group(1).toLowerCase(Locale.ROOT)){case "姓名","name"->"name";case "求职方向","求职意向","headline"->"headline";case "邮箱","email","e-mail"->"email";case "电话","手机号码","手机号","手机","phone"->"phone";default->"location";};
                 String value=match.group(2);int max=switch(field){case "name","phone"->30;case "headline"->70;case "email"->100;default->40;};
-                boolean plausible=switch(field){case "email"->value.matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+");case "phone"->value.matches("[+()0-9 \\-]{5,30}");default->true;};
+                boolean plausible=switch(field){case "email"->prefix.equals("PDF")?PDF_EMAIL.matcher(value).matches():value.matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+");case "phone"->value.matches("[+()0-9 \\-]{5,30}");default->true;};
                 if(value.length()<=max&&plausible&&!fields.containsKey(field)){fields.put(field,value);explicitField=true;continue;}
             }
             String type=headingType(trimmed);
             boolean shortHeading=raw.length()<=40&&(block.heading()||trimmed.matches("[^:：。.!?！？\\n]{1,20}[:：]"));
             if(!block.unclassified()&&raw.length()<=40&&(type!=null||shortHeading)) {
+                headerOpen=false;
                 current=new SectionBuilder(type==null?"custom":type,raw);sections.add(current);
                 if(sections.size()>20)throw contentTooLarge(prefix);
                 if(type==null)unclassified=true;
@@ -37,6 +56,7 @@ public class DocxMapping {
                 current=new SectionBuilder("custom","未分类内容");sections.add(current);
             }
             if(current.type.equals("custom"))unclassified=true;
+            if(prefix.equals("PDF")&&!genericResumeTitle(trimmed))headerOpen=false;
             for(int start=0;start<raw.length();) {
                 int end=Math.min(start+800,raw.length());
                 if(end<raw.length()&&Character.isHighSurrogate(raw.charAt(end-1))&&Character.isLowSurrogate(raw.charAt(end)))end--;
