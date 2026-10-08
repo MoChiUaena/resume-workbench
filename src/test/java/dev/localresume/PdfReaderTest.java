@@ -114,18 +114,89 @@ class PdfReaderTest {
             doc.save(bytes);rejects(bytes.toByteArray(),"PDF_CONTENT_TOO_LARGE");
         }
     }
-    @Test void countsSkippedImagesInAnOtherwiseTextualPdf() throws Exception {
+    @Test void offersAnEmbeddedImageForExplicitSelectionWithoutPersistingThePdf() throws Exception {
         try(var doc=new PDDocument();var bytes=new ByteArrayOutputStream()) {
             var page=new PDPage();doc.addPage(page);
-            var image=LosslessFactory.createFromImage(doc,new BufferedImage(2,2,BufferedImage.TYPE_INT_RGB));
+            var image=LosslessFactory.createFromImage(doc,new BufferedImage(64,64,BufferedImage.TYPE_INT_RGB));
             try(var stream=new PDPageContentStream(doc,page)) {
-                stream.drawImage(image,20,20,2,2);
+                stream.drawImage(image,20,20,64,64);
                 stream.beginText();stream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA),10);
                 stream.newLineAtOffset(40,700);stream.showText("text");stream.endText();
             }
             doc.save(bytes);
             var result=new PdfReader().read(bytes.toByteArray());
             assertThat(result.statistics().images()).isEqualTo(1);
+            assertThat(result.images()).hasSize(1);
+            var candidate=result.images().getFirst();
+            assertThat(candidate.id()).isEqualTo("p1-i1");
+            assertThat(candidate.page()).isEqualTo(1);
+            assertThat(candidate.width()).isEqualTo(64);
+            assertThat(candidate.height()).isEqualTo(64);
+            assertThat(candidate.mimeType()).isIn("image/png","image/jpeg");
+            assertThat(java.util.Base64.getDecoder().decode(candidate.base64())).isNotEmpty();
+            assertThat(result.warnings()).extracting(DocxReader.Warning::code).contains("PDF_IMAGES_AVAILABLE");
+        }
+    }
+    @Test void offersSeparateSyntheticPortraitAndTransparentLogo() throws Exception {
+        var result=new PdfReader().read(fixture("with-images"));
+        assertThat(result.statistics().images()).isEqualTo(2);
+        assertThat(result.images()).extracting(PdfReader.ImageCandidate::id).containsExactly("p1-i1","p1-i2");
+        assertThat(result.images()).allSatisfy(candidate->{
+            assertThat(candidate.page()).isEqualTo(1);
+            assertThat(candidate.width()).isBetween(16,640);
+            assertThat(candidate.height()).isBetween(16,640);
+            assertThat(java.util.Base64.getDecoder().decode(candidate.base64()).length).isLessThanOrEqualTo(PdfImageCandidates.MAX_BYTES);
+        });
+        assertThat(result.images()).extracting(PdfReader.ImageCandidate::mimeType).contains("image/png");
+        assertThat(result.warnings()).extracting(DocxReader.Warning::code).contains("PDF_IMAGES_AVAILABLE").doesNotContain("PDF_IMAGES_SKIPPED");
+    }
+    @Test void aTallImageNeverMakesTheTextPreviewInvalid() throws Exception {
+        try(var doc=new PDDocument();var bytes=new ByteArrayOutputStream()) {
+            var page=new PDPage();doc.addPage(page);
+            var image=LosslessFactory.createFromImage(doc,new BufferedImage(16,4000,BufferedImage.TYPE_INT_RGB));
+            try(var stream=new PDPageContentStream(doc,page)) {
+                stream.drawImage(image,20,20,16,4000);
+                stream.beginText();stream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA),10);
+                stream.newLineAtOffset(40,700);stream.showText("readable text");stream.endText();
+            }
+            doc.save(bytes);
+            var result=new PdfReader().read(bytes.toByteArray());
+            assertThat(result.sourceText()).isEqualTo("readable text");
+            assertThat(result.statistics().images()).isEqualTo(1);
+            assertThat(result.images().size()).isZero();
+            assertThat(result.warnings()).extracting(DocxReader.Warning::code).contains("PDF_IMAGES_SKIPPED");
+        }
+    }
+    @Test void moreThanFiveHundredTwelveImageObjectsHasAnExplicitLimitError() throws Exception {
+        try(var doc=new PDDocument();var bytes=new ByteArrayOutputStream()) {
+            var page=new PDPage();doc.addPage(page);
+            try(var stream=new PDPageContentStream(doc,page)) {
+                for(int index=0;index<513;index++) {
+                    var image=LosslessFactory.createFromImage(doc,new BufferedImage(16,16,BufferedImage.TYPE_INT_RGB));
+                    stream.drawImage(image,20,20,16,16);
+                }
+                stream.beginText();stream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA),10);
+                stream.newLineAtOffset(40,700);stream.showText("readable text");stream.endText();
+            }
+            doc.save(bytes);rejects(bytes.toByteArray(),"PDF_CONTENT_TOO_LARGE");
+        }
+    }
+    @Test void repeatedXObjectsCannotConsumeUnlimitedImageDecodeWork() throws Exception {
+        try(var doc=new PDDocument();var bytes=new ByteArrayOutputStream()) {
+            var page=new PDPage();doc.addPage(page);
+            try(var stream=new PDPageContentStream(doc,page)) {
+                for(int index=0;index<33;index++) {
+                    var pixels=new BufferedImage(16,16,BufferedImage.TYPE_INT_RGB);
+                    if(index==32)for(int y=0;y<16;y++)for(int x=0;x<16;x++)pixels.setRGB(x,y,0xff0077dd);
+                    stream.drawImage(LosslessFactory.createFromImage(doc,pixels),20,20,16,16);
+                }
+                stream.beginText();stream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA),10);
+                stream.newLineAtOffset(40,700);stream.showText("readable text");stream.endText();
+            }
+            doc.save(bytes);
+            var result=new PdfReader().read(bytes.toByteArray());
+            assertThat(result.statistics().images()).isEqualTo(33);
+            assertThat(result.images().size()).isEqualTo(1);
             assertThat(result.warnings()).extracting(DocxReader.Warning::code).contains("PDF_IMAGES_SKIPPED");
         }
     }

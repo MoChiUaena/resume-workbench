@@ -35,6 +35,30 @@ test('selectable two-page PDF is preview-only until edited confirmation, then op
  const download=page.waitForEvent('download');await page.getByRole('button',{name:'导出 PDF',exact:true}).click();expect((await download).suggestedFilename()).toMatch(/\.pdf$/i);
 });
 
+test('selected embedded PDF images become separate photo and logo in the initial version',async({page,request})=>{
+ const before=await ids(request);await open(page);await choose(page,'with-images.pdf');
+ await expect(page.getByRole('region',{name:'PDF 图片候选'}).locator('img')).toHaveCount(2);
+ expect(await ids(request)).toEqual(before);
+ await page.getByLabel('从 PDF 选择证件照').selectOption('p1-i1');
+ await page.getByLabel('从 PDF 选择学校 Logo').selectOption('p1-i2');
+ await page.getByRole('button',{name:'确认创建新简历'}).click();
+ await expect(page.getByRole('dialog',{name:'导入 PDF 简历'})).toHaveCount(0);
+ const after=await ids(request);expect(after).toHaveLength(before.length+1);
+ const id=after.find(value=>!before.includes(value));expect(id).toBeTruthy();owned.push(id!);
+ const saved=await(await request.get('/api/resumes/'+id)).json();
+ const photo=saved.document.layout.photo.id,logo=saved.document.layout.logo.id;
+ expect(photo).toMatch(/^[0-9a-f-]{36}$/);expect(logo).toMatch(/^[0-9a-f-]{36}$/);expect(photo).not.toBe(logo);
+ expect((await request.get('/api/assets/'+photo)).ok()).toBeTruthy();expect((await request.get('/api/assets/'+logo)).ok()).toBeTruthy();
+ const versions=await(await request.get(`/api/resumes/${id}/versions`)).json();expect(versions).toHaveLength(1);
+ const original=await(await request.get(`/api/resumes/${id}/versions/${versions[0].id}`)).json();
+ expect(original.document.layout.photo.id).toBe(photo);expect(original.document.layout.logo.id).toBe(logo);
+ await page.getByRole('button',{name:'照片与校徽'}).click();
+ await expect(page.getByTestId('photo-controls').locator('img')).toBeVisible();
+ await expect(page.getByTestId('logo-controls').locator('img')).toBeVisible();
+ const download=page.waitForEvent('download');await page.getByRole('button',{name:'导出 PDF',exact:true}).click();
+ expect((await download).suggestedFilename()).toMatch(/\.pdf$/i);
+});
+
 test('cancelled PDF preview and invalid, scanned, encrypted and oversized PDFs never create records',async({page,request})=>{
  const before=await ids(request);await open(page);await choose(page,'text.pdf');await expect(page.getByLabel('原文提取内容')).toHaveValue(/奶龙/);expect(await ids(request)).toEqual(before);
  await page.getByRole('button',{name:'取消导入'}).click();await expect(page.getByRole('button',{name:'导入 PDF'})).toBeFocused();expect(await ids(request)).toEqual(before);

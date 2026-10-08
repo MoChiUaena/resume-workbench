@@ -40,6 +40,15 @@ class PdfFixtureContractTest(unittest.TestCase):
         self.assertFalse(reader.pages[0].extract_text().strip())
         self.assertTrue('/XObject' in reader.pages[0]['/Resources'])
 
+    def test_text_pdf_with_two_synthetic_image_choices_is_reproducible(self):
+        first = self.generator.fixture_bytes('with-images')
+        self.assertEqual(first, self.generator.fixture_bytes('with-images'))
+        self.assertLess(len(first), 5 * 1024 * 1024)
+        reader = PdfReader(io.BytesIO(first))
+        self.assertEqual(len(reader.pages), 1)
+        self.assertIn('奶龙', reader.pages[0].extract_text())
+        self.assertEqual(len(reader.pages[0].images), 2)
+
     def test_encrypted_pdf_requires_password_and_is_reproducible(self):
         first = self.generator.fixture_bytes('encrypted')
         self.assertEqual(first, self.generator.fixture_bytes('encrypted'))
@@ -49,7 +58,7 @@ class PdfFixtureContractTest(unittest.TestCase):
         self.assertIn('奶龙', reader.pages[0].extract_text())
 
     def test_checked_in_files_match_generated_selectable_content(self):
-        for kind in ('text', 'two-pages', 'scanned', 'encrypted'):
+        for kind in ('text', 'two-pages', 'scanned', 'encrypted', 'with-images'):
             with self.subTest(kind=kind):
                 source = ROOT / 'fixtures/pdf' / f'{kind}.pdf'
                 self.assertTrue(source.is_file(), f'Missing checked-in {kind} PDF')

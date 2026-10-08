@@ -86,6 +86,10 @@ def run(source, target):
     assert_preview(two, 2)
     assert '项目经历' in two['sourceText'] and '第二页' in two['sourceText'], 'Second-page text disappeared'
     assert call(source, '/api/resumes') == source_before, 'Two-page preview created a resume'
+    with_images = upload(source, '/api/imports/pdf/preview', 'with-images.pdf', (ROOT / 'fixtures/pdf/with-images.pdf').read_bytes())
+    assert_preview(with_images, 1)
+    assert with_images['statistics']['images'] == 2 and len(with_images['images']) == 2, 'Synthetic photo and logo are not selectable'
+    assert call(source, '/api/resumes') == source_before, 'Image preview persisted an unconfirmed PDF'
     rejected_preview(source, 'scanned.pdf', 'scan.pdf', 'PDF_NO_TEXT')
     rejected_preview(source, 'encrypted.pdf', 'protected.pdf', 'PDF_ENCRYPTED')
     request = {'mutationId': str(uuid.uuid4()), 'title': 'PDF 导入验收 ' + uuid.uuid4().hex,
@@ -105,6 +109,19 @@ def run(source, target):
     assert all(value in rendered_text for value in ('奶龙已核对', '示例理工大学', 'Java')), 'Editable import lost selectable Chinese PDF text'
     (ROOT / 'output/pdf').mkdir(parents=True, exist_ok=True)
     (ROOT / 'output/pdf/pdf-imported.pdf').write_bytes(pdf)
+    image_request = {'mutationId': str(uuid.uuid4()), 'title': 'PDF 图片导入验收 ' + uuid.uuid4().hex,
+                     'document': copy.deepcopy(with_images['document'])}
+    for slot, candidate in zip(('photo', 'logo'), with_images['images']):
+        image_request[slot] = {'mimeType': candidate['mimeType'], 'base64': candidate['base64']}
+    image_created = call(source, '/api/imports/pdf/create', image_request)['resume']
+    assert image_created['revision'] == 1, 'Image import did not start at revision one'
+    source_ids = {slot: image_created['document']['layout'][slot]['id'] for slot in ('photo', 'logo')}
+    assert all(source_ids.values()) and source_ids['photo'] != source_ids['logo'], 'Photo and logo were not assigned independently'
+    assert call(source, '/api/imports/pdf/create', image_request)['resume'] == image_created, 'Image retry duplicated or changed import'
+    source_images = {slot: call(source, f"/api/assets/{asset_id}/image", raw=True) for slot, asset_id in source_ids.items()}
+    image_versions = call(source, f"/api/resumes/{image_created['id']}/versions")
+    assert len(image_versions) == 1, 'Selected images must belong to the initial version'
+    assert call(source, f"/api/resumes/{image_created['id']}/versions/{image_versions[0]['id']}")['document'] == image_created['document']
     deleted_request = {**request, 'mutationId': str(uuid.uuid4()), 'title': request['title'] + ' · 删除验证'}
     deleted = assert_receipt(call(source, '/api/imports/pdf/create', deleted_request), deleted_request)
     call(source, '/api/resumes/' + deleted['id'], {'expectedRevision': 1}, 'DELETE')
@@ -115,23 +132,42 @@ def run(source, target):
         assert workspace['schemaVersion'] == 5, 'PDF import changed portable backup schema'
         row = next(entry for entry in workspace['resumes'] if entry['id'] == edited['id'])
         assert row['document'] == edited['document']
-        assert not any(name.startswith('imports/') or name.endswith('text.pdf') for name in backup.namelist()), 'Original PDF or receipt was copied into ZIP'
+        image_row = next(entry for entry in workspace['resumes'] if entry['id'] == image_created['id'])
+        assert image_row['document'] == image_created['document'], 'Image import is missing from workspace backup'
+        assert not any(name.startswith('imports/') or name.endswith(('text.pdf', 'with-images.pdf')) for name in backup.namelist()), 'Original PDF or receipt was copied into ZIP'
     restored = upload(target, '/api/backups/restore', 'pdf-import.zip', complete)
     copies = [call(target, '/api/resumes/' + identity) for identity in restored['resumeIds']]
     imported = [row for row in copies if row['title'] == edited['title']]
     assert len(imported) == 1, 'Imported PDF resume must map to one restored record'
     assert_restored(edited, imported[0])
+    image_copies = [row for row in copies if row['title'] == image_created['title']]
+    assert len(image_copies) == 1, 'Selected PDF images did not restore with their resume'
+    image_restored = image_copies[0]
+    target_ids = {slot: image_restored['document']['layout'][slot]['id'] for slot in ('photo', 'logo')}
+    assert all(target_ids.values()) and all(target_ids[slot] != source_ids[slot] for slot in source_ids), 'Restored images were not remapped'
+    assert all(call(target, f"/api/assets/{target_ids[slot]}/image", raw=True) == source_images[slot] for slot in source_ids), 'Restored image bytes differ'
+    expected_image_document = copy.deepcopy(image_created['document'])
+    for slot in source_ids:
+        expected_image_document['layout'][slot]['id'] = target_ids[slot]
+    assert image_restored['document'] == expected_image_document, 'Restored image resume changed other fields'
+    restored_image_versions = call(target, f"/api/resumes/{image_restored['id']}/versions")
+    assert len(restored_image_versions) == 1, 'Restored selected images lost the initial version'
+    assert call(target, f"/api/resumes/{image_restored['id']}/versions/{restored_image_versions[0]['id']}")['document'] == image_restored['document'], 'Restored initial version lost selected images'
     target_after = call(target, '/api/resumes')
     assert all(item in target_after for item in target_before), 'Restore altered original target resumes'
     assert call(source, '/api/models') == model_before, 'PDF import changed model settings'
     state = {'source': source, 'target': target, 'request': request, 'deletedRequest': deleted_request,
              'sourceResume': edited, 'targetResume': imported[0],
+             'sourceImageResume': image_created, 'targetImageResume': image_restored,
              'sourceVersions': call(source, f"/api/resumes/{edited['id']}/versions"),
              'targetVersions': call(target, f"/api/resumes/{imported[0]['id']}/versions"),
+             'sourceImageVersions': image_versions,
+             'targetImageVersions': restored_image_versions,
              'backupId': meta['id'], 'previewDoesNotPersist': True,
              'scannedAndEncryptedRejected': True, 'createIsExplicitAndIdempotent': True,
              'editedRetryPreserved': True, 'deletedRetryNeverRecreates': True,
-             'selectableChinesePdf': True, 'schema5BackupRestoresEditableImport': True,
+             'selectableChinesePdf': True, 'selectedImagesRestoreWithInitialVersion': True,
+             'schema5BackupRestoresEditableImport': True,
              'instanceModelSettingsUnchanged': True}
     STATE.parent.mkdir(exist_ok=True)
     STATE.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding='utf8')
@@ -147,6 +183,10 @@ def persistence(source, target):
     assert call(target, '/api/resumes/' + restored['id']) == restored, 'Restored PDF import changed on recreation'
     assert call(source, f"/api/resumes/{original['id']}/versions") == state['sourceVersions']
     assert call(target, f"/api/resumes/{restored['id']}/versions") == state['targetVersions']
+    for side in ('source', 'target'):
+        image=state[side+'ImageResume'];version=state[side+'ImageVersions']
+        assert call(state[side], '/api/resumes/' + image['id']) == image, 'Selected PDF images changed on recreation'
+        assert call(state[side], f"/api/resumes/{image['id']}/versions") == version
     assert_receipt(call(source, '/api/imports/pdf/create', state['request']), state['request'], original)
     assert_deleted_retry(source, state['deletedRequest'])
     state['containerRecreationPreservesImportedDataAndRetryReceipts'] = True
