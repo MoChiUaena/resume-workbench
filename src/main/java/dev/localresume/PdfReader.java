@@ -14,7 +14,8 @@ import org.apache.pdfbox.text.TextPosition;
 /** Bounded, local-only extraction of selectable PDF text. */
 public class PdfReader {
     public record Statistics(int paragraphs,int pages,int images) {}
-    public record Result(List<DocxReader.Block> blocks,String sourceText,List<DocxReader.Warning> warnings,Statistics statistics) {}
+    public record ImageCandidate(String id,int page,int width,int height,String mimeType,String base64) {}
+    public record Result(List<DocxReader.Block> blocks,String sourceText,List<DocxReader.Warning> warnings,Statistics statistics,List<ImageCandidate> images) {}
     public static final int MAX_BYTES=5*1024*1024;
     private static final int MAX_PAGES=20,MAX_TEXT=40000,MAX_BLOCKS=600;
 
@@ -31,7 +32,7 @@ public class PdfReader {
             for(int number=1;number<=pages;number++) {
                 PDPage page=document.getPage(number-1);
                 if(page.getResources()!=null)for(var name:page.getResources().getXObjectNames())
-                    if(page.getResources().isImageXObject(name))images++;
+                    if(page.getResources().isImageXObject(name)&&++images>512)throw contentTooLarge();
                 stripper.setStartPage(number);stripper.setEndPage(number);
                 if(number>1)append(all,"\n");
                 var writer=new LimitedWriter(MAX_TEXT-all.length());stripper.writeText(document,writer);
@@ -47,8 +48,10 @@ public class PdfReader {
             if(blocks.isEmpty())throw new ApiException("PDF_NO_TEXT","PDF 没有可选择的文字；请使用含文字的 PDF。扫描件暂不支持。",422);
             var warnings=new ArrayList<DocxReader.Warning>();
             warnings.add(new DocxReader.Warning("PDF_READING_ORDER","PDF 的分栏和布局可能影响文字顺序，请对照原文件核对后创建。"));
-            if(images>0)warnings.add(new DocxReader.Warning("PDF_IMAGES_SKIPPED","PDF 中的图片未导入，可在编辑器中重新上传。"));
-            return new Result(List.copyOf(blocks),all.toString(),List.copyOf(warnings),new Statistics(blocks.size(),pages,images));
+            var choices=PdfImageCandidates.extract(document);
+            if(!choices.isEmpty())warnings.add(new DocxReader.Warning("PDF_IMAGES_AVAILABLE","可从 PDF 图片中选择证件照或学校 Logo；未选择的图片不会保存。"));
+            if(images>choices.size())warnings.add(new DocxReader.Warning("PDF_IMAGES_SKIPPED","部分 PDF 图片过大、重复或无法安全提取，请按需重新上传。"));
+            return new Result(List.copyOf(blocks),all.toString(),List.copyOf(warnings),new Statistics(blocks.size(),pages,images),choices);
         } catch(ApiException e){throw e;}
         catch(InvalidPasswordException e){throw encrypted();}
         catch(IOException|RuntimeException e){throw invalid();}

@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.UnaryOperator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Validator;
 import jakarta.validation.constraints.Size;
@@ -42,11 +43,22 @@ public class DocumentImportReceipts {
     }
     @Transactional
     public DocxImports.Created create(UUID mutationId,String title,ResumeDocument document,Format format) {
+        return createInternal(mutationId,title,document,format,null,UnaryOperator.identity());
+    }
+    @Transactional
+    public DocxImports.Created createPdfWithImages(UUID mutationId,String title,ResumeDocument document,String imageFingerprint,
+                                                   UnaryOperator<ResumeDocument> attach) {
+        if(imageFingerprint==null||attach==null)throw PdfReader.invalid();
+        return createInternal(mutationId,title,document,Format.PDF,imageFingerprint,attach);
+    }
+    private DocxImports.Created createInternal(UUID mutationId,String title,ResumeDocument document,Format format,
+                                               String imageFingerprint,UnaryOperator<ResumeDocument> attach) {
         if(mutationId==null||title==null||title.isBlank())throw invalid(format);
         if(title.length()>120)throw contentTooLarge(format);
         String json=validateDocument(document,format);String hash;
         try {
-            String request=mapper.writeValueAsString(List.of(title,mapper.readTree(json)));
+            String request=mapper.writeValueAsString(imageFingerprint==null
+                ?List.of(title,mapper.readTree(json)):List.of(title,mapper.readTree(json),imageFingerprint));
             hash=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(request.getBytes(StandardCharsets.UTF_8)));
         }catch(IOException|NoSuchAlgorithmException e){throw new IllegalStateException("Import fingerprint unavailable");}
         int reserved=jdbc.update("INSERT INTO document_imports(mutation_id,request_sha256) VALUES (?,?) ON CONFLICT (mutation_id) DO NOTHING",mutationId,hash);
@@ -55,7 +67,9 @@ public class DocumentImportReceipts {
         var receipt=receipts.getFirst();
         if(!receipt.hash().equals(hash))throw new ApiException(format+"_IMPORT_CONFLICT","这次导入确认已用于另一份内容，请重新确认导入。",409);
         if(reserved==1) {
-            var resume=resumes.create(title,document);
+            var saved=attach.apply(document);
+            if(!validator.validate(saved).isEmpty())throw invalid(format);
+            var resume=resumes.create(title,saved);
             jdbc.update("UPDATE document_imports SET resume_id=? WHERE mutation_id=?",resume.id(),mutationId);
             return new DocxImports.Created(mutationId,resume);
         }

@@ -65,9 +65,22 @@ test('PDF attempt freezes reviewed edits and validates fresh and edited receipts
  assert.equal(isPdfCreateReceipt({mutationId,resume:{...resume(attempt),revision:2,title:'后续编辑'}},attempt),true);
 });
 
+test('selected PDF image bytes are frozen and fresh receipt requires the assigned slot',()=>{
+ const candidate={id:'p1-i1',page:1,width:64,height:64,mimeType:'image/png' as const,base64:'iVBORw0KGgo='};
+ const attempt=createPdfImportAttempt('图片导入',document(),mutationId,candidate,null);
+ candidate.base64='changed';
+ assert.deepEqual(attempt.photo,{mimeType:'image/png',base64:'iVBORw0KGgo='});
+ assert.equal(Object.isFrozen(attempt.photo),true);
+ const original=resume(attempt);
+ const assigned={...original,document:{...original.document,layout:{...original.document.layout,photo:{...slot,id:resumeId}}}};
+ assert.equal(isPdfCreateReceipt({mutationId,resume:assigned},attempt),true);
+ assert.equal(isPdfCreateReceipt({mutationId,resume:original},attempt),false);
+ assert.equal(isPdfCreateReceipt({mutationId,resume:{...assigned,document:{...assigned.document,content:{...assigned.document.content,name:'错误'}}}},attempt),false);
+});
+
 test('PDF and Word release only matching status and business-code pairs',()=>{
  for(const [code,status] of [['INVALID_INPUT',503],['PDF_NO_TEXT',503],['PDF_IMPORT_DELETED',409],['PDF_INVALID',500]] as const)assert.equal(isPdfCreateUncertain(code,status),true);
- for(const [code,status] of [['INVALID_INPUT',400],['PDF_NO_TEXT',422],['PDF_IMPORT_CONFLICT',409],['PDF_IMPORT_DELETED',410],['PDF_TOO_LARGE',413],['PDF_CONTENT_TOO_LARGE',413],['PDF_ENCRYPTED',422]] as const)assert.equal(isPdfCreateUncertain(code,status),false);
+ for(const [code,status] of [['INVALID_INPUT',400],['PDF_NO_TEXT',422],['PDF_IMPORT_CONFLICT',409],['PDF_IMPORT_DELETED',410],['PDF_TOO_LARGE',413],['PDF_CONTENT_TOO_LARGE',413],['PDF_ENCRYPTED',422],['CORRUPT_IMAGE',422]] as const)assert.equal(isPdfCreateUncertain(code,status),false);
  assert.equal(isDocxCreateUncertain('INVALID_INPUT',503),true);
  assert.equal(isDocxCreateUncertain('INVALID_INPUT',400),false);
  assert.equal(isDocxCreateUncertain('DOCX_IMPORT_DELETED',410),false);
@@ -75,7 +88,7 @@ test('PDF and Word release only matching status and business-code pairs',()=>{
 
 test('PDF preview validates page shape and PDF create preserves the frozen request',async()=>{
  const originalFetch=globalThis.fetch;const calls:{url:string;body:unknown}[]=[];let attempt!:ReturnType<typeof createPdfImportAttempt>;
- const expected={format:'pdf',fileName:'奶龙.pdf',title:'奶龙',document:document(),sourceText:'奶龙\n教育背景',warnings:[{code:'PDF_READING_ORDER',message:'请核对阅读顺序'}],statistics:{paragraphs:2,pages:2,images:0}};
+ const expected={format:'pdf',fileName:'奶龙.pdf',title:'奶龙',document:document(),sourceText:'奶龙\n教育背景',warnings:[{code:'PDF_READING_ORDER',message:'请核对阅读顺序'}],statistics:{paragraphs:2,pages:2,images:0},images:[]};
  try{
   globalThis.fetch=async(input,init)=>{calls.push({url:String(input),body:init?.body});return Response.json(calls.length===1?expected:calls.length===2?{...expected,statistics:{...expected.statistics,pages:0}}:{mutationId,resume:resume(attempt)});};
   const file=new File(['%PDF-1.7'],'奶龙.pdf',{type:'application/pdf'});

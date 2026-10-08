@@ -43,6 +43,24 @@ class PdfImportControllerTest {
         assertThatThrownBy(()->imports.create(new PdfImportController.Create(UUID.randomUUID(),"x",image)))
             .isInstanceOfSatisfying(ApiException.class,e->assertThat(e.code).isEqualTo("PDF_INVALID"));
     }
+    @Test void selectedPdfImageMustBeBoundedAndMatchItsDeclaredFormatBeforeDatabase() {
+        var doc=ResumeDocument.sample("blank");var token=UUID.randomUUID();
+        assertThatThrownBy(()->imports.create(new PdfImportController.Create(token,"PDF",doc,
+            new PdfImportController.SelectedImage(null,"iVBORw0KGgo="),null)))
+            .isInstanceOfSatisfying(ApiException.class,e->assertThat(e.code).isEqualTo("PDF_IMAGE_INVALID"));
+        assertThatThrownBy(()->imports.create(new PdfImportController.Create(token,"PDF",doc,
+            new PdfImportController.SelectedImage("image/png","not-base64"),null)))
+            .isInstanceOfSatisfying(ApiException.class,e->assertThat(e.code).isEqualTo("PDF_IMAGE_INVALID"));
+        assertThatThrownBy(()->imports.create(new PdfImportController.Create(token,"PDF",doc,
+            new PdfImportController.SelectedImage("image/png",java.util.Base64.getEncoder().encodeToString("not an image".getBytes())),null)))
+            .isInstanceOfSatisfying(ApiException.class,e->assertThat(e.code).isEqualTo("PDF_IMAGE_INVALID"));
+        assertThatThrownBy(()->imports.create(new PdfImportController.Create(token,"PDF",doc,
+            new PdfImportController.SelectedImage("image/png","A".repeat(699052)),null)))
+            .isInstanceOfSatisfying(ApiException.class,e->assertThat(e.code).isEqualTo("PDF_IMAGE_TOO_LARGE"));
+        assertThatThrownBy(()->imports.create(new PdfImportController.Create(token,"PDF",doc,
+            new PdfImportController.SelectedImage("image/png","A".repeat(699056)),null)))
+            .isInstanceOfSatisfying(ApiException.class,e->assertThat(e.code).isEqualTo("PDF_IMAGE_TOO_LARGE"));
+    }
     @Test void createRouteReportsPdfDocumentBoundsBeforeDatabase() throws Exception {
         var mvc=MockMvcBuilders.standaloneSetup(new PdfImportController(imports)).setControllerAdvice(new ApiErrors()).build();
         var request=new PdfImportController.Create(UUID.randomUUID(),"x".repeat(121),ResumeDocument.sample("blank"));
