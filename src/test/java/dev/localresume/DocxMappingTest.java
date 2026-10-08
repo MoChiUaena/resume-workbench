@@ -60,4 +60,85 @@ class DocxMappingTest {
         assertThat(result.warnings()).extracting(DocxReader.Warning::code)
             .contains("PDF_NAME_INFERRED").doesNotContain("PDF_FIELDS_INFERRED");
     }
+    @Test void pdfHeaderContactLineFillsEmailAndPhoneWithoutRepeatingThemInBody() {
+        var result=new DocxMapping().map(List.of(block("奶龙"),block("手机：13800000000 | 邮箱：nailong@example.invalid"),
+            block("教育背景"),block("示例大学")),List.of(),"PDF");
+        var content=result.document().content();
+        assertThat(content.email()).isEqualTo("nailong@example.invalid");
+        assertThat(content.phone()).isEqualTo("13800000000");
+        assertThat(text(result.document())).doesNotContain("13800000000","nailong@example.invalid");
+        assertThat(content.sections()).extracting(ResumeDocument.Section::type).containsExactly("education");
+        assertThat(result.warnings()).extracting(DocxReader.Warning::code).contains("PDF_CONTACTS_INFERRED");
+    }
+    @Test void pdfMixedHeaderContactsRemainUnchangedForReview() {
+        var result=new DocxMapping().map(List.of(block("奶龙"),block("nailong@example.invalid / 13800000000 / 2028 届"),
+            block("教育背景")),List.of(),"PDF");
+        assertThat(result.document().content().email()).isEmpty();
+        assertThat(result.document().content().phone()).isEmpty();
+        assertThat(text(result.document())).contains("2028 届","nailong@example.invalid","13800000000");
+    }
+    @Test void pdfContactCleanupDoesNotChangeOtherWordsContainingContactLabels() {
+        var result=new DocxMapping().map(List.of(block("奶龙"),
+            block("电话：13800000000 | 邮箱：nailong@example.invalid | 电话亭项目")),List.of(),"PDF");
+        assertThat(result.document().content().email()).isEmpty();
+        assertThat(result.document().content().phone()).isEmpty();
+        assertThat(text(result.document())).contains("电话亭项目");
+    }
+    @Test void pdfContactValuesInAnExperienceSectionAreNotPersonalContacts() {
+        var result=new DocxMapping().map(List.of(block("奶龙"),block("工作经历"),
+            block("客户电话 13800000000 / 客服邮箱 service@example.invalid")),List.of(),"PDF");
+        assertThat(result.document().content().email()).isEmpty();
+        assertThat(result.document().content().phone()).isEmpty();
+        assertThat(text(result.document())).contains("13800000000","service@example.invalid");
+    }
+    @Test void pdfCompactCombinedContactsAreNotAcceptedAsOneEmailField() {
+        var result=new DocxMapping().map(List.of(block("奶龙"),
+            block("邮箱：nailong@example.invalid|手机：13800000000")),List.of(),"PDF");
+        assertThat(result.document().content().email()).isEqualTo("nailong@example.invalid");
+        assertThat(result.document().content().phone()).isEqualTo("13800000000");
+    }
+    @Test void pdfUnclassifiedIntroStopsPersonalContactInference() {
+        var result=new DocxMapping().map(List.of(block("奶龙"),block("个人简介"),
+            block("客服热线 13800000000 / 客服邮箱 support@example.invalid")),List.of(),"PDF");
+        assertThat(result.document().content().email()).isEmpty();
+        assertThat(result.document().content().phone()).isEmpty();
+        assertThat(text(result.document())).contains("13800000000","support@example.invalid");
+    }
+    @Test void pdfAmbiguousHeaderContactsStayInReviewText() {
+        var result=new DocxMapping().map(List.of(block("奶龙"),
+            block("邮箱：nailong@example.invalid|手机：13800000000|备用：13900000000")),List.of(),"PDF");
+        assertThat(result.document().content().email()).isEmpty();
+        assertThat(result.document().content().phone()).isEmpty();
+        assertThat(text(result.document())).contains("nailong@example.invalid","13800000000","13900000000");
+    }
+    @Test void pdfGenericTitleBeforeNameAndPureContactsStillInfersContacts() {
+        var result=new DocxMapping().map(List.of(block("个人简历"),block("奶龙"),
+            block("邮箱：nailong@example.invalid|手机：13800000000")),List.of(),"PDF");
+        assertThat(result.document().content().name()).isEqualTo("奶龙");
+        assertThat(result.document().content().email()).isEqualTo("nailong@example.invalid");
+        assertThat(result.document().content().phone()).isEqualTo("13800000000");
+    }
+    @Test void pdfEarlyServiceContactLineIsNotApplicantsContact() {
+        var result=new DocxMapping().map(List.of(block("姓名：奶龙"),
+            block("客服热线 13800000000 / 客服邮箱 support@example.invalid")),List.of(),"PDF");
+        assertThat(result.document().content().email()).isEmpty();
+        assertThat(result.document().content().phone()).isEmpty();
+        assertThat(text(result.document())).contains("13800000000","support@example.invalid");
+    }
+    @Test void pdfLabeledContactInsideBodyStaysInBody() {
+        var result=new DocxMapping().map(List.of(block("奶龙"),block("个人简介"),
+            block("邮箱：service@example.invalid")),List.of(),"PDF");
+        assertThat(result.document().content().email()).isEmpty();
+        assertThat(text(result.document())).contains("service@example.invalid");
+    }
+    @Test void pdfPhoneNumberLabelWorksInCombinedContactHeader() {
+        var result=new DocxMapping().map(List.of(block("奶龙"),
+            block("手机号：13800000000 | 邮箱：nailong@example.invalid")),List.of(),"PDF");
+        assertThat(result.document().content().email()).isEqualTo("nailong@example.invalid");
+        assertThat(result.document().content().phone()).isEqualTo("13800000000");
+    }
+    @Test void pdfPhoneNumberLabelWorksAsSingleField() {
+        var result=new DocxMapping().map(List.of(block("奶龙"),block("手机号码：13800000000")),List.of(),"PDF");
+        assertThat(result.document().content().phone()).isEqualTo("13800000000");
+    }
 }
