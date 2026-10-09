@@ -1,124 +1,61 @@
 # Resume Workbench · 简历工作台
 
-一个在本机编辑中文简历的开源工具。选择简历、修改内容和排版，右侧实时预览，再导出中文 PDF。简历与备份保存在自己的设备上，无需注册；可选的模型润色仅在确认后发送选中句段。
+在自己的电脑上管理、编辑和导出中文简历。左侧选择模块，中间修改内容，右侧实时预览；可调整排版、保存历史版本，并导出可选择文字的中文 PDF。无需注册，默认不连接模型服务。
 
-[下载最新版](https://github.com/MoChiUaena/resume-workbench/releases/latest) · [查看操作演示](docs/demo.gif)
+[下载发布版](https://github.com/MoChiUaena/resume-workbench/releases/latest) · [查看演示](docs/demo.gif) · [参与开发](CONTRIBUTING.md)
 
-![简历编辑与实时预览](docs/workbench-editor.png)
+![奶龙示例简历的编辑界面与实时预览](docs/workbench-editor.png)
 
-## 项目功能
+## 可以做什么
 
-- **管理简历**：新建、重命名、复制和删除，为不同岗位保存不同版本。
-- **Word 导入**：本机解析 DOCX，核对并修改识别结果后创建新简历；已有简历保留。[查看使用方法](docs/docx-import.md)。
-- **PDF 导入**：从可选择文字的 PDF 提取内容，经人工核对后创建新简历；扫描件会明确提示。[查看使用方法](docs/pdf-import.md)。
-- **实时编辑**：编辑基本信息、教育、工作、项目、技能和自定义模块，支持排序与隐藏。
-- **调整排版**：四种简历模板，可修改字体、字号、颜色、对齐、行距、间距和页边距。
-- **处理图片**：支持 JPEG、PNG 和静态 WebP；学校 Logo 与证件照独立设置，可替换、裁剪、旋转和调整大小。
-- **保存与导出**：自动保存、撤销与重做、历史版本对比和恢复，导出可选择文字的中文 PDF 或脱敏 PDF。
-- **备份与恢复**：手动备份、每天／每周自动备份、备份历史查看、下载和恢复。
-- **切换界面**：蓝白工具、纸张文档两种风格，以及深色模式；界面风格与 PDF 模板分别设置。
-- **可选文字润色**：接入 DashScope、DeepSeek、GLM 等服务；划选句段并核对差异后再应用。[查看设置方法](docs/model-settings.md)。
-- **职位匹配与报告历史**：选择模块并输入岗位要求，核对发送内容后生成分析，逐条人工审核改写建议；可命名保存报告，在历史中查看岗位原文、原材料与只读建议。[查看使用方法](docs/model-settings.md#职位匹配)。
+- **管理与编辑**：为不同岗位建立、复制和修改多份简历；支持教育、经历、项目、技能和自定义模块。
+- **导入后核对**：从 DOCX 或含可选择文字的 PDF 提取内容，人工检查字段和模块后再创建新简历。当前源码版还可从 PDF 内嵌图片中手动选择证件照与学校 Logo。
+- **调整版式**：四种 PDF 模板；可修改字体、颜色、字号、间距和图片裁剪，并切换两种界面风格与深色模式。
+- **保存与导出**：自动保存、撤销与重做、历史版本对比和恢复；支持中文 PDF 与经预览确认的脱敏 PDF。
+- **本地备份**：下载完整工作区 ZIP，也可启用每天或每周自动备份；备份包含简历、版本、图片和已保存的职位匹配报告。
+- **可选 AI**：配置 DashScope、DeepSeek 或 GLM 后，可对选中句段提出润色建议，或分析职位匹配；发送内容和修改结果都由你核对。
 
-示例简历使用奶龙素材，创建后可替换为自己的内容和图片。
+当前最新发布版 `v0.9.0` 支持文字型 PDF 导入；PDF 内嵌图片选择已进入 `main` 源码，尚未包含在发布镜像中。扫描版 PDF 暂不支持 OCR。导入限制和核对方法见 [Word 导入](docs/docx-import.md)与 [PDF 导入](docs/pdf-import.md)。
 
-## 安装与启动
+## 快速开始：Docker 发布版
 
-准备好 Docker Desktop 或 Docker Engine + Compose。发布镜像为 Linux amd64，运行后支持离线编辑和导出。
+需要 Docker Desktop，或 Docker Engine 与 Compose。发布镜像目前提供 Linux amd64 架构。
 
-1. 从[最新发布](https://github.com/MoChiUaena/resume-workbench/releases/latest)下载 `resume-workbench-config.zip`，解压并在该目录打开终端。
-2. 复制配置文件：
-
-   ```powershell
-   Copy-Item .env.example .env
-   ```
-
-   Linux/macOS 使用 `cp .env.example .env`。
-
-3. 编辑 `.env`，将 `RESUME_DB_PASSWORD` 改为自己的长随机密码。
-4. 启动应用：
+1. 从[最新发布](https://github.com/MoChiUaena/resume-workbench/releases/latest)下载 `resume-workbench-config.zip`，解压后在该目录打开终端。
+2. 将 `.env.example` 复制为 `.env`：PowerShell 运行 `Copy-Item .env.example .env`；Linux/macOS 运行 `cp .env.example .env`。
+3. 编辑 `.env`，把 `RESUME_DB_PASSWORD` 换成自己的长随机密码。
+4. 启动并等待服务就绪：
 
    ```sh
    docker compose up -d --wait
    ```
 
-5. 打开 <http://127.0.0.1:18765>。
+5. 打开 <http://127.0.0.1:18765>。端口冲突时，在 `.env` 中修改 `RESUME_PORT`。
 
-首次下载镜像需要联网。端口被占用时，可修改 `.env` 中的 `RESUME_PORT`。当前版本面向单人本机使用，没有账号认证。
+首次拉取镜像需要联网；普通编辑与 PDF 导出可离线使用。应用仅绑定本机地址，当前面向单人使用、没有账号认证，请勿直接暴露到公网。
 
-### Windows 源码运行
+停止应用使用 `docker compose stop`；重新启动使用 `docker compose up -d --wait`。升级前先在应用内下载完整备份，再更新发布配置与镜像；保留原 `.env` 密码及数据卷。
 
-准备 PowerShell 7.2 或更新版本、JDK 21、Node.js 24 和 Docker Desktop，在项目目录运行。将下面的 JDK 路径换成本机目录：
+### 从源码运行（Windows）
+
+需要 PowerShell 7.2+、JDK 21、Node.js 24 和 Docker Desktop。在仓库目录执行，并将 JDK 路径换成自己的：
 
 ```powershell
 pwsh -File .\scripts\workbench.ps1 -Action start -Build -JavaHome "C:\Java\jdk-21"
 ```
 
-首次构建会准备前端、Java 和 PDF 浏览器资源，随后在后台启动。日常管理使用同一个入口：
-
-```powershell
-pwsh -File .\scripts\workbench.ps1 -Action status
-pwsh -File .\scripts\workbench.ps1 -Action stop
-pwsh -File .\scripts\workbench.ps1 -Action start -JavaHome "C:\Java\jdk-21"
-pwsh -File .\scripts\workbench.ps1 -Action restart -JavaHome "C:\Java\jdk-21"
-pwsh -File .\scripts\workbench.ps1 -Action logs
-```
-
-更新源码后用 `-Action restart -Build` 重新构建并切换版本。停止前确认页面显示「已保存到本机」；停止只结束经身份核验的本项目 Java 进程，保留数据库、数据和日志。端口被其他程序占用、运行记录损坏或进程身份改变时会拒绝停止。关闭启动终端后，后台应用继续运行。
-
-运行记录在 `.tools/runtime/state.json`，每次启动的日志在 `.tools/runtime/logs`。`status -Json` 返回机器可读信息；`logs` 列出日志目录。自定义应用端口可加 `-Port`；使用已经准备好的外部数据库时可加 `-SkipDatabase`。
-
-再次启动或重启会沿用记录中的 JDK、端口和数据目录；需要更改时明确传入对应参数。开发数据库会核验容器和持久化卷的目录归属，拒绝接管另一份源码目录的数据。
+日常查看状态使用 `-Action status`，停止使用 `-Action stop`；更新源码后使用 `-Action restart -Build`。启动脚本会核对项目进程身份，保留数据库和数据目录。Linux 源码运行与开发验证见[贡献指南](CONTRIBUTING.md)。
 
 ## 怎么使用
 
-1. **选择简历**：在「我的简历」中新建空白简历或示例，也可以复制已有简历后修改。
-2. **修改内容**：左侧选择模块，中间填写内容，右侧实时查看效果；在「照片与校徽」中上传学校 Logo 和证件照。
-3. **调整样式**：在「版式设置」中选择模板，通过「文字」「样式」「间距」调整排版；页面右上角可切换界面风格和深色模式。
-4. **保留版本**：内容会自动保存，关闭前确认显示「已保存到本机」。需要保留某次修改时点击「保存版本」，之后可在「历史版本」中对比或恢复。
-5. **导出 PDF**：点击「导出 PDF」下载完整简历；分享时可选择「脱敏 PDF」，设置要隐藏的信息，检查预览后导出。脱敏设置仅用于导出副本，原稿保留。
+1. 在「我的简历」中新建简历、打开示例，或导入 Word/PDF。导入后先核对文字和模块；如显示图片候选，再辨认图片并手动选择，最后确认创建。
+2. 在编辑页选择模块并修改内容；到「照片与校徽」设置图片，到「版式设置」调整模板、文字、样式和间距。右侧会实时预览。
+3. 等待「已保存到本机」，必要时点击「保存版本」；之后可在「历史版本」中对比或恢复。
+4. 点击「导出 PDF」下载简历；分享前可预览并导出脱敏副本，原稿保持不变。
+5. 在「备份与恢复」下载完整 ZIP，或设置自动备份。使用模型功能前，到「模型设置」配置服务并核对将发送的内容。
 
-## 备份与恢复
+## 数据与隐私
 
-点击页面顶部的「备份与恢复」：
+简历和历史版本保存在本机数据库，图片、导出文件和备份保存在本机数据卷或数据目录。完整备份含个人信息，建议下载后另存到独立位置；备份不包含模型密钥，迁移设备后需要重新配置。可选模型功能只有在你主动确认请求时才会向所配置的服务发送内容。详细说明见[模型设置](docs/model-settings.md)和[备份使用](docs/automatic-backups.md)。
 
-- **手动备份**：创建并下载完整 ZIP，包含简历、版式、历史版本、已保存的职位匹配报告、图片和相关 PDF。
-- **自动备份**：默认关闭。勾选启用，选择每天或每周，再保存设置；数据有变化时生成副本。浏览器无需保持打开；停止应用后暂停，重启后补做到期检查。
-- **本机历史**：查看和下载已有备份，或选择备份恢复。也可以导入下载过的 ZIP；恢复会新增简历，现有记录保留。
-
-正文、历史版本和已保存报告保存在本机数据库，图片、PDF 和备份保存在应用数据卷中，备份目录为 `data/backups`。建议将完整 ZIP 下载后另存到独立位置，用于迁移或设备恢复。完整备份包含原始信息，请妥善保存。
-
-含 WebP 原图的备份需要 0.6.0 或更新版本恢复；已有 JPEG／PNG 备份仍可使用。
-
-0.8.0 及后续版本的完整备份包含报告历史，需要 0.8.0 或更新版本恢复，0.7.0 等旧版无法导入。新程序仍可恢复原来的备份。
-
-在“空间检查”中查看图片与 PDF 占用，确认选中的候选并移至可恢复暂存区，再从记录恢复原位置。暂存仍占磁盘空间；完整批次可在下载文件 ZIP、确认副本已保存并输入批次末六位后永久清理，清理不可撤销。[查看使用方法](docs/storage-preview.md)。
-
-## 停止、重启与升级
-
-停止应用：
-
-```sh
-docker compose stop
-```
-
-重新启动：
-
-```sh
-docker compose up -d --wait
-```
-
-升级前先下载完整备份。下载新版配置并更新 `compose.yml`，将原 `.env` 中的 `RESUME_APP_IMAGE` 改为新版 `.env.example` 对应的镜像版本，保留原数据库密码和两个数据卷，再运行：
-
-```sh
-docker compose pull
-docker compose up -d --wait
-```
-
-正常停止、重启和升级均应保留数据卷，以便继续使用原有简历、图片和备份。
-
-从 0.7.0 升级到 0.8.0 时，数据库会自动增加报告历史表，现有简历、版本、图片和模型配置继续保留。升级前的 ZIP 建议另存；需要回到旧程序时，应使用升级前的备份在独立实例恢复，新版备份不能直接导入旧程序。完整工作区 ZIP 不包含模型密钥，迁移到其他设备后需要重新配置模型。
-
-从 0.8.0 升级到 0.9.0 时，数据库会增加 Word 和 PDF 导入的创建记录，原有简历及数据保留；完整备份格式保持不变。
-
-项目代码采用 [MIT 许可证](LICENSE)，字体和第三方素材的授权见 [第三方声明](THIRD_PARTY_NOTICES.md)。
+项目采用 [MIT 许可证](LICENSE)；字体与第三方素材的授权见[第三方声明](THIRD_PARTY_NOTICES.md)。

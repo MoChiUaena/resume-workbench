@@ -1,23 +1,15 @@
 # 参与开发
 
-请先阅读 README 和 [架构说明](docs/architecture.md)。首版范围是单人本地简历工作台；新功能应维持两服务部署、同源本机访问、原有数据与版本引用，以及预览 / PDF 共用排版。
+欢迎提交问题报告和 Pull Request。开始前请阅读 [README](README.md) 与[架构说明](docs/architecture.md)；项目面向单人本机使用，界面预览与 PDF 导出共用排版逻辑。
 
-开发使用 JDK 21、Node 22.12+ 和 Docker。执行 scripts/start.ps1 或 start.sh 准备数据库、前端、应用和 Chromium。不要修改已有数据库卷的密码，不要把真实简历、.env、备份 ZIP 或未授权素材提交到仓库。
+## 开发环境
 
-Java 测试使用独立 resume_test / backup_test schema；浏览器与备份恢复测试使用独立空 Compose 实例。运行恢复测试必须显式设置 RESUME_TEST_ISOLATED=1，切勿指向自己实际使用的工作区。
+使用 JDK 21、Node.js 24、Docker 与 Compose。Windows 源码启动方式见 README；Linux 可在仓库目录运行 `sh scripts/start.sh`。首次构建会下载依赖和 Chromium。
 
-```powershell
-. ./scripts/prepare-db.ps1
-$env:JAVA_HOME='你的 JDK 21 目录'
-./mvnw.cmd test
-cd frontend
-npm ci
-npm run build
-npm run test:e2e
-```
+## 验证修改
 
-PDF 与完整恢复的重复运行方式见 docs/stage-c-verification.md 和 docs/layout-verification.md。保持源文件依赖、POM、npm lockfile 与许可证清单一致；新增图片格式或字体后先验证实际渲染和文本提取，再声明支持。
+前端改动在 `frontend` 目录运行 `npm ci`、`npm run test:unit` 和 `npm run build`。Java 测试使用独立的测试数据库和测试 schema；在确认数据库是可丢弃实例并设置 `RESUME_DB_URL`、`RESUME_DB_USER`、`RESUME_DB_PASSWORD` 后运行 `./mvnw test`（Windows 使用 `./mvnw.cmd test`）。
 
-PR 描述说明具体触发场景、行为变化、验证和数据兼容性。涉及 schema 时明确旧简历 / 备份的处理；涉及文件清理时覆盖当前与历史引用。演示和测试使用合成数据，不构造真实学校、个人经历或未经测量的性能数字。
+浏览器、备份恢复和升级测试需要独立的空工作区。不要对日常简历实例运行这些测试；仓库 CI 会在隔离容器中执行完整流程。测试与演示只使用虚构数据，真实简历、证件照、`.env`、模型密钥、备份 ZIP 和本地输出都不要提交。
 
-发布版本的步骤见 docs/releasing.md。发布标签不覆盖，升级流程不删除用户数据卷。
+提交 PR 时请说明触发场景、行为变化、验证结果和数据兼容性。涉及数据库迁移或附件清理时，说明旧数据与备份如何保留；涉及图片或字体时，验证预览、导出及恢复。发布流程见[发布说明](docs/releasing.md)。
